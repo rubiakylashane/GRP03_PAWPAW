@@ -6,7 +6,9 @@
   --ink: #0a0a0a;
   --muted: #5b625f;
   --border: #6b7370;
+  --line: #3d4341;
   --font: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  --font-ui: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }

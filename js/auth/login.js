@@ -1,76 +1,104 @@
-const form = document.getElementById("login-form");
-const pw = document.getElementById("password");
-const toggle = document.getElementById("toggle-password");
+/* js/auth/login.js
+   Handles show/hide password, validation and redirect after login.
+   Set USE_BACKEND = true and edit API when the backend is ready.
+   While false, any username + password works (demo). */
+(() => {
+  const USE_BACKEND = false;
+  const API = { login: "/api/auth/login" }; // POST { username, password } -> { token, role, name, mustChangePassword }
 
-/* ---------- Show / hide password ---------- */
-toggle.addEventListener("click", () => {
-  const show = pw.type === "password";
-  pw.type = show ? "text" : "password";
-  toggle.setAttribute("aria-pressed", String(show));
-  toggle.setAttribute("aria-label", show ? "Hide password" : "Show password");
-});
+  // Where each role lands after login (paths are relative to pages/auth/)
+   const HOME = {
+    owner: "../owner/dashboard.html",   // dati: "../owner/dashboard.html"
+    staff: "../staff/dashboard.html",
+    vet: "../vet/dashboard.html",
+    admin: "../admin/dashboard.html"
+  };
+  const CHANGE_TEMP_PASSWORD = "change-temp-password.html";
 
-/* ---------- Prototype accounts (remove when the backend is ready) ---------- */
-const DEMO_USERS = {
-  njyabila:  "admin",     // <--- Idinagdag ko ang account mo rito (admin role)
-  msantos:   "owner",
-  adelacruz: "staff",
-  preyes:    "vet",
-  admin:     "admin",
-};
+  const $ = (id) => document.getElementById(id);
+  const form = $("login-form");
+  const username = $("username");
+  const password = $("password");
+  const submit = form.querySelector(".submit");
 
-/* ---------- Errors ---------- */
-function setError(input, message) {
-  const holder = input.closest(".field");
-  let el = holder.querySelector(".error");
-  if (!message) {
-    if (el) el.remove();
-    input.removeAttribute("aria-invalid");
-    return;
-  }
-  if (!el) {
-    el = document.createElement("p");
-    el.className = "error";
-    el.setAttribute("role", "alert");
-    holder.appendChild(el);
-  }
-  el.textContent = message;
-  input.setAttribute("aria-invalid", "true");
-}
-
-form.addEventListener("input", (e) => setError(e.target, ""));
-
-/* ---------- Submit ---------- */
-form.addEventListener("submit", (e) => {
-  e.preventDefault();
-
-  const usernameInput = form.elements.username;
-  const passwordInput = form.elements.password;
-  const username = usernameInput.value.trim().toLowerCase();
-  const password = passwordInput.value;
-
-  setError(usernameInput, "");
-  setError(passwordInput, "");
-
-  if (!username) {
-    setError(usernameInput, "Enter your username.");
-    usernameInput.focus();
-    return;
-  }
-  if (!password) {
-    setError(passwordInput, "Enter your password.");
-    passwordInput.focus();
-    return;
+  /* ----- Show / hide password ----- */
+  const toggle = $("toggle-password");
+  if (toggle) {
+    toggle.addEventListener("click", () => {
+      const show = password.type === "password";
+      password.type = show ? "text" : "password";
+      toggle.setAttribute("aria-pressed", String(show));
+      toggle.setAttribute("aria-label", show ? "Hide password" : "Show password");
+    });
   }
 
-  // TODO: replace this block with a request to your backend login endpoint
-  const role = DEMO_USERS[username];
-  if (!role) {
-    setError(passwordInput, "Incorrect username or password.");
-    return;
+  /* ----- Error message (created here, no HTML change needed) ----- */
+  const error = document.createElement("p");
+  error.setAttribute("role", "alert");
+  error.hidden = true;
+  error.style.cssText = "color:#c62828;font-size:12px;margin:0 0 12px;";
+  form.insertBefore(error, submit);
+
+  function showError(msg) {
+    error.textContent = msg;
+    error.hidden = !msg;
   }
 
-  sessionStorage.setItem("pawpaw_role", role);
-  sessionStorage.setItem("pawpaw_user", username);
-  window.location.href = `../${role}/dashboard.html`;
-});
+  /* ----- Login request ----- */
+  async function login(user, pass) {
+    if (USE_BACKEND) {
+      const res = await fetch(API.login, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: user, password: pass })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || "Incorrect username or password.");
+      return data;
+    }
+
+    // DEMO: type "admin", "vet" or "staff" as username to test other roles
+    await new Promise((r) => setTimeout(r, 500));
+    const role = ["admin", "vet", "staff"].includes(user.toLowerCase()) ? user.toLowerCase() : "owner";
+    return { token: "demo-token", role, name: user, mustChangePassword: false };
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const user = username.value.trim();
+    const pass = password.value;
+
+    username.classList.remove("invalid");
+    password.classList.remove("invalid");
+
+    if (!user || !pass) {
+      if (!user) username.classList.add("invalid");
+      if (!pass) password.classList.add("invalid");
+      return showError("Enter your username and password.");
+    }
+    showError("");
+
+    const original = submit.textContent;
+    submit.disabled = true;
+    submit.textContent = "Signing in...";
+
+    try {
+      const data = await login(user, pass);
+
+      try {
+        sessionStorage.setItem("pawpaw_user", JSON.stringify({ name: data.name || user, role: data.role }));
+        if (data.token) sessionStorage.setItem("token", data.token);
+      } catch (_) { /* storage blocked, ignore */ }
+
+      if (data.mustChangePassword) {
+        window.location.href = CHANGE_TEMP_PASSWORD;
+        return;
+      }
+      window.location.href = HOME[data.role] || HOME.owner;
+    } catch (err) {
+      showError(err.message);
+      submit.disabled = false;
+      submit.textContent = original;
+    }
+  });
+})();

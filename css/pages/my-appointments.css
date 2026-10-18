@@ -1,0 +1,134 @@
+/* css/pages/my-appointments.css
+   My Appointments and Reschedule Appointment. Load it after appointments.css.
+   Classes start with ma- or rs- so they cannot clash with components.css. */
+
+/* ---------- My Appointments card ---------- */
+.ma-card {
+  box-sizing: border-box;
+  padding: 18px 20px 26px;
+  background: #fff;
+  border: 1px solid #555;
+  border-radius: 22px;
+}
+.ma-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.ma-tools { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.ma-search { position: relative; display: block; width: min(280px, 100%); }
+.ma-search input {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  height: 36px;
+  padding: 0 40px 0 14px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--ink, #111);
+  background: #fff;
+  border: 1px solid #555;
+  border-radius: 999px;
+}
+.ma-search input::-webkit-search-cancel-button { display: none; }
+.ma-search input:focus-visible { outline: 3px solid color-mix(in srgb, var(--green, #0f6b5c) 35%, transparent); outline-offset: 1px; }
+.ma-search svg { position: absolute; top: 50%; right: 12px; width: 18px; height: 18px; transform: translateY(-50%); pointer-events: none; }
+
+.ma-sort select {
+  height: 34px;
+  padding: 0 28px 0 12px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink, #111);
+  background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23333' stroke-width='1.4'/%3E%3C/svg%3E") no-repeat right 10px center;
+  border: 0;
+  border-bottom: 1px solid #ccc;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+.ma-sort select:focus-visible { outline: 3px solid color-mix(in srgb, var(--green, #0f6b5c) 35%, transparent); outline-offset: 1px; }
+
+/* ---------- Table ---------- */
+.ma-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.3fr) minmax(0, 1fr) 130px minmax(0, 1.5fr);
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  font-size: 14px;
+}
+.ma-head { padding: 10px 0 12px; font-size: 14px; font-weight: 600; text-transform: uppercase; color: #333; border-bottom: 1px solid #555; }
+#rows .ma-row { border-bottom: 1px solid #888; }
+#rows .ma-row:last-child { border-bottom: 0; }
+.ma-row strong { display: block; font-size: 14px; font-weight: 600; }
+.ma-row small { display: block; margin-top: 1px; font-size: 14px; font-weight: 600; color: #222; }
+.ma-services { overflow-wrap: anywhere; }
+.ma-c { text-align: center; }
+
+.ma-pill { display: inline-block; min-width: 90px; padding: 2px 12px; font-size: 14px; line-height: 1.4; color: #2e5e43; text-align: center; background: #8fe0a8; border-radius: 999px; }
+.ma-pending { color: #6a5415; background: #f0d58a; }
+.ma-cancelled { color: #7a2222; background: #f3b1b1; }
+
+.ma-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+.ma-btn { min-height: 36px; padding: 5px 16px; font-size: 14px; border-radius: 8px; }
+.ma-none { color: #777; }
+.ma-empty { padding: 32px 4px; text-align: center; color: #555; }
+.ma-empty a { color: var(--green, #0f6b5c); font-weight: 600; }
+
+/* ---------- Cancel confirmation (centered) ---------- */
+.ma-dialog {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  box-sizing: border-box;
+  width: min(420px, 92vw);
+  height: fit-content;
+  padding: 26px;
+  color: var(--ink, #111);
+  background: #fff;
+  border: 1px solid #555;
+  border-radius: 18px;
+}
+.ma-dialog:not([open]) { display: none; }
+.ma-dialog::backdrop { background: rgba(0, 0, 0, 0.4); }
+.ma-dialog h2 { margin: 0 0 8px; font-size: 20px; }
+.ma-dialog p { margin: 0 0 22px; font-size: 15px; color: #444; overflow-wrap: anywhere; }
+.ma-dialog-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.abtn-danger { color: #fff; background: #d32f2f; }
+.abtn-danger:hover { background: #b71c1c; }
+
+.ma-toast {
+  position: fixed; bottom: 24px; left: 50%; z-index: 50;
+  padding: 11px 18px; color: #fff; font-size: 14px; background: #222; border-radius: 10px;
+  opacity: 0; pointer-events: none; transform: translate(-50%, 16px); transition: opacity 0.25s, transform 0.25s;
+}
+.ma-toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* ---------- Reschedule ---------- */
+.rs-layout { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 54px; align-items: start; }
+.rs-layout[hidden], .ap-done[hidden] { display: none; }
+.rs-summary h2 { margin: 0 0 14px; padding-bottom: 12px; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; border-bottom: 1px solid #888; }
+.rs-reason-title { margin: 18px 0 6px; font-size: 14px; font-weight: 600; color: #444; }
+.rs-reason { margin: 0; font-size: 13px; font-weight: 600; line-height: 1.35; color: #333; white-space: pre-wrap; overflow-wrap: anywhere; }
+.rs-form { display: flex; flex-direction: column; gap: 18px; padding: 34px 40px 40px; }
+.rs-form .ap-sum-actions { margin-top: 10px; }
+.rs-form .ap-sum-actions .abtn { width: min(100%, 184px); }
+
+/* ---------- Smaller screens ---------- */
+@media (max-width: 1100px) {
+  .rs-layout { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+}
+@media (max-width: 860px) {
+  .ma-head { display: none; }
+  .ma-row { grid-template-columns: 1fr auto; row-gap: 6px; }
+  .ma-row > span:nth-child(3) { grid-column: 1 / -1; }
+  .ma-c { text-align: right; }
+  .ma-actions { grid-column: 1 / -1; justify-content: flex-start; }
+}
+@media (max-width: 560px) {
+  .ma-tools { flex-direction: column; align-items: stretch; }
+  .ma-search { width: 100%; }
+  .rs-form { padding: 24px 18px 28px; }
+}
+
+/* empty time select looks like a placeholder */
+.rs-form select:invalid { color: #777; }

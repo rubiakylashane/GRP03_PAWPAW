@@ -1,10 +1,4 @@
-
-/* =========================================================
-   PAWPAW CLINIC — AUTH.CSS
-   Login, Register, Forgot Password
-   ========================================================= */
-
-/* ---------- Base layout ---------- */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
 
 html {
   min-height: 100%;
@@ -25,7 +19,7 @@ body {
   min-height: 100vh;
 }
 
-/* ---------- Left brand panel ---------- */
+
 
 .page > .brand {
   position: relative;
@@ -57,7 +51,7 @@ body {
   background-position: center center;
 }
 
-/* ---------- Brand logo and name ---------- */
+
 
 .brand-top {
   display: flex;
@@ -80,18 +74,21 @@ body {
   letter-spacing: 0.02em;
 }
 
-/* ---------- Brand description ---------- */
+
 
 .brand-copy {
   padding-left: 16px;
   max-width: 100%;
 }
 
+/* One line. The size follows the width of the green panel so it never overflows.
+   If there is empty space on the right, lower the 11.5; if it overflows, raise it. */
 .brand-copy h2 {
-  max-width: 15ch;
+  max-width: none;
   margin: 0;
 
-  font-size: clamp(40px, 4.4vw, 64px);
+  white-space: nowrap;
+  font-size: clamp(28px, calc((50vw - 100px) / 11.5), 64px);
   line-height: 1.3;
   font-weight: 700;
 }
@@ -104,9 +101,11 @@ body {
   line-height: 1.3;
 }
 
-/* ---------- Right form panel ---------- */
 
 .page > .form-side {
+  /* same font as the dashboard; the left panel (PAWPAW Clinic, Care for every pets) keeps its own font */
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
   display: flex;
   align-items: center;
   justify-content: center;
@@ -137,7 +136,7 @@ h1 {
   font-size: 20px;
 }
 
-/* ---------- Form fields ---------- */
+
 
 form {
   margin-top: 32px;
@@ -203,7 +202,7 @@ textarea[aria-invalid="true"],
   border-color: #b91c1c;
 }
 
-/* ---------- Password toggle ---------- */
+
 
 .input-wrap input.has-toggle {
   padding-right: 52px;
@@ -252,7 +251,7 @@ textarea[aria-invalid="true"],
   display: block;
 }
 
-/* ---------- Forgot password ---------- */
+
 
 .forgot {
   display: block;
@@ -261,7 +260,7 @@ textarea[aria-invalid="true"],
   text-align: right;
 }
 
-/* ---------- Submit button ---------- */
+
 
 .submit {
   display: block;
@@ -300,7 +299,7 @@ textarea[aria-invalid="true"],
   cursor: not-allowed;
 }
 
-/* ---------- Login signup link ---------- */
+
 
 .signup {
   margin-top: 28px;
@@ -312,10 +311,6 @@ textarea[aria-invalid="true"],
   margin-right: 4px;
   font-weight: 600;
 }
-
-/* =========================================================
-   REGISTER — MULTI-STEP FORM
-   ========================================================= */
 
 .compact h1 {
   font-size: 32px;
@@ -352,7 +347,7 @@ textarea[aria-invalid="true"],
   font-size: 18px;
 }
 
-/* ---------- Registration steps ---------- */
+
 
 .step {
   min-width: 0;
@@ -364,7 +359,7 @@ textarea[aria-invalid="true"],
   display: none !important;
 }
 
-/* ---------- Back links and buttons ---------- */
+
 
 .back {
   display: inline-block;
@@ -405,7 +400,7 @@ textarea[aria-invalid="true"],
   text-decoration: underline;
 }
 
-/* ---------- Validation messages ---------- */
+
 
 .error {
   margin-top: 6px;
@@ -424,7 +419,7 @@ textarea[aria-invalid="true"],
   display: none !important;
 }
 
-/* ---------- Resend verification ---------- */
+
 
 .resend {
   margin-top: 8px;
@@ -455,7 +450,7 @@ textarea[aria-invalid="true"],
   text-decoration: none;
 }
 
-/* ---------- Profile photo upload ---------- */
+
 
 .photo-drop {
   display: grid;
@@ -490,7 +485,7 @@ textarea[aria-invalid="true"],
   border-color: var(--green);
 }
 
-/* ---------- Accessibility ---------- */
+
 
 .visually-hidden {
   position: absolute;
@@ -507,9 +502,6 @@ textarea[aria-invalid="true"],
   border: 0;
 }
 
-/* =========================================================
-   RESPONSIVE LAYOUT
-   ========================================================= */
 
 @media (max-width: 860px) {
   .page {
@@ -543,7 +535,7 @@ textarea[aria-invalid="true"],
 
   .brand-copy h2 {
     max-width: none;
-    font-size: 36px;
+    font-size: clamp(22px, calc((100vw - 48px) / 11.5), 36px);
     line-height: 1.2;
   }
 
@@ -567,7 +559,7 @@ textarea[aria-invalid="true"],
   }
 }
 
-/* ---------- Small mobile screens ---------- */
+
 
 @media (max-width: 400px) {
   .page > .brand {
@@ -589,7 +581,7 @@ textarea[aria-invalid="true"],
   }
 
   .brand-copy h2 {
-    font-size: 32px;
+    font-size: clamp(20px, calc((100vw - 36px) / 11.5), 32px);
   }
 
   .page > .form-side {

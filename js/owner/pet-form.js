@@ -1,4 +1,3 @@
-
 /* js/owner/pet-form.js
    Add a new pet / Edit pet.
    The page decides which one with <body data-mode="add"> or "edit".
@@ -196,6 +195,32 @@
     }
 
     return `${year}-${pad(month)}-${pad(day)}`;
+  }
+
+  /* ----- Calendar button (needs js/owner/calendar.js) ----- */
+  const dobBtn = $("dob-btn");
+  const dobNative = $("dob-picker");
+  const showDob = (iso) => { const p = iso.split("-"); return p[1] + "/" + p[2] + "/" + p[0]; };
+
+  if (dobBtn && f.dob) {
+    dobBtn.addEventListener("click", () => {
+      if (!window.PawCalendar) {
+        console.error('calendar.js is not loaded - check the <script src="../../js/owner/calendar.js"> path.');
+        return;
+      }
+      const iso = parseDob(f.dob.value);
+      window.PawCalendar.open({
+        anchor: dobBtn.closest(".pf-date") || dobBtn.parentElement,
+        value: iso && iso <= todayIso ? iso : "",
+        max: todayIso,
+        onPick: (v) => { f.dob.value = showDob(v); setError("dob", ""); }
+      });
+    });
+  }
+  if (dobNative && f.dob) {
+    dobNative.addEventListener("change", () => {
+      if (dobNative.value) { f.dob.value = showDob(dobNative.value); setError("dob", ""); }
+    });
   }
 
   /* ----- Photo upload and preview ----- */

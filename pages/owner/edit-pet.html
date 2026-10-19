@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="../../css/base.css" />
   <link rel="stylesheet" href="../../css/layout.css" />
   <link rel="stylesheet" href="../../css/components.css" />
-  <link rel="stylesheet" href="../../css/pages/pet.css" />
+  <link rel="stylesheet" href="../../css/pages/pets.css" />
 </head>
 <body class="app" data-mode="edit">
 
@@ -48,7 +48,7 @@
         <span>My Appointments</span>
       </a>
       <a href="medical-records.html" class="nav-link">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5M9.5 13h6M9.5 17h6"/></svg>
+        <svg viewBox="0 0 24 24" fill="currentColor" fill-rule="evenodd" aria-hidden="true"><path d="M6.5 2h7.2l5.8 5.8v11.7a2.5 2.5 0 0 1-2.5 2.5h-10.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2zM8.4 11.2h7.2a.9.9 0 0 1 0 1.8H8.4a.9.9 0 0 1 0-1.8zm0 4h7.2a.9.9 0 0 1 0 1.8H8.4a.9.9 0 0 1 0-1.8zM8.4 7.2h2.7a.9.9 0 0 1 0 1.8H8.4a.9.9 0 0 1 0-1.8z"/></svg>
         <span>Medical Records</span>
       </a>
       <a href="vaccination-history.html" class="nav-link">
@@ -133,29 +133,15 @@
           <p class="pf-error" id="err-photo" role="alert" hidden></p>
         </div>
 
-        
-<div class="pf-field pf-dob">
-  <label for="dob">Date of Birth</label>
-  <div class="pf-date">
-    <input
-      id="dob"
-      name="dob"
-      type="text"
-      placeholder="MM/DD/YYYY"
-      maxlength="10"
-      inputmode="numeric"
-      autocomplete="bday"
-      aria-describedby="err-dob"
-      required
-    />
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <rect x="3.5" y="5" width="17" height="15.5" rx="2"/>
-      <path d="M3.5 10h17M8 3v4M16 3v4"/>
-    </svg>
-  </div>
-  <p class="pf-error" id="err-dob" role="alert" hidden></p>
-</div>
-
+        <div class="pf-field pf-dob">
+          <label for="dob">Date of Birth</label>
+          <div class="pf-date">
+            <input id="dob" name="dob" type="text" inputmode="numeric" placeholder="MM/DD/YYYY" maxlength="10" autocomplete="off" required />
+            <button type="button" class="pf-date-btn" id="dob-btn" aria-label="Pick a date from the calendar"><svg width="26" height="26" style="width:26px;height:26px;max-width:26px;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></button>
+            <input id="dob-picker" class="pf-date-native" type="date" tabindex="-1" aria-hidden="true" />
+          </div>
+          <p class="pf-error" id="err-dob" role="alert" hidden></p>
+        </div>
 
         <div class="pf-field pf-notes">
           <label for="notes">Additional Notes</label>
@@ -171,8 +157,8 @@
     </form>
   </main>
 
-  <script src="../../js/owner/app-shell.js"></script>
-  <script src="../../js/owner/pets-store.js"></script>
-  <script src="../../js/owner/pet-form.js"></script>
+    <script src="../../js/owner/calendar.js"></script>
+   <script src="../../js/owner/pets-store.js"></script>
+   <script src="../../js/owner/pet-form.js"></script>
 </body>
 </html>

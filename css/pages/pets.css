@@ -100,24 +100,9 @@
   border: 1px solid #555;
   border-radius: 22px;
 }
+.pets-grid[hidden], .pets-empty[hidden], .pbtn[hidden] { display: none; }
 .pets-empty h2 { margin: 0 0 6px; font-size: 20px; }
 .pets-empty p { margin: 0 0 18px; color: #555; }
-
-/* ---------- View Details dialog ---------- */
-.pet-dialog {
-  box-sizing: border-box;
-  width: min(480px, 92vw);
-  padding: 26px;
-  color: var(--ink, #111);
-  background: #fff;
-  border: 1px solid #555;
-  border-radius: 22px;
-}
-.pet-dialog::backdrop { background: rgba(0, 0, 0, 0.4); }
-.pet-dialog .pet-card-top { margin-bottom: 4px; }
-.pet-dialog h3 { margin: 18px 0 4px; font-size: 14px; }
-.pet-dialog .pet-note { margin: 0; font-size: 15px; color: #333; white-space: pre-wrap; overflow-wrap: anywhere; }
-.pet-dialog .pet-actions { margin-top: 22px; }
 
 /* ---------- Toast ---------- */
 .pets-toast {
@@ -216,24 +201,39 @@
 .pf-field select#species:disabled { background-image: none; }
 .pf-field select#breed:disabled { opacity: 0.55; }
 
-/* date field: the whole box opens the native calendar */
+/* date field: type MM/DD/YYYY, or click the calendar icon to pick */
 .pf-date { position: relative; }
-.pf-date input[type="date"] { padding-right: 48px; }
-.pf-date input[type="date"]::-webkit-calendar-picker-indicator {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  cursor: pointer;
-}
-.pf-date svg {
+.pf-date input#dob { padding-right: 56px; }
+.pf-date-btn {
   position: absolute;
   top: 50%;
-  right: 14px;
-  width: 26px;
-  height: 26px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  color: var(--ink, #111);
+  background: none;
+  border: 0;
+  border-radius: 8px;
   transform: translateY(-50%);
+  cursor: pointer;
+}
+.pf-date-btn:hover { background: #eef1ee; }
+.pf-date-btn:focus-visible { outline: 3px solid color-mix(in srgb, var(--green, #0f6b5c) 35%, transparent); }
+.pf-date-btn svg { width: 26px; height: 26px; }
+/* hidden native picker, only used to show the calendar popup */
+.pf-field input.pf-date-native {
+  position: absolute !important;
+  right: 0;
+  bottom: 0;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  font-size: 10px !important;   /* Chrome sizes the calendar popup from this: smaller number = smaller calendar */
+  opacity: 0;
   pointer-events: none;
 }
 
@@ -288,6 +288,119 @@
   margin-top: 36px;
 }
 .pf-actions .pbtn { min-height: 66px; font-size: 20px; border-radius: 8px; }
+
+/* ---------- Calendar popup (opened by the calendar icon; js/owner/calendar.js) ---------- */
+/* to resize it: change .pcal width and .pcal-day width/height. Selected-day color: --pcal-accent */
+.pcal {
+  --pcal-accent: #0f6b5c;
+  position: absolute;
+  z-index: 60;
+  top: calc(100% + 6px);
+  right: 0;
+  box-sizing: border-box;
+  width: 300px;
+  padding: 0 0 14px;
+  color: #1b1b1b;
+  font: inherit;
+  font-size: 14px;
+  background: #fff;
+  border: 1px solid #ececec;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.16), 0 0 2px rgba(0,0,0,.14);
+}
+.pcal * { box-sizing: border-box; }
+.pcal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 50px;
+  padding: 0 14px 0 16px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid #ececec;
+}
+.pcal-title {
+  padding: 4px 0;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: #1b1b1b;
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.pcal-title:hover:not(.is-static) { color: var(--pcal-accent); }
+.pcal-title.is-static { cursor: default; }
+.pcal-arrows { display: flex; gap: 10px; }
+.pcal-nav {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: #8a8a8a;
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.pcal-nav svg { width: 9px; height: 9px; }
+.pcal-nav:hover:not(:disabled) { background: #f1f1f1; color: #333; }
+.pcal-nav:disabled { opacity: .35; cursor: default; }
+.pcal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  row-gap: 2px;
+  justify-items: center;
+  padding: 0 10px;
+  text-align: center;
+}
+.pcal-dow {
+  padding: 10px 0 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #1b1b1b;
+}
+.pcal-day {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  font: inherit;
+  font-size: 14px;
+  color: #1b1b1b;
+  background: none;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.pcal-day.is-other { color: #707070; }
+.pcal-day:hover:not(:disabled):not(.is-sel) { background: #f1f1f1; }
+.pcal-day.is-today:not(.is-sel) { box-shadow: inset 0 0 0 1.5px var(--pcal-accent); }
+.pcal-day.is-sel { color: #fff; background: var(--pcal-accent); }
+.pcal-day:disabled { color: #c4c4c4; cursor: default; }
+.pcal-pick {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding: 6px 14px 0;
+}
+.pcal-cell {
+  height: 44px;
+  font: inherit;
+  font-size: 14px;
+  color: #1b1b1b;
+  background: none;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.pcal-cell:hover:not(:disabled):not(.is-sel) { background: #f1f1f1; }
+.pcal-cell.is-sel { color: #fff; background: var(--pcal-accent); }
+.pcal-cell:disabled { color: #c4c4c4; cursor: default; }
+.pcal button:focus-visible { outline: 2px solid var(--pcal-accent); outline-offset: 1px; }
+@media (max-width: 420px) {
+  .pcal { width: min(300px, calc(100vw - 32px)); }
+}
 
 /* ---------- Smaller screens ---------- */
 @media (max-width: 900px) {

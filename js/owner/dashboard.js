@@ -121,7 +121,19 @@
     const name = SAMPLE.user.name !== "User" ? SAMPLE.user.name : (data.user.name || "User");
     $("greeting-name").textContent = name;
     $("sidebar-name").textContent = name;
-    if (data.user.avatar) $("user-avatar").style.backgroundImage = `url('${data.user.avatar}')`;
+    // profile picture: the one saved on Edit Profile (per user), else the one from the API
+    let avatar = data.user.avatar || "";
+    try {
+      const prof = JSON.parse(localStorage.getItem("pawpaw_profile:" + String(name).trim().toLowerCase()) || "null");
+      if (prof && prof.photo) avatar = prof.photo;
+    } catch (_) { /* ignore */ }
+    if (avatar) {
+      const av = $("user-avatar");
+      av.style.backgroundImage = `url('${avatar}')`;
+      av.style.backgroundSize = "cover";
+      av.style.backgroundPosition = "center";
+      av.style.backgroundRepeat = "no-repeat";
+    }
 
     $("today").textContent = new Date().toLocaleDateString("en-US", {
       weekday: "long", month: "long", day: "numeric", year: "numeric"

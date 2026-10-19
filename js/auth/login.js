@@ -8,7 +8,7 @@
 
   // Where each role lands after login (paths are relative to pages/auth/)
    const HOME = {
-    owner: "../owner/dashboard.html",   // dati: "../owner/dashboard.html"
+    owner: "../owner/dashboard.html",   
     staff: "../staff/dashboard.html",
     vet: "../vet/dashboard.html",
     admin: "../admin/dashboard.html"

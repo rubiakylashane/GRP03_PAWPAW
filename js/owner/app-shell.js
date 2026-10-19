@@ -30,6 +30,15 @@
     if ($("greeting-name")) $("greeting-name").textContent = saved.name;
   }
 
+  /* ----- Profile picture in the sidebar (saved on Edit Profile) ----- */
+  try {
+    const avatar = $("user-avatar");
+    if (avatar && saved) {
+      const prof = JSON.parse(localStorage.getItem("pawpaw_profile:" + String(saved.name).trim().toLowerCase()) || "null");
+      if (prof && prof.photo) avatar.style.cssText += `;background-image:url('${prof.photo}');background-size:cover;background-position:center`;
+    }
+  } catch (_) { /* ignore */ }
+
   /* ----- Log out ----- */
   const logout = $("logout");
   if (logout) {

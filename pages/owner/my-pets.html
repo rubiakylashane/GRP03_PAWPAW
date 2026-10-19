@@ -10,7 +10,8 @@
   <link rel="stylesheet" href="../../css/base.css" />
   <link rel="stylesheet" href="../../css/layout.css" />
   <link rel="stylesheet" href="../../css/components.css" />
-  <link rel="stylesheet" href="../../css/pages/pet.css" />
+  <link rel="stylesheet" href="../../css/pages/pets.css" />
+  <link rel="stylesheet" href="../../css/pages/pet-details.css" />
 </head>
 <body class="app">
 
@@ -48,9 +49,9 @@
         <span>My Appointments</span>
       </a>
       <a href="medical-records.html" class="nav-link">
-  <svg viewBox="0 0 24 24" fill="currentColor" fill-rule="evenodd" aria-hidden="true"><path d="M6.5 2h7.2l5.8 5.8v11.7a2.5 2.5 0 0 1-2.5 2.5h-10.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2zM8.4 11.2h7.2a.9.9 0 0 1 0 1.8H8.4a.9.9 0 0 1 0-1.8zm0 4h7.2a.9.9 0 0 1 0 1.8H8.4a.9.9 0 0 1 0-1.8zM8.4 7.2h2.7a.9.9 0 0 1 0 1.8H8.4a.9.9 0 0 1 0-1.8z"/></svg>
-  <span>Medical Records</span>
-</a>
+        <svg viewBox="0 0 24 24" fill="currentColor" fill-rule="evenodd" aria-hidden="true"><path d="M6.5 2h7.2l5.8 5.8v11.7a2.5 2.5 0 0 1-2.5 2.5h-10.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2zM8.4 11.2h7.2a.9.9 0 0 1 0 1.8H8.4a.9.9 0 0 1 0-1.8zm0 4h7.2a.9.9 0 0 1 0 1.8H8.4a.9.9 0 0 1 0-1.8zM8.4 7.2h2.7a.9.9 0 0 1 0 1.8H8.4a.9.9 0 0 1 0-1.8z"/></svg>
+        <span>Medical Records</span>
+      </a>
       <a href="vaccination-history.html" class="nav-link">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4.5 6v5.5c0 4.5 3 8 7.5 9.5 4.5-1.5 7.5-5 7.5-9.5V6L12 3Z"/></svg>
         <span>Vaccination History</span>
@@ -81,38 +82,41 @@
   <main class="main">
     <header class="pets-head">
       <div>
-        <h1>My Pets</h1>
-        <p class="pets-sub">Your household pets all in one place</p>
+        <h1 id="page-title">My Pets</h1>
+        <p class="pets-sub" id="page-sub">Your household pets all in one place</p>
       </div>
-      <a href="add-pet.html" class="pbtn pbtn-primary">Add Pet</a>
+      <a href="add-pet.html" class="pbtn pbtn-primary" id="btn-add">Add Pet</a>
+      <a href="my-pets.html" class="pbtn pbtn-primary" id="btn-back" hidden>Go Back</a>
     </header>
 
     <section id="pets-grid" class="pets-grid" aria-label="Your pets"></section>
 
-    <!-- View Details -->
-    <dialog id="pet-dialog" class="pet-dialog" aria-labelledby="dlg-name">
-      <div class="pet-card-top">
-        <span class="pet-photo" id="dlg-photo" aria-hidden="true"></span>
-        <div class="pet-id">
-          <h2 id="dlg-name"></h2>
-          <p id="dlg-sub"></p>
+    <section class="pd-card" id="pd-card" aria-label="Pet details" hidden>
+      <span class="pd-photo" id="pd-photo" aria-hidden="true"></span>
+      <div class="pd-body">
+        <div class="pd-top">
+          <h2 id="pd-name"></h2>
+          <a href="edit-pet.html" class="pbtn pbtn-primary pbtn-sm" id="pd-edit">Edit</a>
         </div>
+        <dl class="pd-facts">
+          <div class="pd-species"><dt>Species</dt><dd id="pd-species"></dd></div>
+          <div class="pd-sex"><dt>Sex</dt><dd id="pd-sex"></dd></div>
+          <div class="pd-breed"><dt>Breed</dt><dd id="pd-breed"></dd></div>
+          <div class="pd-dob"><dt>Date of Birth</dt><dd id="pd-dob"></dd></div>
+          <div class="pd-age"><dt>Age</dt><dd id="pd-age"></dd></div>
+        </dl>
       </div>
-      <dl class="pet-facts">
-        <div><dt>Breed</dt><dd id="dlg-breed"></dd></div>
-        <div><dt>Gender</dt><dd id="dlg-sex"></dd></div>
-        <div><dt>Date of Birth</dt><dd id="dlg-dob"></dd></div>
-      </dl>
-      <h3>Allergies</h3>
-      <p class="pet-note" id="dlg-allergies"></p>
-      <h3>Additional Notes</h3>
-      <p class="pet-note" id="dlg-notes"></p>
-      <div class="pet-actions">
-        <button type="button" class="pbtn pbtn-outline" id="dlg-close">Close</button>
-        <a class="pbtn pbtn-primary" id="dlg-edit" href="edit-pet.html">Edit</a>
+      <div class="pd-notes">
+        <div><h3>Allergies</h3><p id="pd-allergies"></p></div>
+        <div><h3>Additional Notes</h3><p id="pd-notes"></p></div>
       </div>
-    </dialog>
+    </section>
 
+    <section class="pets-empty" id="pd-missing" hidden>
+      <h2>Pet not found</h2>
+      <p>This pet may have been removed or belongs to another account.</p>
+      <a class="pbtn pbtn-primary" href="my-pets.html">Back to My Pets</a>
+    </section>
     <div class="pets-toast" id="toast" role="status" aria-live="polite"></div>
   </main>
 

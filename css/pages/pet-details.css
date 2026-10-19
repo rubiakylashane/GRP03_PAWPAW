@@ -1,0 +1,61 @@
+/* css/pages/pet-details.css
+   Pet details view on the My Pets page (loaded after pets.css). */
+
+.pbtn-sm { min-height: 36px; padding: 5px 24px; font-size: 14px; }
+.pd-card {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: 257px minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
+  gap: 0 36px;
+  min-height: 655px;
+  padding: 24px 22px 40px;
+  background: #fff;
+  border: 1px solid #555;
+  border-radius: 22px;
+}
+.pd-card[hidden], .pets-empty[hidden], .pets-grid[hidden], .pbtn[hidden] { display: none; }
+.pd-photo {
+  width: 257px;
+  height: 257px;
+  background: #d9d9d9 center / cover no-repeat;
+  border-radius: 16px;
+}
+.pd-body { padding-top: 22px; }
+.pd-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.pd-top h2 { margin: 0; font-size: 36px; font-weight: 700; line-height: 1.1; letter-spacing: -0.02em; overflow-wrap: anywhere; }
+
+.pd-facts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-areas: "species sex" "breed dob" "age .";
+  gap: 22px 24px;
+  margin: 26px 0 0;
+}
+.pd-species { grid-area: species; } .pd-sex { grid-area: sex; }
+.pd-breed { grid-area: breed; }     .pd-dob { grid-area: dob; }
+.pd-age { grid-area: age; }
+.pd-facts > div { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; font-size: 20px; }
+.pd-facts dt { font-weight: 600; color: #333; }
+.pd-facts dd { margin: 0; color: #555; overflow-wrap: anywhere; }
+
+.pd-notes {
+  grid-column: 1 / -1;
+  align-self: start;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px 36px;
+  margin-top: 36px;
+  padding: 0 10px;
+}
+.pd-notes h3 { margin: 0 0 10px; font-size: 22px; font-weight: 600; color: #333; }
+.pd-notes p { margin: 0; font-size: 17px; color: #555; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+@media (max-width: 760px) {
+  .pd-card { grid-template-columns: 1fr; min-height: 0; padding: 20px 16px 28px; }
+  .pd-photo { width: 140px; height: 140px; margin-bottom: 8px; }
+  .pd-top h2 { font-size: 28px; }
+  .pd-facts { grid-template-columns: 1fr; grid-template-areas: "species" "breed" "age" "sex" "dob"; }
+  .pd-facts > div { font-size: 17px; }
+  .pd-notes { grid-template-columns: 1fr; padding: 0; }
+}

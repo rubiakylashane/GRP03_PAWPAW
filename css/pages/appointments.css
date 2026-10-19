@@ -138,6 +138,7 @@
   height: 1px !important;
   padding: 0 !important;
   border: 0 !important;
+  font-size: 10px !important;   /* Chrome sizes the calendar popup from this: smaller number = smaller calendar */
   opacity: 0;
   pointer-events: none;
 }
@@ -293,6 +294,115 @@
 .ap-pill { display: inline-block; padding: 1px 10px; margin-right: 6px; font-size: 12px; background: #f0d58a; border-radius: 999px; color: #3a3a3a; }
 .ap-done-actions { display: flex; flex-direction: column; align-items: center; gap: 10px; }
 .ap-done-actions .abtn { width: min(100%, 210px); padding: 8px 12px; font-size: 14px; white-space: nowrap; }
+
+/* ---------- Calendar popup (opened by the calendar icon; js/owner/calendar.js) ---------- */
+/* to resize it: change .pcal width, .pcal-day height and the font sizes below */
+.pcal {
+  position: absolute;
+  z-index: 60;
+  top: calc(100% + 6px);
+  right: 0;
+  box-sizing: border-box;
+  width: 264px;
+  padding: 6px 8px 10px;
+  color: #1b1b1b;
+  font: inherit;
+  font-size: 13px;
+  background: #fff;
+  border: 1px solid #e3e3e3;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.18), 0 0 2px rgba(0,0,0,.12);
+}
+.pcal * { box-sizing: border-box; }
+.pcal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 2px 6px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid #eee;
+}
+.pcal-title {
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1b1b1b;
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.pcal-title:hover:not(.is-static) { background: #f1f1f1; }
+.pcal-title.is-static { cursor: default; }
+.pcal-arrows { display: flex; gap: 2px; }
+.pcal-nav {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  color: #707070;
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.pcal-nav:hover:not(:disabled) { background: #f1f1f1; color: #222; }
+.pcal-nav:disabled { opacity: .3; cursor: default; }
+.pcal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  row-gap: 2px;
+  justify-items: center;
+  text-align: center;
+}
+.pcal-dow {
+  padding: 6px 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: #1b1b1b;
+}
+.pcal-day {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  color: #1b1b1b;
+  background: none;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.pcal-day.is-other { color: #8a8a8a; }
+.pcal-day:hover:not(:disabled):not(.is-sel) { background: #eef3f1; }
+.pcal-day.is-today:not(.is-sel) { box-shadow: inset 0 0 0 1.5px var(--green, #0f6b5c); }
+.pcal-day.is-sel { color: #fff; background: var(--green, #0f6b5c); }
+.pcal-day:disabled { color: #c4c4c4; cursor: default; }
+.pcal-pick {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  padding-top: 4px;
+}
+.pcal-cell {
+  height: 40px;
+  font: inherit;
+  font-size: 13px;
+  color: #1b1b1b;
+  background: none;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.pcal-cell:hover:not(:disabled):not(.is-sel) { background: #eef3f1; }
+.pcal-cell.is-sel { color: #fff; background: var(--green, #0f6b5c); }
+.pcal-cell:disabled { color: #c4c4c4; cursor: default; }
+.pcal button:focus-visible { outline: 2px solid var(--green, #0f6b5c); outline-offset: 1px; }
+@media (max-width: 420px) {
+  .pcal { width: min(264px, calc(100vw - 32px)); }
+}
 
 /* ---------- Smaller screens ---------- */
 @media (max-width: 1100px) {

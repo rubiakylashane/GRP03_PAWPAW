@@ -44,6 +44,37 @@
   // Pets added on the Add pet page (saved by pets-store.js in demo mode)
   try { if (window.PawPets) SAMPLE.pets = window.PawPets.load(); } catch (_) {}
 
+  // Appointments and vaccinations saved in demo mode (the staff pages update the same lists)
+  const pad = (n) => String(n).padStart(2, "0");
+  const todayIso = () => { const d = new Date(); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); };
+  const readList = (base) => {
+    let name = "guest";
+    for (const store of ["sessionStorage", "localStorage"]) {
+      try { const u = JSON.parse(window[store].getItem("pawpaw_user") || "null"); if (u && u.name) { name = String(u.name).trim().toLowerCase(); break; } } catch (_) {}
+    }
+    try { const v = JSON.parse(localStorage.getItem(base + ":" + name) || "null"); return Array.isArray(v) ? v : []; } catch (_) { return []; }
+  };
+  SAMPLE.appointments = readList("pawpaw_appointments").map((a) => ({
+    date: a.date, time: a.time || "00:00", pet: a.petName || a.pet || "-",
+    doctor: a.vet || a.doctor || "To be assigned",
+    service: (a.services || []).map((x) => x.name).join(", ") || a.service || "-",
+    status: a.status || "pending",
+    note: a.status === "cancelled" ? (a.declineReason || "") : (a.rescheduleReason || "")
+  }));
+  SAMPLE.overdue = readList("pawpaw_vaccinations")
+    .filter((r) => r.nextDue && r.nextDue < todayIso())
+    .map((r) => { const p = SAMPLE.pets.find((x) => x.name === r.pet); return { pet: r.pet, photo: p ? p.photo : "" }; });
+
+  // colours for the statuses the clinic staff can set
+  (function () {
+    const st = document.createElement("style");
+    st.textContent = ".pill{display:inline-block;min-width:70px;padding:1px 12px;border-radius:999px;font-size:11px;line-height:1.6;text-align:center;color:#3a3a3a}"
+      + ".pill-pending{background:var(--pill-yellow,#f6d98a)}.pill-confirmed{background:var(--pill-green,#a8dfb0)}.pill-cancelled{background:#f3b1b1}"
+      + ".pill-checked_in{background:#f3e27a}.pill-with_vet{background:#9cc7ee}.pill-completed{background:#c9c9c9}.pill-no_show{background:#e3c4f0}"
+      + ".cell-note{display:block;margin-top:3px;font-size:11px;line-height:1.3;color:#7a4a00}";
+    document.head.appendChild(st);
+  })();
+
   // Name saved by login.js (demo mode)
   (function () {
     for (const store of ["sessionStorage", "localStorage"]) {
@@ -85,7 +116,7 @@
     const d = new Date(2000, 0, 1, h, m);
     return d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
   }
-  const label = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+  const label = (s) => ({ checked_in: "Checked in", with_vet: "With vet", no_show: "No-show" }[s] || s.charAt(0).toUpperCase() + s.slice(1));
 
   /* ---------- Renderers ---------- */
   function appointmentRow(a) {
@@ -101,7 +132,7 @@
         </span>
         <span role="cell" class="cell-service">${esc(a.service)}</span>
         <span role="cell" class="status-cell">
-          <span class="pill pill-${esc(a.status)}">${esc(label(a.status))}</span>
+          <span class="pill pill-${esc(a.status)}">${esc(label(a.status))}</span>${a.note ? `<span class="cell-note">${esc(a.note)}</span>` : ""}
         </span>
       </div>`;
   }
@@ -140,8 +171,11 @@
     });
 
     const byDate = (a, b) => (a.date + a.time).localeCompare(b.date + b.time);
-    const upcoming = data.appointments.filter((a) => a.status === "confirmed").sort(byDate);
+    const today = todayIso();
+    const upcoming = data.appointments.filter((a) => ["confirmed", "checked_in", "with_vet"].includes(a.status) && a.date >= today).sort(byDate);
     const pending = data.appointments.filter((a) => a.status === "pending").sort(byDate);
+    // requests the clinic declined stay in this box so the owner can read the reason
+    const declined = data.appointments.filter((a) => a.status === "cancelled" && a.note).sort(byDate).reverse();
 
     $("stat-upcoming").textContent = upcoming.length;
     $("stat-pending").textContent = pending.length;
@@ -149,7 +183,7 @@
     $("stat-pets").textContent = data.pets.length;
 
     fillRows("upcoming-rows", upcoming.slice(0, 3), "No upcoming appointments.");
-    fillRows("pending-rows", pending.slice(0, 3), "No pending requests.");
+    fillRows("pending-rows", pending.concat(declined).slice(0, 3), "No pending requests.");
 
     $("pets-list").innerHTML = data.pets.length
       ? data.pets.slice(0, 3).map((p) => `

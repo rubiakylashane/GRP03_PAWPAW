@@ -17,8 +17,23 @@
     const h = h24 % 12 === 0 ? 12 : h24 % 12;
     return h + ":" + pad(m) + " " + (h24 < 12 ? "AM" : "PM");
   }
-  const label = (s) => s.charAt(0).toUpperCase() + s.slice(1);
-  const STATUS_ORDER = { confirmed: 0, pending: 1, cancelled: 2 };
+  const LABELS = { checked_in: "Checked in", with_vet: "With vet", no_show: "No-show" };
+  const label = (s) => LABELS[s] || s.charAt(0).toUpperCase() + s.slice(1);
+  // order for "Sort: status" (statuses the clinic staff set are included)
+  const STATUS_ORDER = { confirmed: 0, pending: 1, checked_in: 2, with_vet: 3, completed: 4, no_show: 5, cancelled: 6 };
+  const orderOf = (s) => (s in STATUS_ORDER ? STATUS_ORDER[s] : 9);
+
+  // pill colours for the new statuses (the clinic staff set these)
+  (function () {
+    const st = document.createElement("style");
+    st.textContent = ".ma-pill.ma-checked_in{background:#f3e27a}.ma-pill.ma-with_vet{background:#9cc7ee}.ma-pill.ma-completed{background:#cfcfcf}" +
+      ".ma-pill.ma-no_show{background:#e3c4f0}.ma-pill.ma-cancelled{background:#f3b1b1}.ma-note{display:block;margin-top:5px;font-size:11px;line-height:1.3;color:#7a4a00}";
+    document.head.appendChild(st);
+  })();
+
+  const today = () => { const d = new Date(); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); };
+  // Reschedule / Cancel only while the visit has not happened yet
+  const canChange = (a) => (a.status === "pending" || a.status === "confirmed") && a.date >= today();
 
   function services(a) {
     const names = (a.services || []).map((l) => l.name);
@@ -27,8 +42,7 @@
   }
 
   function row(a) {
-    const done = a.status === "cancelled";
-    const actions = done
+    const actions = !canChange(a)
       ? `<span class="ma-none">-</span>`
       : `<a class="abtn abtn-outline ma-btn" href="reschedule-appointment.html?id=${encodeURIComponent(a.id)}">Reschedule</a>
          <button type="button" class="abtn abtn-cancel ma-btn" data-cancel="${esc(a.id)}">Cancel</button>`;
@@ -37,7 +51,7 @@
         <span role="cell"><strong>${esc(longDate(a.date))}</strong><small>${esc(time12(a.time))}</small></span>
         <span role="cell"><strong>${esc(a.petName)}</strong><small>${esc(a.vet || "To be assigned")}</small></span>
         <span role="cell" class="ma-services" title="${esc((a.services || []).map((l) => l.name).join(", "))}">${esc(services(a))}</span>
-        <span role="cell" class="ma-c"><span class="ma-pill ma-${esc(a.status)}">${esc(label(a.status))}</span></span>
+        <span role="cell" class="ma-c"><span class="ma-pill ma-${esc(a.status)}">${esc(label(a.status))}</span>${(a.declineReason || a.rescheduleReason) ? `<span class="ma-note">${esc(a.status === "cancelled" ? a.declineReason || "" : a.rescheduleReason || "")}</span>` : ""}</span>
         <span role="cell" class="ma-c ma-actions">${actions}</span>
       </div>`;
   }
@@ -53,7 +67,7 @@
     const by = {
       soon: (a, b) => key(a).localeCompare(key(b)),
       late: (a, b) => key(b).localeCompare(key(a)),
-      status: (a, b) => (STATUS_ORDER[a.status] - STATUS_ORDER[b.status]) || key(a).localeCompare(key(b)),
+      status: (a, b) => (orderOf(a.status) - orderOf(b.status)) || key(a).localeCompare(key(b)),
       pet: (a, b) => a.petName.localeCompare(b.petName) || key(a).localeCompare(key(b))
     };
     return list.sort(by[sortEl.value] || by.soon);

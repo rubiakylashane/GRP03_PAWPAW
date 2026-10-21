@@ -59,7 +59,7 @@
     doctor: a.vet || a.doctor || "To be assigned",
     service: (a.services || []).map((x) => x.name).join(", ") || a.service || "-",
     status: a.status || "pending",
-    note: a.status === "cancelled" ? (a.declineReason || "") : (a.rescheduleReason || "")
+    note: a.status === "cancelled" ? (a.declineReason || "") : (["pending", "confirmed"].indexOf(a.status) >= 0 ? (a.rescheduleReason || "") : "")
   }));
   SAMPLE.overdue = readList("pawpaw_vaccinations")
     .filter((r) => r.nextDue && r.nextDue < todayIso())

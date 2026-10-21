@@ -4,7 +4,7 @@
 (() => {
   const A = window.PawStaffAppts, O = window.PawOwners, S = window.PawStaff, $ = (id) => document.getElementById(id), esc = O.esc;
   const qs = new URLSearchParams(location.search);
-  const ownerKey = qs.get("owner") || "", petParam = qs.get("pet") || "", vaccineParam = qs.get("vaccine") || "";
+  const ownerKey = qs.get("owner") || "", petParam = qs.get("pet") || "", petIdParam = qs.get("petid") || "", vaccineParam = qs.get("vaccine") || "";
   if (!ownerKey || !O.exists(ownerKey)) { location.replace("vaccine-reminders.html"); return; }
 
   const owner = O.owner(ownerKey), pets = O.petsOf(ownerKey), TBA = A.TBA;
@@ -30,7 +30,7 @@
 
   /* ----- fields ----- */
   $("f-pet").innerHTML = pets.length ? pets.map((p) => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join("") : `<option value="">No pets yet</option>`;
-  const match = pets.find((p) => p.name === petParam);
+  const match = pets.find((p) => petIdParam && p.id === petIdParam) || pets.find((p) => p.name === petParam);
   if (match) $("f-pet").value = match.id;
   $("f-vet").innerHTML = `<option value="${TBA}">To be assigned</option>` + A.VETS.map((v) => `<option>${esc(v)}</option>`).join("");
   const TIMES = []; for (let h = 8; h <= 17; h++) [0, 30].forEach((m) => { if (!(h === 17 && m)) TIMES.push(pad(h) + ":" + pad(m)); });

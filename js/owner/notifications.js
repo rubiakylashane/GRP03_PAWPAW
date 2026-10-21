@@ -13,26 +13,61 @@
   const API = { list: "/api/notifications", read: (id) => "/api/notifications/" + encodeURIComponent(id) + "/read", readAll: "/api/notifications/read-all" };
 
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-  function ownerKey() {
+  /* who is signed in: owner (own list), staff / admin (shared "staff" list), vet (list of that vet).
+     VETS mirrors js/staff/staff-appts-store.js; a vet login that matches none of them sees every vet's list. */
+  const VETS = ["Dr. Maria Santos", "Dr. Jose Reyes"];
+  const user = (() => {
     for (const st of ["sessionStorage", "localStorage"]) {
-      try { const u = JSON.parse(window[st].getItem("pawpaw_user") || "null"); if (u && u.name) return String(u.name).trim().toLowerCase(); } catch (_) {}
+      try { const u = JSON.parse(window[st].getItem("pawpaw_user") || "null"); if (u && u.name) return u; } catch (_) {}
     }
-    return "";
+    return null;
+  })();
+  const role = user ? String(user.role || "owner") : "";
+  const vetOf = () => { const w = String(user.name).toLowerCase().split(/[\s_.-]+/); return VETS.find((v) => w.some((x) => x.length > 2 && x !== "dr" && v.toLowerCase().includes(x))) || null; };
+  function ownerKey() {                                     // identity used for this browser's "already shown" list
+    if (!user) return "";
+    if (role === "staff" || role === "admin") return "staff";
+    if (role === "vet") return "vet:" + (vetOf() || "all").toLowerCase();
+    return String(user.name).trim().toLowerCase();
   }
-  const KEY = "pawpaw_notifications:" + ownerKey();
-  if (!ownerKey()) return;                                   // not signed in
+  const KEYS = !user ? [] : (role === "staff" || role === "admin") ? ["pawpaw_notifications:staff"]
+    : role === "vet" ? (vetOf() ? [vetOf()] : VETS).map((v) => "pawpaw_notifications:vet:" + v.toLowerCase())
+    : ["pawpaw_notifications:" + String(user.name).trim().toLowerCase()];
+  if (!user) return;                                         // not signed in
 
   let items = [];
   async function load() {
     if (USE_BACKEND) {
-      try { const r = await fetch(API.list, { headers: { Accept: "application/json" } }); if (r.ok) return await r.json(); } catch (_) {}
+      try { const r = await fetch(API.list, { headers: { Accept: "application/json" } }); if (r.ok) return (await r.json()).map((n) => ({ ...n, _k: KEYS[0] })); } catch (_) {}
     }
-    try { const v = JSON.parse(localStorage.getItem(KEY) || "[]"); return Array.isArray(v) ? v : []; } catch (_) { return []; }
+    const out = [];
+    KEYS.forEach((k) => { try { const v = JSON.parse(localStorage.getItem(k) || "[]"); if (Array.isArray(v)) v.forEach((n) => out.push({ ...n, _k: k })); } catch (_) {} });
+    return out;
   }
-  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(items)); } catch (_) {} };
+  const save = () => KEYS.forEach((k) => { try { localStorage.setItem(k, JSON.stringify(items.filter((n) => n._k === k).map(({ _k, ...n }) => n))); } catch (_) {} });
 
-  const LINK = { reminder: "book-appointment.html", appointment: "my-appointments.html" };
+  const IS_STAFF = role === "staff" || role === "admin";   // staff bell reads "pawpaw_notifications:staff" (owner book / cancel / reschedule)
+  const IS_VET = role === "vet";                            // vet bell: new patient, check-in, reschedule, cancel
+  /* Where a notification leads: the page of what it is about. A notification can carry its own page in
+     "link" (e.g. "medical-records.html"); older ones are matched by their title / type. */
+  function pageOf(n) {
+    if (n.link && /^[\w-]+\.html(\?[\w=&%.-]*)?$/.test(n.link)) return n.link;
+    const t = String(n.title || "");
+    if (IS_STAFF) return n.type === "reminder" ? "vaccine-reminders.html" : "appointments.html";
+    if (IS_VET) return "my-appointments.html";
+    if (/medical record/i.test(t)) return "medical-records.html";
+    if (/vaccin\w* (recorded|added)/i.test(t)) return "vaccination-history.html";
+    if (n.type === "reminder") return "vaccination-history.html";
+    return "my-appointments.html";
+  }
+  function kindOf(n) {
+    const t = String(n.title || "");
+    if (/medical record/i.test(t)) return "record";
+    if (/vaccin\w* (recorded|added)/i.test(t)) return "reminder";
+    return n.type;
+  }
   const ICON = {
+    record: '<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M9.5 13h6M9.5 17h6"/>',
     reminder: '<path d="M12 3 4.5 6v5.5c0 4.5 3 8 7.5 9.5 4.5-1.5 7.5-5 7.5-9.5V6L12 3Z"/>',
     appointment: '<rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/>'
   };
@@ -48,7 +83,7 @@
   /* ---------- styles ---------- */
   const css = document.createElement("style");
   css.textContent = `
-  .nb-bell{position:fixed;top:16px;right:24px;z-index:60;width:46px;height:46px;border:0;border-radius:50%;background:#fff;color:#0f6b5c;display:grid;place-items:center;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.18)}
+  .nb-bell{position:fixed;top:16px;right:24px;z-index:60;width:46px;height:46px;border-radius:50%;background:#fff;color:#0f6b5c;display:grid;place-items:center;cursor:pointer;border:3px solid #e29d1a;box-shadow:0 2px 10px rgba(0,0,0,.3)}
   .nb-bell:hover{background:#f1f6f3}.nb-bell:focus-visible{outline:3px solid #e2a21c;outline-offset:2px}
   .nb-badge{position:absolute;top:-4px;right:-4px;min-width:20px;height:20px;padding:0 5px;border-radius:999px;background:#d9534f;color:#fff;font:700 12px/20px Inter,sans-serif;text-align:center;box-sizing:border-box}
   .nb-panel{position:fixed;top:72px;right:24px;z-index:61;width:min(380px,calc(100vw - 32px));max-height:min(520px,calc(100vh - 100px));display:flex;flex-direction:column;background:#fff;color:#222;border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.28);font-family:Inter,sans-serif;overflow:hidden}
@@ -71,11 +106,11 @@
   .nb-tab.on{background:#0f6b5c;color:#fff}
   .nb-group{padding:14px 20px 6px;font:700 12px Inter,sans-serif;letter-spacing:.04em;text-transform:uppercase;color:#6a6a6a;background:#fff;position:sticky;top:0}
   .nb-toasts{position:fixed;right:24px;bottom:24px;z-index:70;display:grid;gap:12px;width:min(360px,calc(100vw - 32px));font-family:Inter,sans-serif}
-  .nb-toast{display:flex;gap:14px;align-items:flex-start;padding:16px 18px;border-radius:14px;background:#0f6b5c;color:#fff;box-shadow:0 10px 30px rgba(0,0,0,.3);text-decoration:none;animation:nbin .25s ease-out}
-  .nb-toast .nb-ico{background:rgba(255,255,255,.2);color:#fff}
-  .nb-toast strong{display:block;font-size:14.5px;line-height:1.3}
-  .nb-toast span.t{display:block;margin-top:3px;font-size:13px;line-height:1.45;opacity:.95}
-  .nb-toast button{margin-left:auto;border:0;background:none;color:#fff;font-size:20px;line-height:1;cursor:pointer;opacity:.8}
+  .nb-toast{display:flex;gap:14px;align-items:flex-start;padding:16px 18px;border-radius:14px;background:#fff;color:#222;border-left:6px solid #e29d1a;box-shadow:0 10px 30px rgba(0,0,0,.35);text-decoration:none;animation:nbin .25s ease-out}
+  .nb-toast .nb-ico{background:#fdf0d2;color:#b97a00}
+  .nb-toast strong{display:block;font-size:14.5px;line-height:1.3;color:#111}
+  .nb-toast span.t{display:block;margin-top:3px;font-size:13px;line-height:1.45;color:#444}
+  .nb-toast button{margin-left:auto;border:0;background:none;color:#555;font-size:20px;line-height:1;cursor:pointer}
   @keyframes nbin{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
   @media (prefers-reduced-motion:reduce){.nb-toast{animation:none}}
   @media (max-width:900px){.nb-bell{top:10px;right:12px;width:42px;height:42px}.nb-panel{top:60px;right:16px}.nb-toasts{right:16px;bottom:16px}}`;
@@ -98,8 +133,8 @@
     return days <= 0 ? "Today" : days === 1 ? "Yesterday" : days < 7 ? "Earlier this week" : "Older";
   }
   const item = (n) => `
-      <li><a class="nb-item${n.readAt ? "" : " new"}" href="${LINK[n.type] || "dashboard.html"}" data-id="${esc(n.id)}">
-        <span class="nb-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n.type] || ICON.appointment}</svg></span>
+      <li><a class="nb-item${n.readAt ? "" : " new"}" href="${esc(pageOf(n))}" data-id="${esc(n.id)}">
+        <span class="nb-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[kindOf(n)] || ICON.appointment}</svg></span>
         <span class="nb-body"><span class="nb-title">${esc(n.title)}</span><span class="nb-text">${esc(n.text)}</span><span class="nb-time">${esc(ago(n.createdAt))}</span></span>
       </a></li>`;
 
@@ -127,8 +162,8 @@
     try { localStorage.setItem(TKEY, JSON.stringify(done.concat(fresh.map((n) => n.id)).slice(-100))); } catch (_) {}
     fresh.slice(0, 2).forEach((n) => {
       const t = document.createElement("a");
-      t.className = "nb-toast"; t.href = LINK[n.type] || "dashboard.html";
-      t.innerHTML = `<span class="nb-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n.type] || ICON.appointment}</svg></span><span><strong>${esc(n.title)}</strong><span class="t">${esc(n.text)}</span></span><button type="button" aria-label="Close">&times;</button>`;
+      t.className = "nb-toast"; t.href = pageOf(n);
+      t.innerHTML = `<span class="nb-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[kindOf(n)] || ICON.appointment}</svg></span><span><strong>${esc(n.title)}</strong><span class="t">${esc(n.text)}</span></span><button type="button" aria-label="Close">&times;</button>`;
       t.querySelector("button").addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); t.remove(); });
       toastBox.appendChild(t);
       setTimeout(() => t.remove(), 7000);
@@ -159,7 +194,7 @@
 
   /* refresh when the staff page (another tab) adds something, or when this tab is shown again */
   const refresh = () => load().then((v) => { items = v; render(); popToasts(); });
-  window.addEventListener("storage", (e) => { if (e.key === KEY) refresh(); });
+  window.addEventListener("storage", (e) => { if (KEYS.indexOf(e.key) >= 0) refresh(); });
   document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
   setInterval(refresh, 15000);
   refresh();

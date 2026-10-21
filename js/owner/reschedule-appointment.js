@@ -25,7 +25,7 @@
 
   const id = new URLSearchParams(location.search).get("id");
   const appt = id ? Appts.get(id) : null;
-  if (!appt || appt.status === "cancelled") { $("rs-missing").hidden = false; return; }
+  if (!appt || ["pending", "confirmed"].indexOf(appt.status) < 0 || appt.date < new Date().toISOString().slice(0, 10)) { $("rs-missing").hidden = false; return; }
   $("rs-layout").hidden = false;
 
   /* ----- summary (left card) ----- */

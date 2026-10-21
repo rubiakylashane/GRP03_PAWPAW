@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="../../js/auth-guard.js" data-role="staff,admin"></script>
   <title>Appointments | Pawpaw Clinic Staff</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -177,33 +178,6 @@
     </div>
   </dialog>
 
-  <dialog id="rec-dialog" class="dlg" aria-labelledby="rec-title">
-    <h2 id="rec-title">Visit record</h2>
-    <p class="dlg-sub" id="rec-sub"></p>
-    <label class="dlg-label" for="rec-diag">Diagnosis</label>
-    <input type="text" id="rec-diag" class="dlg-select" maxlength="150" />
-    <label class="dlg-label" for="rec-treat">Treatment</label>
-    <input type="text" id="rec-treat" class="dlg-select" maxlength="200" />
-    <label class="dlg-label" for="rec-notes">Notes</label>
-    <textarea id="rec-notes" class="dlg-text" rows="3" maxlength="500"></textarea>
-    <p class="dlg-hint bad" id="rec-err" hidden></p>
-    <div class="dlg-actions">
-      <button type="button" class="btn btn-outline" data-close>Skip for now</button>
-      <button type="button" class="btn btn-primary" id="rec-ok">Save record</button>
-    </div>
-  </dialog>
-
-  <dialog id="vacc-dialog" class="dlg" aria-labelledby="vacc-title">
-    <h2 id="vacc-title">Vaccination record</h2>
-    <p class="dlg-sub" id="vacc-sub"></p>
-    <div id="vacc-fields"></div>
-    <p class="dlg-hint bad" id="vacc-err" hidden></p>
-    <div class="dlg-actions">
-      <button type="button" class="btn btn-outline" data-close>Cancel</button>
-      <button type="button" class="btn btn-primary" id="vacc-ok">Save</button>
-    </div>
-  </dialog>
-
   <dialog id="add-dialog" class="dlg" aria-labelledby="add-title">
     <h2 id="add-title">Add appointment</h2>
     <p class="dlg-sub">For an owner and pet that are already registered.</p>
@@ -231,5 +205,6 @@
   <script src="../../js/owner/calendar.js"></script>
   <script src="../../js/staff/staff-appts-store.js"></script>
   <script src="../../js/staff/appointments.js"></script>
+  
 </body>
 </html>

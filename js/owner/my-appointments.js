@@ -20,6 +20,9 @@
   const LABELS = { checked_in: "Checked in", with_vet: "With vet", no_show: "No-show" };
   const label = (s) => LABELS[s] || s.charAt(0).toUpperCase() + s.slice(1);
   // order for "Sort: status" (statuses the clinic staff set are included)
+  /* clinic note: decline reason only when cancelled; reschedule reason only while pending / confirmed
+     (it disappears once the pet is checked in, with the vet, or done) */
+  const noteOf = (a) => a.status === "cancelled" ? (a.declineReason || "") : (["pending", "confirmed"].indexOf(a.status) >= 0 ? (a.rescheduleReason || "") : "");
   const STATUS_ORDER = { confirmed: 0, pending: 1, checked_in: 2, with_vet: 3, completed: 4, no_show: 5, cancelled: 6 };
   const orderOf = (s) => (s in STATUS_ORDER ? STATUS_ORDER[s] : 9);
 
@@ -51,7 +54,7 @@
         <span role="cell"><strong>${esc(longDate(a.date))}</strong><small>${esc(time12(a.time))}</small></span>
         <span role="cell"><strong>${esc(a.petName)}</strong><small>${esc(a.vet || "To be assigned")}</small></span>
         <span role="cell" class="ma-services" title="${esc((a.services || []).map((l) => l.name).join(", "))}">${esc(services(a))}</span>
-        <span role="cell" class="ma-c"><span class="ma-pill ma-${esc(a.status)}">${esc(label(a.status))}</span>${(a.declineReason || a.rescheduleReason) ? `<span class="ma-note">${esc(a.status === "cancelled" ? a.declineReason || "" : a.rescheduleReason || "")}</span>` : ""}</span>
+        <span role="cell" class="ma-c"><span class="ma-pill ma-${esc(a.status)}">${esc(label(a.status))}</span>${noteOf(a) ? `<span class="ma-note">${esc(noteOf(a))}</span>` : ""}</span>
         <span role="cell" class="ma-c ma-actions">${actions}</span>
       </div>`;
   }

@@ -53,3 +53,17 @@
   .sdash .apt-list .otable { overflow-x: auto; }
   .sdash .apt-list .arow { min-width: 1000px; }
 }
+
+/* vet pages */
+.sdash .vrow-pt { grid-template-columns: 1.2fr 1.2fr 1.4fr .9fr 1.4fr; }
+.sdash .vet-pick select { height: 46px; padding: 0 16px; font: inherit; font-size: 16px; font-weight: 600; border: 0; border-radius: 10px; background: #fff; color: #111; }
+.sdash .dlg-wide { width: min(560px, 94vw); max-height: 92vh; overflow-y: auto; }
+.sdash .dlg-h { margin: 20px 0 4px; font-size: 15px; font-weight: 700; padding-top: 14px; border-top: 1px solid #ddd; }
+.sdash .dlg-h small { font-weight: 500; color: #666; }
+.sdash .dlg-vacc-h { margin-top: 20px; }
+@media (max-width: 640px) {
+  .sdash .own-toolbar { flex-wrap: wrap; }
+  .sdash .own-toolbar .own-sort { margin-left: 0; width: 100%; }
+  .sdash .own-toolbar .own-sort select { width: 100%; }
+}
+.sdash .resch-tag { display: inline-block; margin-left: 6px; padding: 2px 8px; border-radius: 999px; background: #e8d5f5; color: #4a2a63; font-size: 11px; font-weight: 700; vertical-align: middle; }

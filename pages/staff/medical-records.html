@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="../../js/auth-guard.js" data-role="staff,admin"></script>
   <title>Medical Records | Pawpaw Clinic Staff</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -72,12 +73,9 @@
         <h1>Records</h1>
         <p class="sub">Visit records and prescriptions of every pet.</p>
       </div>
-      <div class="head-btns">
-        <button type="button" class="abtn abtn-light" id="add-rx">+ Add Prescription</button>
-        <button type="button" class="abtn" id="add-visit">+ Add Visit Record</button>
-      </div>
     </header>
 
+    <p class="rec-scope" id="scope" hidden></p>
     <div class="own-toolbar rec-toolbar">
       <input type="search" id="search" class="own-search" placeholder="Search" aria-label="Search records" autocomplete="off" />
       <label class="own-sort">
@@ -120,35 +118,9 @@
     <div class="dlg-actions"><button type="button" class="btn btn-outline" data-close>Close</button></div>
   </dialog>
 
-  <dialog id="visit-dialog" class="dlg" aria-labelledby="visit-dlg-title">
-    <h2 id="visit-dlg-title">Add visit record</h2>
-    <label class="dlg-label" for="v-owner">Owner</label><select id="v-owner" class="dlg-select"></select>
-    <label class="dlg-label" for="v-pet">Pet</label><select id="v-pet" class="dlg-select"></select>
-    <label class="dlg-label" for="v-date">Date</label><input type="date" id="v-date" class="dlg-select" />
-    <label class="dlg-label" for="v-diag">Diagnosis</label><input type="text" id="v-diag" class="dlg-select" maxlength="150" />
-    <label class="dlg-label" for="v-treat">Treatment</label><input type="text" id="v-treat" class="dlg-select" maxlength="200" />
-    <label class="dlg-label" for="v-notes">Notes</label><textarea id="v-notes" class="dlg-text" rows="3" maxlength="500"></textarea>
-    <p class="dlg-hint bad" id="v-err" hidden></p>
-    <div class="dlg-actions"><button type="button" class="btn btn-outline" data-close>Cancel</button><button type="button" class="btn btn-primary" id="v-save">Save</button></div>
-  </dialog>
-
-  <dialog id="rx-dialog" class="dlg" aria-labelledby="rx-dlg-title">
-    <h2 id="rx-dlg-title">Add prescription</h2>
-    <label class="dlg-label" for="r-owner">Owner</label><select id="r-owner" class="dlg-select"></select>
-    <label class="dlg-label" for="r-pet">Pet</label><select id="r-pet" class="dlg-select"></select>
-    <label class="dlg-label" for="r-date">Date</label><input type="date" id="r-date" class="dlg-select" />
-    <label class="dlg-label" for="r-med">Medication</label><input type="text" id="r-med" class="dlg-select" maxlength="120" />
-    <div class="dlg-two">
-      <div><label class="dlg-label" for="r-dose">Dose</label><input type="text" id="r-dose" class="dlg-select" maxlength="80" placeholder="e.g. 1 tablet" /></div>
-      <div><label class="dlg-label" for="r-qty">Quantity</label><input type="text" id="r-qty" class="dlg-select" maxlength="40" placeholder="e.g. 14 tablets" /></div>
-    </div>
-    <label class="dlg-label" for="r-inst">Instructions</label><textarea id="r-inst" class="dlg-text" rows="2" maxlength="300" placeholder="e.g. Twice a day after meals for 7 days"></textarea>
-    <p class="dlg-hint bad" id="r-err" hidden></p>
-    <div class="dlg-actions"><button type="button" class="btn btn-outline" data-close>Cancel</button><button type="button" class="btn btn-primary" id="r-save">Save</button></div>
-  </dialog>
-
   <script src="../../js/staff/owners-store.js"></script>
   <script src="../../js/staff/staff-shell.js"></script>
   <script src="../../js/staff/medical-records.js"></script>
+ 
 </body>
 </html>

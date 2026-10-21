@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="../../js/auth-guard.js" data-role="staff,admin"></script>
   <title>Dashboard | Pawpaw Clinic Staff</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -66,7 +67,7 @@
   <!-- Main -->
   <main class="main">
     <header class="page-head">
-      <h1>Dashboard</h1>
+      <h1 id="greeting">Dashboard</h1>
       <p class="date" id="today"></p>
     </header>
 
@@ -113,6 +114,13 @@
   <dialog id="review-dialog" class="dlg" aria-labelledby="review-title">
     <h2 id="review-title">Review request</h2>
     <dl class="dlg-facts" id="review-facts"></dl>
+    <div id="review-vetbox">
+      <label class="dlg-label" for="review-vet">Veterinarian</label>
+      <select id="review-vet" class="dlg-select"></select>
+    </div>
+    <label class="dlg-label" for="review-reason">Reason if declined (seen by the owner)</label>
+    <textarea id="review-reason" class="dlg-select" rows="2" placeholder="e.g. Fully booked on this day."></textarea>
+    <p class="dlg-hint" id="review-hint"></p>
     <div class="dlg-actions">
       <button type="button" class="btn btn-outline" id="review-close">Close</button>
       <button type="button" class="btn btn-danger" id="review-decline">Decline</button>
@@ -126,12 +134,15 @@
     <p class="dlg-sub" id="vet-sub"></p>
     <label class="dlg-label" for="vet-select">Veterinarian</label>
     <select id="vet-select" class="dlg-select"></select>
+    <p class="dlg-hint" id="vet-hint"></p>
     <div class="dlg-actions">
       <button type="button" class="btn btn-outline" id="vet-cancel">Cancel</button>
       <button type="button" class="btn btn-primary" id="vet-save">Assign</button>
     </div>
   </dialog>
 
+  <script src="../../js/staff/staff-appts-store.js"></script>
   <script src="../../js/staff/dashboard.js"></script>
+  <script src="../../js/notifications.js"></script>
 </body>
 </html>

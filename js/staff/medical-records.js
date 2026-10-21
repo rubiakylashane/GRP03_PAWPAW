@@ -1,4 +1,4 @@
-/* js/staff/medical-records.js - staff Records page: visit records + prescriptions of every pet
+/* js/staff/medical-records.js - Records page, shared by staff (view only) and vet (view + add): visit records + prescriptions of every pet
    Demo storage (same lists the owner's Medical Records page reads):
      "pawpaw_records:<owner>" = { visits: [{ id, pet, date, diagnosis, treatment, notes }],
                                   prescriptions: [{ id, pet, date, medication, dose, instructions, quantity }] }
@@ -34,6 +34,15 @@
     } catch (_) { /* storage blocked */ }
   }
 
+  /* opened from "View Record": only this owner's pet (matched by pet id; older records without an id by name) */
+  const params = new URLSearchParams(location.search);
+  let scope = params.get("owner") ? { owner: params.get("owner"), petId: params.get("petid") || "", name: params.get("q") || "" } : null;
+  const inScope = (r) => !scope || (r.owner === scope.owner && (scope.petId && r.petId ? r.petId === scope.petId : !scope.name || r.pet === scope.name));
+  function drawScope() {
+    const el = $("scope"); if (!el) return;
+    el.hidden = !scope;
+    if (scope) el.innerHTML = `Showing records of <strong>${esc(scope.name || "this pet")}</strong> (${esc(ownerName(scope.owner))}) <button type="button" id="scope-clear">Show all</button>`;
+  }
   const by = {
     new: (a, b) => (b.date || "").localeCompare(a.date || ""),
     old: (a, b) => (a.date || "").localeCompare(b.date || ""),
@@ -43,8 +52,9 @@
   const who = (r) => `<span role="cell"><span class="o-name">${esc(r.pet)}</span><span class="o-email">${esc(ownerName(r.owner))}</span></span>`;
 
   function render() {
+    drawScope();
     const q = $("search").value.trim().toLowerCase(), sort = by[$("sort").value] || by.new;
-    const hit = (r) => !q || Object.values({ ...r, ownerName: ownerName(r.owner) }).join(" ").toLowerCase().includes(q);
+    const hit = (r) => inScope(r) && (!q || Object.values({ ...r, ownerName: ownerName(r.owner) }).join(" ").toLowerCase().includes(q));
     const v = visits.filter(hit).sort(sort), r = rxs.filter(hit).sort(sort);
     $("visit-rows").innerHTML = v.length ? v.map((x) => `
       <div class="orow rrow rrow-visit" role="row" tabindex="0" data-kind="v" data-id="${esc(x.id)}">
@@ -73,6 +83,9 @@
   document.addEventListener("keydown", (e) => { if (e.key === "Enter") { const r = e.target.closest("[data-kind]"); if (r) details(r.dataset.kind, r.dataset.id); } });
 
   /* ----- add dialogs ----- */
+  /* the add buttons and dialogs exist only on the vet page (staff only view records) */
+  const on = (id, ev, fn) => { const el = $(id); if (el) el.addEventListener(ev, fn); };
+  const petNameOf = (owner, id) => { const p = O.petsOf(owner).find((x) => x.id === id); return p ? p.name : ""; };
   const owners = () => O.list().filter((o) => o.id);
   function fillOwner(prefix) {
     const list = owners();
@@ -81,7 +94,7 @@
   }
   function fillPets(prefix) {
     const pets = O.petsOf($(prefix + "-owner").value);
-    $(prefix + "-pet").innerHTML = pets.length ? pets.map((p) => `<option>${esc(p.name)}</option>`).join("") : `<option value="">No pets yet</option>`;
+    $(prefix + "-pet").innerHTML = pets.length ? pets.map((p) => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join("") : `<option value="">No pets yet</option>`;
   }
   const err = (id, m) => { $(id).textContent = m || ""; $(id).hidden = !m; return !m; };
   function openAdd(dialog, prefix) {
@@ -99,34 +112,35 @@
     }
     load(); render();
   }
-  $("add-visit").addEventListener("click", () => openAdd("visit-dialog", "v"));
-  $("add-rx").addEventListener("click", () => openAdd("rx-dialog", "r"));
-  $("v-owner").addEventListener("change", () => fillPets("v"));
-  $("r-owner").addEventListener("change", () => fillPets("r"));
+  on("add-visit", "click", () => openAdd("visit-dialog", "v"));
+  on("add-rx", "click", () => openAdd("rx-dialog", "r"));
+  on("v-owner", "change", () => fillPets("v"));
+  on("r-owner", "change", () => fillPets("r"));
 
-  $("v-save").addEventListener("click", async () => {
-    const owner = $("v-owner").value, pet = $("v-pet").value, date = $("v-date").value, diagnosis = $("v-diag").value.trim();
-    if (!pet) return err("v-err", "This owner has no pet yet.");
+  on("v-save", "click", async () => {
+    const owner = $("v-owner").value, petId = $("v-pet").value, pet = petNameOf(owner, petId), date = $("v-date").value, diagnosis = $("v-diag").value.trim();
+    if (!petId) return err("v-err", "This owner has no pet yet.");
     if (!date) return err("v-err", "Pick the visit date.");
     if (!diagnosis) return err("v-err", "Enter the diagnosis.");
-    try { await save(owner, "v", { id: uid(), pet, date, diagnosis, treatment: $("v-treat").value.trim(), notes: $("v-notes").value.trim() }); }
+    try { await save(owner, "v", { id: uid(), petId, pet, date, diagnosis, treatment: $("v-treat").value.trim(), notes: $("v-notes").value.trim() }); }
     catch (_) { return err("v-err", "Could not save. Try again."); }
     ["v-diag", "v-treat", "v-notes"].forEach((id) => { $(id).value = ""; });
     $("visit-dialog").close(); S.toast("Visit record saved.");
   });
-  $("r-save").addEventListener("click", async () => {
-    const owner = $("r-owner").value, pet = $("r-pet").value, date = $("r-date").value, medication = $("r-med").value.trim();
-    if (!pet) return err("r-err", "This owner has no pet yet.");
+  on("r-save", "click", async () => {
+    const owner = $("r-owner").value, petId = $("r-pet").value, pet = petNameOf(owner, petId), date = $("r-date").value, medication = $("r-med").value.trim();
+    if (!petId) return err("r-err", "This owner has no pet yet.");
     if (!date) return err("r-err", "Pick the date.");
     if (!medication) return err("r-err", "Enter the medication.");
-    try { await save(owner, "r", { id: uid(), pet, date, medication, dose: $("r-dose").value.trim(), instructions: $("r-inst").value.trim(), quantity: $("r-qty").value.trim() }); }
+    try { await save(owner, "r", { id: uid(), petId, pet, date, medication, dose: $("r-dose").value.trim(), instructions: $("r-inst").value.trim(), quantity: $("r-qty").value.trim() }); }
     catch (_) { return err("r-err", "Could not save. Try again."); }
     ["r-med", "r-dose", "r-qty", "r-inst"].forEach((id) => { $(id).value = ""; });
     $("rx-dialog").close(); S.toast("Prescription saved.");
   });
 
+  document.addEventListener("click", (e) => { if (e.target.id === "scope-clear") { scope = null; $("search").value = ""; render(); } });
   $("search").addEventListener("input", render);
   $("sort").addEventListener("change", render);
-  try { const q = new URLSearchParams(location.search).get("q"); if (q) $("search").value = q; } catch (_) {}
+  if (!scope) { try { const q = params.get("q"); if (q) $("search").value = q; } catch (_) {} }
   load(); render();
 })();

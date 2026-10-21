@@ -25,3 +25,14 @@
   .sdash .rrow-visit { min-width: 820px; }
   .sdash .rrow-rx { min-width: 960px; }
 }
+
+/* dialog bits used by the vet's add forms */
+.sdash .dlg-text { width: 100%; padding: 10px; font: inherit; font-size: 14px; border: 1px solid #555; border-radius: 8px; resize: vertical; box-sizing: border-box; }
+.sdash .dlg-two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.sdash .dlg-hint { margin-top: 10px; min-height: 18px; font-size: 13px; font-weight: 600; }
+.sdash .dlg-hint.bad { color: #b3261e; }
+.sdash .dlg { width: min(440px, 92vw); }
+
+.sdash .rec-scope { margin: 0 0 14px; font-size: 15px; color: #fff; }
+.sdash .rec-scope button { margin-left: 10px; padding: 4px 14px; border: 1px solid #fff; border-radius: 999px; background: transparent; color: #fff; font: inherit; font-size: 13px; cursor: pointer; }
+.sdash .rec-scope button:hover { background: rgba(255, 255, 255, .15); }

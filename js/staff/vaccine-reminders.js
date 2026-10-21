@@ -49,7 +49,7 @@
   function row(r) {
     const o = ownerOf(r), st = status(r);
     const phone = o.phone || "";
-    const q = "owner=" + encodeURIComponent(r.owner) + "&pet=" + encodeURIComponent(r.pet || "") + "&vaccine=" + encodeURIComponent(r.vaccine || "");
+    const q = "owner=" + encodeURIComponent(r.owner) + "&petid=" + encodeURIComponent(r.petId || "") + "&pet=" + encodeURIComponent(r.pet || "") + "&vaccine=" + encodeURIComponent(r.vaccine || "");
     return `
       <div class="orow vrow" role="row">
         <span role="cell">${esc(r.vaccine || "-")}</span>

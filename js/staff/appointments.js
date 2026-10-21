@@ -1,6 +1,6 @@
 /* js/staff/appointments.js - staff Appointments page
    tabs, date filter, search, sort, show more, approve + assign, check in, reschedule,
-   no-show, decline (with reason), mark completed, add appointment, vet conflict warning. */
+   no-show, decline (with reason), add appointment, vet conflict warning. */
 (() => {
   const A = window.PawStaffAppts, O = window.PawOwners, S = window.PawStaff, $ = (id) => document.getElementById(id);
   const esc = O.esc, PAGE = 6, TBA = A.TBA;
@@ -33,66 +33,6 @@
     pet: (a, b) => petName(a).localeCompare(petName(b))
   };
 
-  /* ---------- vaccination records (feed Vaccine Reminders and the owner's Vaccination History) ---------- */
-  const VKEY = "pawpaw_vaccinations:";
-  const INTERVAL_MONTHS = { rabies: 12, "5-in-1": 12, dhpp: 12, "4-in-1": 12, default: 12 };   // suggested next due; staff can edit
-  const vaccinesOf = (a) => (a.services || []).map((x) => x.name || "").filter((n) => /vaccin/i.test(n))
-    .map((n) => { const m = n.match(/\(([^)]+)\)/); return m ? m[1].trim() : "Vaccination"; });
-  const readVacc = (key) => { try { const v = JSON.parse(localStorage.getItem(VKEY + key) || "[]"); return Array.isArray(v) ? v : []; } catch (_) { return []; } };
-  const hasRecord = (a) => readVacc(a.owner).some((r) => r.apptId === a.id);
-  function suggestDue(vaccine, from) {
-    const v = vaccine.toLowerCase(); let m = INTERVAL_MONTHS.default;
-    Object.keys(INTERVAL_MONTHS).forEach((k) => { if (v.indexOf(k) >= 0) m = INTERVAL_MONTHS[k]; });
-    const d = new Date(from + "T00:00:00"); d.setMonth(d.getMonth() + m); return iso(d);
-  }
-  const givenDate = (a) => (a.date && a.date <= today() ? a.date : today());
-  function openVacc(a, finish) {
-    cur = a; curFinish = finish;
-    const given = givenDate(a);
-    $("vacc-sub").textContent = who(a) + " - given " + fmtShort(given);
-    $("vacc-fields").innerHTML = vaccinesOf(a).map((v, i) => `
-      <div class="dlg-vacc">
-        <label class="dlg-label" for="vd-${i}">${esc(v)} - next due</label>
-        <input type="date" id="vd-${i}" class="dlg-select" data-vname="${esc(v)}" min="${given}" value="${suggestDue(v, given)}" />
-      </div>`).join("");
-    $("vacc-err").hidden = true; D.vacc.showModal();
-  }
-  function saveVacc() {
-    const a = cur, given = givenDate(a), inputs = [...$("vacc-fields").querySelectorAll("input")];
-    if (inputs.some((i) => !i.value)) { $("vacc-err").textContent = "Pick the next due date for each vaccine."; $("vacc-err").hidden = false; return; }
-    try {
-      const list = readVacc(a.owner).filter((r) => r.apptId !== a.id);
-      inputs.forEach((i) => list.push({
-        id: "vx-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), apptId: a.id,
-        vaccine: i.dataset.vname, pet: petName(a), dateAdministered: given, nextDue: i.value,
-        administeredBy: a.vet && a.vet !== TBA ? a.vet : "", notes: ""
-      }));
-      localStorage.setItem(VKEY + a.owner, JSON.stringify(list));
-    } catch (_) { /* ignore */ }
-    D.vacc.close();
-    if (curFinish) { set(a, { status: "completed" }, petName(a) + " completed. Vaccination record saved."); openRec(a); }
-    else { render(); S.toast("Vaccination record saved."); }
-  }
-
-  /* ---------- visit record (Medical Records page) ---------- */
-  const RKEY = "pawpaw_records:";
-  const readRec = (key) => { try { const v = JSON.parse(localStorage.getItem(RKEY + key) || "null"); return { visits: (v && v.visits) || [], prescriptions: (v && v.prescriptions) || [] }; } catch (_) { return { visits: [], prescriptions: [] }; } };
-  const hasVisit = (a) => readRec(a.owner).visits.some((r) => r.apptId === a.id);
-  function openRec(a) {
-    cur = a; $("rec-sub").textContent = who(a) + " - " + fmtShort(givenDate(a));
-    ["rec-diag", "rec-treat", "rec-notes"].forEach((id) => { $(id).value = ""; });
-    $("rec-err").hidden = true; D.rec.showModal();
-  }
-  function saveRec() {
-    const diagnosis = $("rec-diag").value.trim();
-    if (!diagnosis) { $("rec-err").textContent = "Enter the diagnosis, or choose Skip for now."; $("rec-err").hidden = false; return; }
-    const a = cur, d = readRec(a.owner);
-    d.visits.push({ id: "r-" + Date.now().toString(36), apptId: a.id, pet: petName(a), date: givenDate(a), diagnosis,
-      treatment: $("rec-treat").value.trim(), notes: $("rec-notes").value.trim(), vet: a.vet && a.vet !== TBA ? a.vet : "" });
-    try { localStorage.setItem(RKEY + a.owner, JSON.stringify(d)); } catch (_) { /* ignore */ }
-    D.rec.close(); render(); S.toast("Visit record saved.");
-  }
-
   /* 9: same vet, same date and time as another active appointment */
   const clash = (a) => A.ACTIVE.indexOf(a.status) >= 0 ? A.conflict(all, a.vet, a.date, a.time, a.id) : null;
 
@@ -114,8 +54,8 @@
       case "pending": return btn("approve", "obtn-green", "Approve &amp; Assign") + btn("decline", "obtn-cancel", "Decline");
       case "confirmed": return btn("checkin", "obtn-green", "Check In") + btn("resched", "obtn-outline", "Reschedule") + btn("noshow", "obtn-outline", "No-show");
       case "checked_in": return btn("assign", "obtn-outline", "Assign Vet");
-      case "with_vet": return btn("complete", "obtn-green", "Mark Completed");
-      case "completed": return (vaccinesOf(a).length && !hasRecord(a) ? btn("vacc", "obtn-green", "Set Next Due") : "") + (!hasVisit(a) ? btn("addrec", "obtn-green", "Add Record") : "") + `<a class="obtn obtn-outline obtn-sm" href="medical-records.html?q=${encodeURIComponent(petName(a))}">View Record</a>`;
+      case "with_vet": return "";                                   // the vet completes the visit
+      case "completed": return `<a class="obtn obtn-outline obtn-sm" href="medical-records.html?owner=${encodeURIComponent(a.owner)}&petid=${encodeURIComponent(a.petId || "")}&q=${encodeURIComponent(petName(a))}">View Record</a>`;
       default: return "";
     }
   }
@@ -128,7 +68,7 @@
         <span role="cell"><span class="o-name">${esc(petName(a))}</span><span class="o-email">${esc(ownerName(a))}</span></span>
         <span role="cell"><span class="${vetName(a) === TBA ? "a-muted" : ""}">${esc(vetName(a))}</span>${warn}</span>
         <span role="cell">${esc(services(a))}</span>
-        <span role="cell"><span class="spill spill-${esc(a.status)}">${esc(A.STATUS[a.status] || a.status)}</span></span>
+        <span role="cell"><span class="spill spill-${esc(a.status)}">${esc(A.STATUS[a.status] || a.status)}</span>${a.status === "pending" && a.rescheduledFrom ? `<span class="resch-tag" title="Was ${esc(a.rescheduledFrom.date)} ${esc(a.rescheduledFrom.time)}">Rescheduled</span>` : ""}</span>
         <span role="cell" class="a-actions">${actions(a)}</span>
       </div>`;
   }
@@ -151,8 +91,8 @@
   }
 
   /* ---------- dialogs ---------- */
-  const D = { detail: $("detail-dialog"), approve: $("approve-dialog"), vet: $("vet-dialog"), resched: $("resched-dialog"), decline: $("decline-dialog"), add: $("add-dialog"), vacc: $("vacc-dialog"), rec: $("rec-dialog") };
-  let cur = null, curFinish = false;
+  const D = { detail: $("detail-dialog"), approve: $("approve-dialog"), vet: $("vet-dialog"), resched: $("resched-dialog"), decline: $("decline-dialog"), add: $("add-dialog") };
+  let cur = null;
   const who = (a) => petName(a) + " - " + ownerName(a);
   const when = (a) => (a.date ? fmtDate(a.date) : "") + " " + fmtTime(a.time);
   const hint = (el, c) => { el.textContent = c ? "Warning: " + vetName(c) + " already has " + petName(c) + " at this time." : ""; el.className = "dlg-hint" + (c ? " bad" : ""); };
@@ -227,10 +167,7 @@
       ({
         approve: () => openApprove(a), decline: () => openDecline(a), assign: () => openAssign(a), resched: () => openResched(a),
         checkin: () => set(a, { status: "checked_in" }, petName(a) + " checked in."),
-        noshow: () => set(a, { status: "no_show" }, petName(a) + " marked as no-show."),
-        complete: () => { if (vaccinesOf(a).length) openVacc(a, true); else { set(a, { status: "completed" }, petName(a) + " completed."); openRec(a); } },
-        addrec: () => openRec(a),
-        vacc: () => openVacc(a, false)
+        noshow: () => set(a, { status: "no_show" }, petName(a) + " marked as no-show.")
       })[b.dataset.act]();
       return;
     }
@@ -248,8 +185,6 @@
   $("more").addEventListener("click", () => { shown += PAGE; render(); });
   $("search").addEventListener("input", () => { shown = PAGE; render(); });
   $("sort").addEventListener("change", render);
-  $("vacc-ok").addEventListener("click", saveVacc);
-  $("rec-ok").addEventListener("click", saveRec);
   $("add-btn").addEventListener("click", openAdd);
 
   /* 2: date filter (calendar popup) */

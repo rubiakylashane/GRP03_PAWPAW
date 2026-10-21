@@ -18,6 +18,33 @@ window.PawAppts = (() => {
     return base + ":" + name;
   }
 
+  function ownerName() {
+    for (const store of ["sessionStorage", "localStorage"]) {
+      try { const u = JSON.parse(window[store].getItem("pawpaw_user") || "null"); if (u && u.name) return String(u.name).trim(); } catch (_) { /* ignore */ }
+    }
+    return "An owner";
+  }
+  /* message for the STAFF bell ("pawpaw_notifications:staff"). Backend: the server creates this itself. */
+  function tellStaff(title, a) {
+    try {
+      const k = "pawpaw_notifications:staff", list = JSON.parse(localStorage.getItem(k) || "[]");
+      list.push({ id: "n-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), type: "appointment", title,
+        text: ownerName() + " - " + (a.petName || "pet") + ", " + a.date + " " + (a.time || "") + ".", createdAt: new Date().toISOString(), readAt: null });
+      localStorage.setItem(k, JSON.stringify(list.slice(-50)));
+    } catch (_) { /* ignore */ }
+  }
+
+  /* message for the vet's bell, when the appointment already has a vet */
+  function tellVet(title, a) {
+    if (!a.vet || a.vet === "To be assigned") return;
+    try {
+      const k = "pawpaw_notifications:vet:" + String(a.vet).toLowerCase(), list = JSON.parse(localStorage.getItem(k) || "[]");
+      list.push({ id: "n-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), type: "appointment", title,
+        text: (a.petName || "Pet") + ", " + a.date + " " + (a.time || "") + ".", createdAt: new Date().toISOString(), readAt: null });
+      localStorage.setItem(k, JSON.stringify(list.slice(-50)));
+    } catch (_) { /* ignore */ }
+  }
+
   function load() {
     try {
       const v = JSON.parse(localStorage.getItem(userKey(BASE)) || "null");
@@ -41,6 +68,7 @@ window.PawAppts = (() => {
     };
     list.push(created);
     save(list);
+    tellStaff("New appointment request", created);
     return created;
   }
 
@@ -51,8 +79,11 @@ window.PawAppts = (() => {
     const list = load();
     const i = list.findIndex((a) => a.id === id);
     if (i < 0) return null;
-    list[i] = { ...list[i], ...patch, updatedAt: new Date().toISOString() };
+    const before = list[i];
+    list[i] = { ...before, ...patch, updatedAt: new Date().toISOString() };
     save(list);
+    if (patch.status === "cancelled" && before.status !== "cancelled") { tellStaff("Appointment cancelled by owner", list[i]); tellVet("Appointment cancelled", list[i]); }
+    else if ((patch.date && patch.date !== before.date) || (patch.time && patch.time !== before.time)) { tellStaff("Reschedule request", list[i]); tellVet("Appointment rescheduled", list[i]); }
     return list[i];
   }
 

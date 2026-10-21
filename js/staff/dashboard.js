@@ -69,7 +69,24 @@
         if (i >= 0) { list[i] = { ...list[i], ...patch, updatedAt: new Date().toISOString() }; localStorage.setItem(appt._key, JSON.stringify(list)); }
       } catch (_) { /* ignore */ }
     }
+    tellOwner(appt, patch);
+    if (!USE_BACKEND && !SHOW_DEMO && window.PawStaffAppts) window.PawStaffAppts.vetChanged({ ...appt }, patch);
     Object.assign(appt, patch);
+  }
+
+  /* message for the owner's notification bell (the server does this itself when there is a backend) */
+  function tellOwner(appt, patch) {
+    if (USE_BACKEND || SHOW_DEMO || !appt.owner) return;
+    let title = "", text = "";
+    const what = (appt.petName || "") + ", " + appt.date + " " + (appt.time || "");
+    if (patch.status === "confirmed" && appt.status === "pending") { title = "Appointment approved"; text = what + "."; }
+    else if (patch.status === "cancelled") { title = "Request declined"; text = what + "." + (patch.declineReason ? " Reason: " + patch.declineReason : ""); }
+    if (!title) return;
+    try {
+      const k = "pawpaw_notifications:" + appt.owner, list = JSON.parse(localStorage.getItem(k) || "[]");
+      list.push({ id: "n-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), type: "appointment", title, text, createdAt: new Date().toISOString(), readAt: null });
+      localStorage.setItem(k, JSON.stringify(list.slice(-50)));
+    } catch (_) { /* ignore */ }
   }
 
   /* ---------- Formatting ---------- */
@@ -85,6 +102,9 @@
 
   /* ---------- Render ---------- */
   let all = [];
+  const A = window.PawStaffAppts;
+  const vetOf = (a) => a.vet || "To be assigned";
+  const hint = (el, c) => { el.textContent = c ? "Warning: " + vetOf(c) + " already has " + (c.petName || c.pet) + " at this time." : ""; el.className = "dlg-hint" + (c ? " bad" : ""); };
 
   function actionCell(a) {
     if (a.status === "confirmed") return `<button type="button" class="btn btn-primary" data-act="checkin" data-id="${esc(a.id)}">Check In</button>`;
@@ -106,7 +126,7 @@
   function pendingItem(a) {
     return `
       <div class="req">
-        <p class="req-title"><strong>${esc(a.petName || a.pet)}</strong> - ${esc(a.owner || "Owner")}</p>
+        <p class="req-title"><strong>${esc(a.petName || a.pet)}</strong> - ${esc(a.owner || "Owner")}${a.rescheduledFrom ? ` <span class="resch-tag" title="Was ${esc(a.rescheduledFrom.date)} ${esc(a.rescheduledFrom.time)}">Rescheduled</span>` : ""}</p>
         <p class="req-sub">${esc(fmtDate(a.date))} (${esc(fmtTime(a.time))}) - ${esc(serviceText(a))}</p>
         <div class="req-actions">
           <button type="button" class="btn btn-primary" data-act="approve" data-id="${esc(a.id)}">Approve</button>
@@ -156,8 +176,18 @@
       ["Estimated", a.total != null ? "₱" + Number(a.total).toLocaleString("en-US") : "-"]
     ];
     $("review-facts").innerHTML = rows.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join("");
+    const sel = $("review-vet");
+    sel.innerHTML = VETS.map((v) => `<option>${esc(v)}</option>`).join("");
+    if (VETS.includes(a.vet)) sel.value = a.vet;
+    $("review-reason").value = "";
+    checkReview();
     reviewDlg.showModal();
   }
+
+  const checkReview = () => A && hint($("review-hint"), A.conflict(all, $("review-vet").value, current.date, current.time, current.id));
+  const checkVet = () => A && hint($("vet-hint"), A.conflict(all, $("vet-select").value, current.date, current.time, current.id));
+  $("review-vet").addEventListener("change", checkReview);
+  $("vet-select").addEventListener("change", checkVet);
 
   function openVet(a) {
     current = a;
@@ -165,27 +195,33 @@
     const sel = $("vet-select");
     sel.innerHTML = VETS.map((v) => `<option>${esc(v)}</option>`).join("");
     if (VETS.includes(a.vet)) sel.value = a.vet;
+    checkVet();
     vetDlg.showModal();
   }
 
-  async function approve(a) { await change(a, { status: "confirmed" }); render(); say("Request approved."); }
+  async function approve(a, vet) {
+    const patch = { status: "confirmed" };
+    if (vet) patch.vet = vet;
+    await change(a, patch); render(); say("Request approved.");
+  }
 
   document.addEventListener("click", async (e) => {
     const b = e.target.closest("[data-act]");
     if (!b) return;
     const a = find(b.dataset.id);
     if (!a) return;
-    if (b.dataset.act === "approve") approve(a);
+    if (b.dataset.act === "approve") openReview(a);
     else if (b.dataset.act === "review") openReview(a);
     else if (b.dataset.act === "assign") openVet(a);
     else if (b.dataset.act === "checkin") { await change(a, { status: "checked_in" }); render(); say(a.petName + " checked in."); }
   });
 
   $("review-close").addEventListener("click", () => reviewDlg.close());
-  $("review-approve").addEventListener("click", async () => { reviewDlg.close(); await approve(current); });
+  $("review-approve").addEventListener("click", async () => { reviewDlg.close(); await approve(current, $("review-vet").value); });
   $("review-decline").addEventListener("click", async () => {
+    const reason = $("review-reason").value.trim();
     reviewDlg.close();
-    await change(current, { status: "cancelled" });
+    await change(current, { status: "cancelled", declineReason: reason });
     render(); say("Request declined.");
   });
   $("vet-cancel").addEventListener("click", () => vetDlg.close());
@@ -197,6 +233,16 @@
   });
 
   /* ---------- Page chrome ---------- */
+  /* greeting with the signed-in name: "Good morning, Maria" */
+  (() => {
+    let name = "";
+    for (const store of ["sessionStorage", "localStorage"]) {
+      try { const u = JSON.parse(window[store].getItem("pawpaw_user") || "null"); if (u && u.name) { name = String(u.name).trim(); break; } } catch (_) { /* ignore */ }
+    }
+    if (name && name === name.toLowerCase()) name = name.charAt(0).toUpperCase() + name.slice(1);
+    const h = new Date().getHours();
+    $("greeting").textContent = (h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening") + (name ? ", " + name : "");
+  })();
   $("today").textContent = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
 
   for (const store of ["sessionStorage", "localStorage"]) {

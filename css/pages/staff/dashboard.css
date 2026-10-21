@@ -212,3 +212,7 @@ body.sdash {
 @media (max-width: 520px) {
   .sdash .stats { grid-template-columns: 1fr; }
 }
+.sdash textarea.dlg-select { height: auto; padding: 8px 10px; resize: vertical; }
+.sdash .dlg-hint { margin-top: 10px; min-height: 18px; font-size: 13px; color: #2e7d32; font-weight: 600; }
+.sdash .dlg-hint.bad { color: #b36b00; }
+.sdash .resch-tag { display: inline-block; margin-left: 6px; padding: 2px 8px; border-radius: 999px; background: #e8d5f5; color: #4a2a63; font-size: 11px; font-weight: 700; vertical-align: middle; }

@@ -15,7 +15,7 @@
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   /* who is signed in: owner (own list), staff / admin (shared "staff" list), vet (list of that vet).
      VETS mirrors js/staff/staff-appts-store.js; a vet login that matches none of them sees every vet's list. */
-  const VETS = ["Dr. Maria Santos", "Dr. Jose Reyes"];
+  const VETS = (() => { try { const v = JSON.parse(localStorage.getItem("pawpaw_vets") || "null"); if (Array.isArray(v) && v.length) return v.map((x) => x.name); } catch (_) { /* default */ } return ["Dr. Anajoy N. Abila", "Dr. Sean Kurvie G. Buerano", "Dr. Roxanne N. Regulacion", "Dr. Jenmarc M. Ronquillo", "Dr. Kyla Shane T. Rubia"]; })();
   const user = (() => {
     for (const st of ["sessionStorage", "localStorage"]) {
       try { const u = JSON.parse(window[st].getItem("pawpaw_user") || "null"); if (u && u.name) return u; } catch (_) {}
@@ -48,6 +48,7 @@
 
   const IS_STAFF = role === "staff" || role === "admin";   // staff bell reads "pawpaw_notifications:staff" (owner book / cancel / reschedule)
   const IS_VET = role === "vet";                            // vet bell: new patient, check-in, reschedule, cancel
+  const ACCENT = (IS_STAFF || IS_VET) ? "#f2d64f" : "#e29d1a";   // bell ring + toast edge: Golden Lemon for staff and vet, orange for owners
   /* Where a notification leads: the page of what it is about. A notification can carry its own page in
      "link" (e.g. "medical-records.html"); older ones are matched by their title / type. */
   function pageOf(n) {
@@ -83,8 +84,8 @@
   /* ---------- styles ---------- */
   const css = document.createElement("style");
   css.textContent = `
-  .nb-bell{position:fixed;top:16px;right:24px;z-index:60;width:46px;height:46px;border-radius:50%;background:#fff;color:#0f6b5c;display:grid;place-items:center;cursor:pointer;border:3px solid #e29d1a;box-shadow:0 2px 10px rgba(0,0,0,.3)}
-  .nb-bell:hover{background:#f1f6f3}.nb-bell:focus-visible{outline:3px solid #e2a21c;outline-offset:2px}
+  .nb-bell{position:fixed;top:16px;right:24px;z-index:60;width:46px;height:46px;border-radius:50%;background:#fff;color:#0f6b5c;display:grid;place-items:center;cursor:pointer;border:3px solid ${ACCENT};box-shadow:0 2px 10px rgba(0,0,0,.3)}
+  .nb-bell:hover{background:#f1f6f3}.nb-bell:focus-visible{outline:3px solid ${ACCENT};outline-offset:2px}
   .nb-badge{position:absolute;top:-4px;right:-4px;min-width:20px;height:20px;padding:0 5px;border-radius:999px;background:#d9534f;color:#fff;font:700 12px/20px Inter,sans-serif;text-align:center;box-sizing:border-box}
   .nb-panel{position:fixed;top:72px;right:24px;z-index:61;width:min(380px,calc(100vw - 32px));max-height:min(520px,calc(100vh - 100px));display:flex;flex-direction:column;background:#fff;color:#222;border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.28);font-family:Inter,sans-serif;overflow:hidden}
   .nb-panel[hidden]{display:none}
@@ -106,7 +107,7 @@
   .nb-tab.on{background:#0f6b5c;color:#fff}
   .nb-group{padding:14px 20px 6px;font:700 12px Inter,sans-serif;letter-spacing:.04em;text-transform:uppercase;color:#6a6a6a;background:#fff;position:sticky;top:0}
   .nb-toasts{position:fixed;right:24px;bottom:24px;z-index:70;display:grid;gap:12px;width:min(360px,calc(100vw - 32px));font-family:Inter,sans-serif}
-  .nb-toast{display:flex;gap:14px;align-items:flex-start;padding:16px 18px;border-radius:14px;background:#fff;color:#222;border-left:6px solid #e29d1a;box-shadow:0 10px 30px rgba(0,0,0,.35);text-decoration:none;animation:nbin .25s ease-out}
+  .nb-toast{display:flex;gap:14px;align-items:flex-start;padding:16px 18px;border-radius:14px;background:#fff;color:#222;border-left:6px solid ${ACCENT};box-shadow:0 10px 30px rgba(0,0,0,.35);text-decoration:none;animation:nbin .25s ease-out}
   .nb-toast .nb-ico{background:#fdf0d2;color:#b97a00}
   .nb-toast strong{display:block;font-size:14.5px;line-height:1.3;color:#111}
   .nb-toast span.t{display:block;margin-top:3px;font-size:13px;line-height:1.45;color:#444}

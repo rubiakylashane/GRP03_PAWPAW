@@ -127,6 +127,8 @@
     const vk = "pawpaw_vaccinations:" + a.owner, vx = V.readJson(vk, []).filter((r) => r.apptId !== a.id);
     blocks.filter((b) => b.type === "Vaccination").forEach((b, i) => vx.push({ id: "vx-" + Date.now().toString(36) + i, apptId: a.id, petId: a.petId || "", vaccine: b.vaccine.trim(), pet: V.petName(a), dateAdministered: b.given, nextDue: b.due, administeredBy: a.vet, notes: "" }));
     try { localStorage.setItem(rk, JSON.stringify(rec)); localStorage.setItem(vk, JSON.stringify(vx)); } catch (_) { return err("Could not save. Storage is blocked."); }
+    window.PawOwners.audit(old ? "update" : "create", "medical_record", (old ? "Updated" : "Added") + " the medical record of " + V.petName(a) + ".");
+    if (rx.length) window.PawOwners.audit(old ? "update" : "create", "prescription", (old ? "Updated" : "Added") + " " + rx.length + " prescription" + (rx.length === 1 ? "" : "s") + " for " + V.petName(a) + ": " + rx.map((r) => r.medication).join(", ") + ".");
     A.notify(a.owner, "record", old ? "Medical record updated" : "Medical record added", V.petName(a) + "'s medical record is ready. See Medical Records for the details.");
     const given = blocks.filter((b) => b.type === "Vaccination");
     if (given.length) A.notify(a.owner, "record", "Vaccination recorded", given.map((b) => b.vaccine.trim()).join(", ") + " given to " + V.petName(a) + ". See Vaccination History for the next due date.");

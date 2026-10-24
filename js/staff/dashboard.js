@@ -9,7 +9,7 @@
     appointments: "/api/staff/appointments",   // GET   -> [{ id, owner, petName, vet, date, time, services:[{name}], status, walkIn }]
     update: "/api/staff/appointments/"         // PATCH /:id  { status, vet }
   };
-  const VETS = ["Dr. Maria Santos", "Dr. Jose Reyes"];
+  const VETS = (window.PawStaffAppts && window.PawStaffAppts.VETS) || ["Dr. Anajoy N. Abila", "Dr. Sean Kurvie G. Buerano", "Dr. Roxanne N. Regulacion", "Dr. Jenmarc M. Ronquillo", "Dr. Kyla Shane T. Rubia"];
   const SHOW_DEMO = false; // true = fill the page with sample rows to preview the layout
 
   const KEY = "pawpaw_appointments:";
@@ -70,7 +70,7 @@
       } catch (_) { /* ignore */ }
     }
     tellOwner(appt, patch);
-    if (!USE_BACKEND && !SHOW_DEMO && window.PawStaffAppts) window.PawStaffAppts.vetChanged({ ...appt }, patch);
+    if (!USE_BACKEND && window.PawStaffAppts) window.PawStaffAppts.vetChanged({ ...appt }, patch);
     Object.assign(appt, patch);
   }
 
@@ -135,6 +135,14 @@
       </div>`;
   }
 
+  /* "Today: 4 appointments • Vaccination ×2 • Laboratory Test ×1": how many, and which services (cancelled ones are left out) */
+  function todaySummary(list, noun) {
+    const rows = list.filter((a) => a.status !== "cancelled"), n = {};
+    rows.forEach((a) => { [...new Set((a.services || []).map((l) => String(l.name || "").split(" (")[0]).filter(Boolean))].forEach((s) => { n[s] = (n[s] || 0) + 1; }); });
+    const parts = Object.keys(n).sort((x, y) => n[y] - n[x]).slice(0, 3).map((s) => s + " \u00D7" + n[s]);
+    return rows.length ? "Today: " + rows.length + " " + (rows.length === 1 ? noun[0] : noun[1]) + (parts.length ? " \u2022 " + parts.join(" \u2022 ") : "") : "No " + noun[1] + " today.";
+  }
+
   function render() {
     const today = todayIso();
     const byTime = (a, b) => String(a.time).localeCompare(String(b.time));
@@ -142,6 +150,7 @@
     const pending = all.filter((a) => a.status === "pending").sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
 
     $("stat-today").textContent = todays.length;
+    $("today-sum").textContent = todaySummary(todays, ["appointment", "appointments"]);
     $("stat-pending").textContent = pending.length;
     $("stat-walkins").textContent = all.filter((a) => a.date === today && a.walkIn && a.status !== "cancelled").length;
     $("stat-checkedin").textContent = all.filter((a) => a.date === today && a.status === "checked_in").length;

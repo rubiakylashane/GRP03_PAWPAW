@@ -61,19 +61,38 @@ window.PawOwners = (() => {
   const exists = (key) => keys().includes(key);
   const list = () => keys().map(owner);
 
-  function saveProfile(key, patch) {
+  /* audit trail (demo): shared list "pawpaw_audit", read by the admin Audit Log page.
+     Backend: the server writes this itself, from the signed-in user, whenever a record is created, changed or deleted. */
+  function audit(action, record, details) {
+    try {
+      let u = null;
+      for (const st of ["sessionStorage", "localStorage"]) { try { const x = JSON.parse(window[st].getItem("pawpaw_user") || "null"); if (x && x.name) { u = x; break; } } catch (_) { /* ignore */ } }
+      const raw = (u && u.name) || "Unknown", who = raw === raw.toLowerCase() ? raw.charAt(0).toUpperCase() + raw.slice(1) : raw;
+      const a = JSON.parse(localStorage.getItem("pawpaw_audit") || "[]");
+      a.push({ at: new Date().toISOString(), user: who, role: (u && u.role) || "", action, record, details,
+        text: "<strong>" + esc(who) + "</strong> " + esc(details.charAt(0).toLowerCase() + details.slice(1)) });
+      localStorage.setItem("pawpaw_audit", JSON.stringify(a.slice(-500)));
+    } catch (_) { /* ignore */ }
+  }
+
+  /* quiet = true when the caller writes its own audit line (or the profile is brand new) */
+  function saveProfile(key, patch, quiet) {
+    const name = (read(PROF + key, {}) || {}).name;
     write(PROF + key, { ...(read(PROF + key, {}) || {}), ...patch });
+    if (!quiet) audit("update", "owner", "Updated owner " + (patch.name || name || key) + ".");
   }
 
   /* walk-in owner registered by staff */
   function createWalkin({ first, middle, last, phone, email }) {
     const key = "walkin-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
     const w = read(WALK, []); w.push({ key }); write(WALK, w);
+    const full = [first, middle, last].filter(Boolean).join(" ");
+    audit("create", "owner", "Registered walk-in owner " + full + ".");
     saveProfile(key, {
-      name: [first, middle, last].filter(Boolean).join(" "),
+      name: full,
       firstName: first, middleName: middle, lastName: last,
       phone, email, address: "", photo: "", memberSince: today(), walkIn: true
-    });
+    }, true);
     return key;
   }
 
@@ -84,12 +103,14 @@ window.PawOwners = (() => {
     const list = petsOf(key);
     const created = { ...pet, id: "p" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6) };
     list.push(created); write(PETS + key, list);
+    audit("create", "pet", "Added pet " + (created.name || "") + " for " + (owner(key).name || key) + ".");
     return created;
   }
   function updatePet(key, id, patch) {
     const list = petsOf(key), i = list.findIndex((p) => p.id === id);
     if (i < 0) return null;
     list[i] = { ...list[i], ...patch, id }; write(PETS + key, list);
+    audit("update", "pet", "Updated pet " + (list[i].name || "") + " of " + (owner(key).name || key) + ".");
     return list[i];
   }
 
@@ -127,6 +148,6 @@ window.PawOwners = (() => {
     catch (_) { return ""; }
   }
 
-  return { list, owner, exists, saveProfile, createWalkin, petsOf, getPet, addPet, updatePet,
+  return { audit, list, owner, exists, saveProfile, createWalkin, petsOf, getPet, addPet, updatePet,
            esc, fmtLong, fmtShort, ageText, validPhone, validEmail, setFlash, takeFlash };
 })();

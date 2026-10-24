@@ -23,3 +23,10 @@ window.PawServices = [
   { id: "lab", name: "Laboratory Test", price: 900,
     desc: "Blood and other lab work ordered by your veterinarian to support a diagnosis." }
 ];
+
+/* the admin Services page saves its list in "pawpaw_services": when it exists, owners and staff see that list instead.
+   Backend: remove this and fill window.PawServices from GET /api/services. */
+try {
+  const saved = JSON.parse(localStorage.getItem("pawpaw_services") || "null");
+  if (Array.isArray(saved) && saved.length) window.PawServices = saved;
+} catch (_) { /* keep the default list */ }

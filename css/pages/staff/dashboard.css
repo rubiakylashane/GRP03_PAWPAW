@@ -4,7 +4,8 @@
    Background picture: assets/images/dashboard-bg.svg (url below is relative to THIS file). */
 
 body.sdash {
-  --orange: #e29d1a;
+  --orange: #f2d64f;   /* Golden Lemon (staff and vet sidebar, mobile bar, buttons) */
+  --on-lemon: #123d33;  /* dark green text on the lemon colour */
   --green: #0f6b5c;
   --green-dark: #0b5649;
   --ink: #111;
@@ -35,7 +36,7 @@ body.sdash {
   width: var(--sidebar-w);
   display: flex; flex-direction: column;
   background: var(--orange);
-  color: #fff;
+  color: var(--on-lemon);
   z-index: 40;
 }
 .sdash .sidebar-brand {
@@ -49,16 +50,16 @@ body.sdash {
 .sdash .nav-link {
   display: flex; align-items: center; gap: 14px;
   padding: 14px 12px; border-radius: 8px;
-  font-size: 22px; font-weight: 600; letter-spacing: -0.02em; color: #fff;
+  font-size: 22px; font-weight: 600; letter-spacing: -0.02em; color: var(--on-lemon);
   transition: background .15s;
 }
 .sdash .nav-link svg { width: 28px; height: 28px; flex: none; }
-.sdash .nav-link:hover { background: rgba(255, 255, 255, .18); }
-.sdash .nav-link.active, .sdash .nav-link.active:hover { background: var(--green); }
+.sdash .nav-link:hover { background: rgba(18, 61, 51, .12); }
+.sdash .nav-link.active, .sdash .nav-link.active:hover { background: var(--green); color: #fff; }
 .sdash .sidebar-user {
   margin: auto 8px 0; padding: 18px 16px 22px;
   display: flex; align-items: center; gap: 22px;
-  border-top: 1px solid rgba(255, 255, 255, .45);
+  border-top: 1px solid rgba(18, 61, 51, .35);
 }
 .sdash .avatar {
   width: 80px; height: 80px; flex: none; border-radius: 50%;
@@ -78,26 +79,27 @@ body.sdash {
 .sdash .page-head { margin-bottom: 26px; }
 .sdash .page-head h1 { font-size: 36px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.1; }
 .sdash .date { margin-top: 8px; font-size: 14px; }
+.sdash .today-sum { margin-top: 4px; font-weight: 600; }
 
 /* Stats */
 .sdash .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px; margin-bottom: 46px; }
 .sdash .stat {
-  min-height: 148px; padding: 20px 18px 16px;
+  min-height: 100px; padding: 18px 18px 16px;
   color: var(--ink); background: #fff;
   border: 1px solid var(--line); border-radius: 26px;
 }
-.sdash .stat h3 { font-size: 16px; font-weight: 400; color: #333; letter-spacing: 0; }
-.sdash .stat-value { margin-top: 18px; padding-left: 8px; font-size: 38px; font-weight: 700; line-height: 1; }
+.sdash .stat h3 { font-size: 12.5px; font-weight: 400; color: #333; letter-spacing: 0; }
+.sdash .stat-value { margin-top: 10px; padding-left: 8px; font-size: 28px; font-weight: 700; line-height: 1; }
 
 /* Cards */
 .sdash .dash-grid { display: grid; grid-template-columns: minmax(0, 1fr) 306px; gap: 40px; align-items: start; }
 .sdash .card {
-  min-height: 386px; padding: 22px 20px 24px;
+  min-height: 0; padding: 22px 20px 24px;
   color: var(--ink); background: #fff;
   border: 1px solid var(--line); border-radius: 28px;
 }
 .sdash .card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
-.sdash .card-head h2 { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+.sdash .card-head h2 { font-size: 16px; font-weight: 700; letter-spacing: -0.02em; }
 .sdash .card-head-line { padding-bottom: 8px; margin-bottom: 10px; border-bottom: 1px solid #777; }
 .sdash .link-sm { font-size: 12px; font-weight: 600; color: var(--green); }
 .sdash .link-sm:hover { text-decoration: underline; }
@@ -111,16 +113,16 @@ body.sdash {
 }
 .sdash .row-head {
   min-height: 0; padding: 6px 4px;
-  font-size: 11.5px; font-weight: 500; letter-spacing: 0; text-transform: uppercase; color: #333;
+  font-size: 11px; font-weight: 500; letter-spacing: 0; text-transform: uppercase; color: #333;
   border-bottom: 1px solid #777;
 }
 .sdash .row:last-child { border-bottom: 0; }
-.sdash .c-time { font-size: 14px; }
+.sdash .c-time { font-size: 13px; }
 .sdash .cell-main { display: block; font-size: 13px; font-weight: 700; }
-.sdash .cell-sub { display: block; margin-top: 2px; font-size: 10.5px; font-weight: 500; color: #333; }
-.sdash .c-service { font-size: 14px; }
+.sdash .cell-sub { display: block; margin-top: 2px; font-size: 11.5px; font-weight: 500; color: #333; }
+.sdash .c-service { font-size: 13px; }
 .sdash .c-action { text-align: center; }
-.sdash .row > .c-action { display: flex; justify-content: center; font-size: 11px; font-weight: 500; }
+.sdash .row > .c-action { display: flex; justify-content: center; font-size: 11.5px; font-weight: 500; }
 
 .sdash .pill {
   display: inline-block; padding: 1px 16px; border-radius: 999px;
@@ -134,7 +136,7 @@ body.sdash {
 .sdash .btn {
   display: inline-flex; align-items: center; justify-content: center;
   padding: 5px 14px; min-width: 88px;
-  font: inherit; font-size: 11px; font-weight: 600; letter-spacing: 0;
+  font: inherit; font-size: 11.5px; font-weight: 600; letter-spacing: 0;
   border: 1px solid transparent; border-radius: 6px; cursor: pointer;
   transition: background .15s;
 }
@@ -153,11 +155,11 @@ body.sdash {
 .sdash .req:last-child { border-bottom: 0; }
 .sdash .req-title { font-size: 13px; }
 .sdash .req-title strong { font-weight: 700; }
-.sdash .req-sub { margin-top: 2px; font-size: 10.5px; color: #333; }
+.sdash .req-sub { margin-top: 2px; font-size: 11.5px; color: #333; }
 .sdash .req-actions { display: flex; gap: 14px; margin-top: 10px; }
 .sdash .req-actions .btn { min-width: 88px; padding: 6px 14px; }
 
-.sdash .empty { padding: 22px 4px; font-size: 14px; color: var(--muted); }
+.sdash .empty { padding: 22px 4px; font-size: 13px; color: var(--muted); }
 
 /* Toast */
 .sdash .toast {
@@ -176,15 +178,15 @@ body.sdash {
   border: 1px solid #555; border-radius: 16px;
 }
 .sdash .dlg::backdrop { background: rgba(0, 0, 0, .45); }
-.sdash .dlg h2 { font-size: 20px; font-weight: 700; }
-.sdash .dlg-sub { margin-top: 4px; font-size: 14px; color: var(--muted); }
-.sdash .dlg-facts { display: grid; gap: 8px; margin-top: 14px; font-size: 14px; }
+.sdash .dlg h2 { font-size: 16px; font-weight: 700; }
+.sdash .dlg-sub { margin-top: 4px; font-size: 13px; color: var(--muted); }
+.sdash .dlg-facts { display: grid; gap: 8px; margin-top: 14px; font-size: 13px; }
 .sdash .dlg-facts div { display: grid; grid-template-columns: 110px 1fr; gap: 10px; }
 .sdash .dlg-facts dt { font-weight: 600; }
-.sdash .dlg-label { display: block; margin: 16px 0 6px; font-size: 14px; font-weight: 600; }
-.sdash .dlg-select { width: 100%; height: 40px; padding: 0 10px; font: inherit; font-size: 14px; border: 1px solid #555; border-radius: 8px; background: #fff; }
+.sdash .dlg-label { display: block; margin: 16px 0 6px; font-size: 12px; font-weight: 600; }
+.sdash .dlg-select { width: 100%; height: 40px; padding: 0 10px; font: inherit; font-size: 13px; border: 1px solid #555; border-radius: 8px; background: #fff; }
 .sdash .dlg-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; }
-.sdash .dlg .btn { font-size: 14px; padding: 8px 16px; }
+.sdash .dlg .btn { font-size: 13px; padding: 8px 16px; }
 
 /* Mobile */
 .sdash .mobile-bar, .sdash .overlay { display: none; }
@@ -195,9 +197,9 @@ body.sdash {
 @media (max-width: 900px) {
   .sdash .mobile-bar {
     position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 12px;
-    padding: 12px 16px; color: #fff; background: var(--orange);
+    padding: 12px 16px; color: var(--on-lemon); background: var(--orange);
   }
-  .sdash .menu-btn { display: grid; place-items: center; width: 40px; height: 40px; color: #fff; background: none; border: 0; border-radius: 8px; cursor: pointer; }
+  .sdash .menu-btn { display: grid; place-items: center; width: 40px; height: 40px; color: var(--on-lemon); background: none; border: 0; border-radius: 8px; cursor: pointer; }
   .sdash .menu-btn svg { width: 26px; height: 26px; }
   .sdash .mobile-title { font-family: "IBM Plex Mono", monospace; font-weight: 700; }
   .sdash .sidebar { width: min(300px, 85vw); transform: translateX(-100%); transition: transform .2s; }

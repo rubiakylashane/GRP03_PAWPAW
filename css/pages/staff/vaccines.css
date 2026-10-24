@@ -4,14 +4,14 @@
 /* list */
 .sdash .vx-list .vrow { grid-template-columns: 1fr 1.25fr 1.1fr 1.1fr 1.35fr 1.35fr; gap: 14px; min-height: 0; }
 .sdash .vx-list .vrow.orow-head { min-height: 0; }
-.sdash .vx-list .orow > [role="cell"] { font-size: 17px; }
+.sdash .vx-list .orow > [role="cell"] { font-size: 13px; }
 .sdash .vx-list .o-name { font-weight: 700; }
-.sdash .vpill { display: inline-block; padding: 5px 14px; border-radius: 999px; font-size: 15px; font-weight: 600; color: #fff; }
+.sdash .vpill { display: inline-block; padding: 5px 14px; border-radius: 999px; font-size: 11px; font-weight: 600; color: #fff; }
 .sdash .vpill-red { background: #d9534f; }
 .sdash .vpill-orange { background: #e8892b; }
 .sdash .vpill-green { background: #3ea86a; }
 .sdash .v-actions { display: flex; gap: 8px; }
-.sdash .v-actions .obtn-sm { min-height: 40px; padding: 0 16px; font-size: 14px; text-decoration: none; display: inline-flex; align-items: center; white-space: nowrap; }
+.sdash .v-actions .obtn-sm { min-height: 40px; padding: 0 16px; font-size: 11.5px; text-decoration: none; display: inline-flex; align-items: center; white-space: nowrap; }
 
 /* book form */
 .sdash .vx-book { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 28px; align-items: start; }
@@ -30,7 +30,7 @@
 .sdash .vx-svc { margin-bottom: 14px; border: 1px solid #555; border-radius: 10px; background: #fff; }
 .sdash .vx-svc.on { background: #0f6b5c; color: #fff; border-color: #0f6b5c; }
 .sdash .vx-svc-head { display: flex; align-items: center; gap: 14px; padding: 16px 18px; cursor: pointer; font-size: 16px; font-weight: 500; }
-.sdash .vx-svc-head input { width: 20px; height: 20px; accent-color: #f2b233; }
+.sdash .vx-svc-head input { width: 20px; height: 20px; accent-color: var(--orange); }
 .sdash .vx-svc-name { flex: 1; }
 .sdash .vx-price { font-weight: 600; font-size: 15px; }
 .sdash .vx-types { padding: 0 18px 16px 52px; display: grid; gap: 10px; }
@@ -39,7 +39,7 @@
 
 /* summary */
 .sdash .vx-sum { padding: 22px 24px 26px; max-width: none; }
-.sdash .vx-sum h2 { font-size: 20px; font-weight: 700; padding-bottom: 12px; border-bottom: 1px solid #777; }
+.sdash .vx-sum h2 { font-size: 16px; font-weight: 700; padding-bottom: 12px; border-bottom: 1px solid #777; }
 .sdash .vx-sum dl { margin-top: 12px; display: grid; gap: 10px; font-size: 15px; }
 .sdash .vx-sum dl div { display: flex; justify-content: space-between; gap: 14px; }
 .sdash .vx-sum dt { color: #444; }

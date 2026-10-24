@@ -7,12 +7,30 @@
      POST  /api/staff/appointments       { owner, petId, service, date, time, vet } */
 window.PawStaffAppts = (() => {
   const KEY = "pawpaw_appointments:";
-  const VETS = ["Dr. Maria Santos", "Dr. Jose Reyes"];
-  const SERVICES = ["General Consultation", "Vaccination", "Deworming", "Grooming", "Dental Cleaning", "Laboratory Test"];   // same names as the owner Services page (svc/services-data.js)
+  /* the doctors: the admin Veterinarians page saves them in "pawpaw_vets"; until then these are used */
+  const VETS = (() => { try { const v = JSON.parse(localStorage.getItem("pawpaw_vets") || "null"); if (Array.isArray(v) && v.length) return v.map((x) => x.name); } catch (_) { /* default */ } return ["Dr. Anajoy N. Abila", "Dr. Sean Kurvie G. Buerano", "Dr. Roxanne N. Regulacion", "Dr. Jenmarc M. Ronquillo", "Dr. Kyla Shane T. Rubia"]; })();
+  /* same names as the owner Services page: the admin Services page saves them in "pawpaw_services"; until then these are used */
+  const SERVICES = (() => { try { const v = JSON.parse(localStorage.getItem("pawpaw_services") || "null"); if (Array.isArray(v) && v.length) return v.map((x) => x.name); } catch (_) { /* default */ } return ["General Consultation", "Vaccination", "Deworming", "Grooming", "Dental Cleaning", "Laboratory Test"]; })();
   const STATUS = { pending: "Pending", confirmed: "Confirmed", checked_in: "Checked in", with_vet: "With vet", completed: "Completed", cancelled: "Cancelled", no_show: "No-show" };
   const ORDER = ["pending", "confirmed", "checked_in", "with_vet", "completed", "no_show", "cancelled"];
   const ACTIVE = ["pending", "confirmed", "checked_in", "with_vet"];   // still occupy a vet's time
   const TBA = "To be assigned";
+
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  /* audit trail (demo): shared list "pawpaw_audit", read by the admin Audit Log page.
+     Backend: the server writes this itself, from the signed-in user, whenever a record is created, changed or deleted. */
+  function audit(action, record, details) {
+    try {
+      let u = null;
+      for (const st of ["sessionStorage", "localStorage"]) { try { const x = JSON.parse(window[st].getItem("pawpaw_user") || "null"); if (x && x.name) { u = x; break; } } catch (_) { /* ignore */ } }
+      const raw = (u && u.name) || "Unknown", who = raw === raw.toLowerCase() ? raw.charAt(0).toUpperCase() + raw.slice(1) : raw;
+      const a = JSON.parse(localStorage.getItem("pawpaw_audit") || "[]");
+      a.push({ at: new Date().toISOString(), user: who, role: (u && u.role) || "", action, record, details,
+        text: "<strong>" + esc(who) + "</strong> " + esc(details.charAt(0).toLowerCase() + details.slice(1)) });
+      localStorage.setItem("pawpaw_audit", JSON.stringify(a.slice(-500)));
+    } catch (_) { /* ignore */ }
+  }
+  function ownerLabel(key) { try { return (JSON.parse(localStorage.getItem("pawpaw_profile:" + key) || "{}") || {}).name || key; } catch (_) { return key; } }
 
   function load() {
     const out = [];
@@ -54,7 +72,8 @@ window.PawStaffAppts = (() => {
   }
 
   /* save a change (status / vet / date / time ...) back to the owner's list */
-  function change(appt, patch) {
+  /* quiet = true when the caller writes its own audit line (the admin Appointments page does) */
+  function change(appt, patch, quiet) {
     const before = { ...appt };
     try {
       const list = JSON.parse(localStorage.getItem(appt._key) || "[]");
@@ -62,6 +81,13 @@ window.PawStaffAppts = (() => {
       if (i >= 0) { list[i] = { ...list[i], ...patch, updatedAt: new Date().toISOString() }; localStorage.setItem(appt._key, JSON.stringify(list)); }
     } catch (_) { /* ignore */ }
     vetChanged(before, patch);
+    if (!quiet) {
+      const bits = [];
+      if (patch.status && patch.status !== before.status) bits.push("status from " + (STATUS[before.status] || before.status) + " to " + (STATUS[patch.status] || patch.status));
+      if (patch.vet && patch.vet !== before.vet) bits.push("veterinarian to " + patch.vet);
+      if ((patch.date && patch.date !== before.date) || (patch.time && patch.time !== before.time)) bits.push("schedule to " + (patch.date || before.date) + " " + (patch.time || before.time || ""));
+      if (bits.length) audit("update", "appointment", "Changed the appointment of " + (before.petName || "a pet") + " (" + ownerLabel(before.owner) + "): " + bits.join(", ") + ".");
+    }
     Object.assign(appt, patch);
     return appt;
   }
@@ -76,6 +102,7 @@ window.PawStaffAppts = (() => {
       list.push(a);
       localStorage.setItem(key, JSON.stringify(list));
     } catch (_) { /* ignore */ }
+    audit("create", "appointment", "Booked an appointment for " + (a.petName || "a pet") + " (" + ownerLabel(ownerKey) + ") on " + a.date + " " + (a.time || "") + ".");
     if (a.vet && a.vet !== TBA) notifyVet(a.vet, "New patient assigned", (a.petName || "Pet") + ", " + a.date + " " + (a.time || "") + ".");
     return { ...a, owner: ownerKey, _key: key };
   }

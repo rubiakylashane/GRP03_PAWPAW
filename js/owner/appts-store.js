@@ -45,6 +45,15 @@ window.PawAppts = (() => {
     } catch (_) { /* ignore */ }
   }
 
+  /* audit trail (demo): shared list "pawpaw_audit", read by the admin Audit Log page. Backend: the server writes this itself. */
+  function audit(action, details) {
+    try {
+      const who = ownerName(), a = JSON.parse(localStorage.getItem("pawpaw_audit") || "[]"), esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+      a.push({ at: new Date().toISOString(), user: who, role: "owner", action, record: "appointment", details, text: "<strong>" + esc(who) + "</strong> " + esc(details.charAt(0).toLowerCase() + details.slice(1)) });
+      localStorage.setItem("pawpaw_audit", JSON.stringify(a.slice(-500)));
+    } catch (_) { /* ignore */ }
+  }
+
   function load() {
     try {
       const v = JSON.parse(localStorage.getItem(userKey(BASE)) || "null");
@@ -69,6 +78,7 @@ window.PawAppts = (() => {
     list.push(created);
     save(list);
     tellStaff("New appointment request", created);
+    audit("create", "Requested an appointment for " + (created.petName || "a pet") + " on " + created.date + " " + (created.time || "") + ".");
     return created;
   }
 
@@ -82,8 +92,8 @@ window.PawAppts = (() => {
     const before = list[i];
     list[i] = { ...before, ...patch, updatedAt: new Date().toISOString() };
     save(list);
-    if (patch.status === "cancelled" && before.status !== "cancelled") { tellStaff("Appointment cancelled by owner", list[i]); tellVet("Appointment cancelled", list[i]); }
-    else if ((patch.date && patch.date !== before.date) || (patch.time && patch.time !== before.time)) { tellStaff("Reschedule request", list[i]); tellVet("Appointment rescheduled", list[i]); }
+    if (patch.status === "cancelled" && before.status !== "cancelled") { tellStaff("Appointment cancelled by owner", list[i]); tellVet("Appointment cancelled", list[i]); audit("update", "Cancelled the appointment of " + (list[i].petName || "a pet") + " on " + list[i].date + " " + (list[i].time || "") + "."); }
+    else if ((patch.date && patch.date !== before.date) || (patch.time && patch.time !== before.time)) { tellStaff("Reschedule request", list[i]); tellVet("Appointment rescheduled", list[i]); audit("update", "Rescheduled the appointment of " + (list[i].petName || "a pet") + " to " + list[i].date + " " + (list[i].time || "") + "."); }
     return list[i];
   }
 

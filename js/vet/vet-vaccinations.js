@@ -74,6 +74,7 @@
     const pet = O.getPet(owner, petId), k = KEY + owner, list = V.readJson(k, []);
     list.push({ id: "vx-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), apptId: "", petId, pet: pet ? pet.name : "", vaccine, dateAdministered: given, nextDue: due, administeredBy: V.mine || "Vet", notes: $("rv-notes").value.trim() });
     try { localStorage.setItem(k, JSON.stringify(list)); } catch (_) { return err("Could not save. Storage is blocked."); }
+    window.PawOwners.audit("create", "vaccination", "Recorded " + vaccine + " vaccination for " + (pet ? pet.name : "a pet") + ".");
     window.PawStaffAppts.notify(owner, "record", "Vaccination recorded", vaccine + " given to " + (pet ? pet.name : "your pet") + ". See Vaccination History for the next due date.");
     rows = readAll(); dlg.close(); render(); S.toast("Vaccination recorded.");
   }

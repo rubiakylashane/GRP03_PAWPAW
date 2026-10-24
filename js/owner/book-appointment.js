@@ -8,7 +8,7 @@
 
   /* ================= EDIT THESE ================= */
   // Veterinarians shown in the dropdown (leave "To be assigned" when none is picked)
-  const VETS = ["Dr. Maria Santos", "Dr. Jose Reyes"];
+  const VETS = (() => { try { const v = JSON.parse(localStorage.getItem("pawpaw_vets") || "null"); if (Array.isArray(v) && v.length) return v.map((x) => x.name); } catch (_) { /* default */ } return ["Dr. Anajoy N. Abila", "Dr. Sean Kurvie G. Buerano", "Dr. Roxanne N. Regulacion", "Dr. Jenmarc M. Ronquillo", "Dr. Kyla Shane T. Rubia"]; })();   // the admin Veterinarians page saves the list in "pawpaw_vets"
 
   // Clinic hours: first slot, closing time (no slot starts at closing time), minutes per slot
   const HOURS = { open: "09:00", close: "17:00", step: 30 };

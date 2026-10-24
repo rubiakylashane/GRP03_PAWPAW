@@ -13,7 +13,16 @@
   const todays = all.filter((a) => a.date === t).sort(by);
   const upcoming = all.filter((a) => a.status === "confirmed" && a.date > t).sort(by);
   const done = all.filter((a) => a.status === "completed").sort((a, b) => V.stamp(b).localeCompare(V.stamp(a)));
+  /* "Today: 4 appointments • Vaccination ×2 • Laboratory Test ×1": how many, and which services (cancelled ones are left out) */
+  function todaySummary(list, noun) {
+    const rows = list.filter((a) => a.status !== "cancelled"), n = {};
+    rows.forEach((a) => { [...new Set((a.services || []).map((l) => String(l.name || "").split(" (")[0]).filter(Boolean))].forEach((s) => { n[s] = (n[s] || 0) + 1; }); });
+    const parts = Object.keys(n).sort((x, y) => n[y] - n[x]).slice(0, 3).map((s) => s + " \u00D7" + n[s]);
+    return rows.length ? "Today: " + rows.length + " " + (rows.length === 1 ? noun[0] : noun[1]) + (parts.length ? " \u2022 " + parts.join(" \u2022 ") : "") : "No " + noun[1] + " today.";
+  }
+
   $("stat-today").textContent = todays.length;
+  $("today-sum").textContent = todaySummary(todays, ["patient", "patients"]);
   $("stat-progress").textContent = all.filter((a) => a.status === "with_vet").length;
   $("stat-done").textContent = done.filter((a) => a.date === t).length;
   $("stat-upcoming").textContent = upcoming.length;

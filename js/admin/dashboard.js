@@ -7,8 +7,6 @@
        revenueLastMonth, completedThisMonth, cancelRate, noShowRate,   (rates are % of this month's appointments up to today)
        vetsToday: [{ name, done, total }], unassignedToday,
        weekRevenue: [Mon..Sun amounts], topServices: [{ name, n }] (this week),
-       busyDays: [Mon..Sun counts], busyHours: [{ h: 8, n: 12 }] (last 90 days),
-       attention: [{ n, label, href, red? }],
        today: [{ time: "09:00", pet, owner, vet, status }] } */
 (() => {
   const USE_BACKEND = false;
@@ -41,15 +39,6 @@
     unassignedToday: 1,
     weekRevenue: [8200, 12400, 9100, 15600, 11800, 18900, 4300],
     topServices: [{ name: "Vaccination", n: 48 }, { name: "General Consultation", n: 32 }, { name: "Grooming", n: 20 }, { name: "Dental Cleaning", n: 12 }, { name: "Laboratory Test", n: 8 }],
-    busyDays: [18, 26, 24, 22, 28, 34, 12],
-    busyHours: [{ h: 8, n: 6 }, { h: 9, n: 14 }, { h: 10, n: 22 }, { h: 11, n: 20 }, { h: 12, n: 8 }, { h: 13, n: 15 }, { h: 14, n: 24 }, { h: 15, n: 21 }, { h: 16, n: 14 }, { h: 17, n: 6 }],
-    attention: [
-      { n: 8, label: "Appointment requests waiting for approval", href: "appointments.html?status=pending" },
-      { n: 3, label: "Upcoming appointments with no veterinarian", href: "appointments.html?vet=unassigned" },
-      { n: 5, label: "Vaccinations overdue", href: "../staff/vaccine-reminders.html", red: true },
-      { n: 7, label: "Vaccinations due in the next 7 days", href: "../staff/vaccine-reminders.html" },
-      { n: 2, label: "Accounts still on a temporary password", href: "users-staff.html" }
-    ],
     today: [
       { time: "09:00", pet: "Luna", owner: "Maria Santos", vet: "Dr. Anajoy N. Abila", status: "completed" },
       { time: "10:30", pet: "Biscuit", owner: "Ben Cruz", vet: "Dr. Sean Kurvie G. Buerano", status: "with_vet" },
@@ -106,7 +95,7 @@
     };
   }
 
-  /* ---------- Needs attention, Today's schedule, revenue vs last month (from localStorage) ---------- */
+  /* ---------- Today's schedule, revenue vs last month (from localStorage) ---------- */
   const pad2 = (n) => String(n).padStart(2, "0");
   const isoOf = (d) => d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());   // local date
   const readJson = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k) || "null"); return v == null ? d : v; } catch (_) { return d; } };
@@ -155,25 +144,12 @@
     }
     const due = Object.keys(latest).map((id) => latest[id].nextDue).filter(Boolean);
     const overdue = due.filter((d) => d < today).length, dueSoon = due.filter((d) => d >= today && d <= soon).length;
-    const users = readJson("pawpaw_users", []) || [], vets = readJson("pawpaw_vets", []) || [];
-    const tempPw = users.filter((u) => u.mustChange && u.status !== "inactive").length;
-    const noLogin = vets.filter((v) => !users.some((u) => u.id === v.userId)).length;
-    const attention = [
-      { n: pending, label: "Appointment requests waiting for approval", href: "appointments.html?status=pending" },
-      { n: noVet, label: "Upcoming appointments with no veterinarian", href: "appointments.html?vet=unassigned" },
-      { n: overdue, label: "Vaccinations overdue", href: "../staff/vaccine-reminders.html", red: true },
-      { n: dueSoon, label: "Vaccinations due in the next 7 days", href: "../staff/vaccine-reminders.html" },
-      { n: noLogin, label: "Veterinarians without a login account", href: "veterinarians.html", red: true },
-      { n: tempPw, label: "Accounts still on a temporary password", href: "users-staff.html" }
-    ].filter((a) => a.n > 0);
     todayRows.sort((a, b) => String(a.time).localeCompare(String(b.time)));
-    const hs = Object.keys(hours).map(Number), lo = hs.length ? Math.min(8, ...hs) : 8, hi = hs.length ? Math.max(17, ...hs) : 17, busyHours = [];
-    for (let h = lo; h <= hi; h++) busyHours.push({ h, n: hours[h] || 0 });
     return {
       revenueLastMonth: revLast, completedThisMonth: doneThis, cancelRate: base ? Math.round(cx / base * 100) : null, noShowRate: base ? Math.round(ns / base * 100) : null,
       vetsToday: Object.keys(byVet).map((k) => byVet[k]).sort((a, b) => b.total - a.total || a.name.localeCompare(b.name)), unassignedToday,
       weekRevenue: weekRev, topServices: Object.keys(wkSvc).map((n) => ({ name: n, n: wkSvc[n] })).sort((a, b) => b.n - a.n).slice(0, 5),
-      busyDays: days, busyHours, attention, today: todayRows
+      today: todayRows
     };
   }
 
@@ -227,18 +203,6 @@
     const vw = d.vetsToday || [];
     $("vw-list").innerHTML = (vw.length ? vw.map((v) => `<div class="vw-row"><span class="vw-name">${esc(v.name)}</span><span class="vw-track"><i style="width:${v.total ? Math.round(v.done / v.total * 100) : 0}%"></i></span><span class="vw-val${v.total ? "" : " none"}">${v.total ? v.done + " / " + v.total : "None today"}</span></div>`).join("") : `<p class="empty">No veterinarians yet.</p>`)
       + (d.unassignedToday ? `<p class="vw-note">${d.unassignedToday} appointment${d.unassignedToday === 1 ? "" : "s"} today ${d.unassignedToday === 1 ? "has" : "have"} no veterinarian yet.</p>` : "");
-
-    /* busiest days and hours (the busiest bar is dark) */
-    const cols = (items) => { const max = Math.max(1, ...items.map((i) => i.n)), top = Math.max(...items.map((i) => i.n)); return items.map((i) => `<div class="bz-col${i.n === top && top > 0 ? " top" : ""}"><b>${i.n || ""}</b><i style="height:${Math.round(i.n / max * 62)}px"></i><span>${esc(i.label)}</span></div>`).join(""); };
-    const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], hr12 = (h) => (h % 12 || 12) + (h < 12 ? "a" : "p");
-    $("bz-days").innerHTML = cols((d.busyDays || [0, 0, 0, 0, 0, 0, 0]).map((n, i) => ({ n, label: DAYS[i] })));
-    $("bz-hours").innerHTML = cols((d.busyHours || []).map((x) => ({ n: x.n, label: hr12(x.h) })));
-
-    /* needs attention */
-    const att = d.attention || [];
-    $("att-list").innerHTML = att.length
-      ? att.map((a) => `<li><span class="att-n${a.red ? " red" : ""}">${a.n}</span><span>${esc(a.label)}</span><a href="${esc(a.href)}">Review</a></li>`).join("")
-      : `<li class="att-ok">All clear. Nothing needs attention right now.</li>`;
 
     /* today's schedule (first 5) */
     const LABEL = { pending: "Pending", confirmed: "Approved", checked_in: "Checked-in", with_vet: "In Progress", completed: "Completed", no_show: "No-show", cancelled: "Cancelled" };

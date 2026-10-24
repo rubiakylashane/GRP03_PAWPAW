@@ -2,7 +2,7 @@
    Admin pages. Load AFTER ../staff/dashboard.css (same body.sdash look); this file only changes
    the sidebar colour, the stat cards and adds the admin Dashboard parts. */
 
-body.sdash.adm { --admin-dark: #0d2a25; --orange: #e29d1a; }
+body.sdash.adm { --admin-dark: #0d2a25; --orange: #e29d1a; --sidebar-bg: #0d2a25; }
 .adm .sidebar { background: var(--admin-dark); color: #fff; }
 .adm .nav-link { color: #fff; }
 .adm .sidebar-user { border-top-color: rgba(255, 255, 255, .3); }
@@ -130,4 +130,42 @@ body.sdash.adm { --admin-dark: #0d2a25; --orange: #e29d1a; }
 @media (max-width: 520px) {
   .adm .ts-wrap { grid-template-columns: 1fr; gap: 14px; }
   .adm .wk-cols { gap: 5px; }
+}
+
+/* Dashboard layout: 3 columns (wide card + 2 narrow cards), rows line up.
+   Row 1: Today's schedule | Weekly revenue | Revenue per service
+   Row 2: Recent activity  | Veterinarians   | Top services */
+.adm .adm-dash { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: stretch; }
+.adm .adm-dash > .card { min-width: 0; }
+.adm .adm-dash > .span2 { grid-column: span 2; }
+/* narrow cards: names and amounts on one line, the bar underneath */
+.adm .nar .rev-row, .adm .nar .vw-row { grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; }
+.adm .nar .rev-bar, .adm .nar .vw-track { grid-column: 1 / -1; order: 3; }
+.adm .nar .ts-wrap { grid-template-columns: minmax(0, 1fr); gap: 12px; min-height: 0; align-items: start; }
+.adm .nar .ts-row { grid-template-columns: minmax(0, 1fr) 28px; gap: 6px 10px; }
+.adm .nar .ts-row .vw-track { grid-column: 1 / -1; order: 3; }
+.adm .nar .ts-main em { font-size: 30px; }
+.adm .nar .wk-cols { gap: 6px; height: 170px; }
+.adm .nar .wk-col span { font-size: 10.5px; }
+.adm .nar .wk-col b { font-size: 10.5px; padding: 2px 6px; }
+@media (max-width: 1280px) {
+  .adm .adm-dash { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .adm .adm-dash > .wide, .adm .adm-dash > .span2 { grid-column: 1 / -1; }
+}
+@media (max-width: 700px) {
+  .adm .adm-dash { grid-template-columns: minmax(0, 1fr); }
+}
+.adm .nar .card-head { flex-wrap: wrap; row-gap: 2px; }
+.adm .nar .td-count { white-space: nowrap; font-size: 12px; }
+
+/* Sidebar on a short screen: the admin menu has 8 links, so it can scroll and the links get tighter instead of being cut off */
+.adm .sidebar { overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
+.adm .sidebar::-webkit-scrollbar { display: none; }
+@media (max-height: 860px) {
+  .adm .nav { padding-top: 28px; gap: 2px; }
+  .adm .nav-link { padding: 11px 14px; font-size: 19px; }
+}
+@media (max-height: 700px) {
+  .adm .nav { padding-top: 12px; gap: 0; }
+  .adm .nav-link { padding: 8px 14px; font-size: 17px; }
 }

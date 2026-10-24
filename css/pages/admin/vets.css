@@ -20,6 +20,8 @@
 .adm .v-err { margin-top: 4px; font-size: 12px; font-weight: 500; color: #c0281c; }
 .adm .v-btn { min-height: 36px; padding: 0 20px; font: inherit; font-size: 13px; font-weight: 700; color: #fff; background: var(--green); border: 0; border-radius: 8px; cursor: pointer; }
 .adm .v-btn:hover { background: var(--green-dark); }
+.adm .v-btn:disabled { color: #6b7774; background: #d5dcda; cursor: not-allowed; }
+.adm .v-btn:disabled:hover { background: #d5dcda; }
 .adm .v-dlg { width: min(560px, calc(100vw - 32px)); }
 .adm .v-dlg .v-grid { margin-bottom: 8px; }
 

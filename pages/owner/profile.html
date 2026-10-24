@@ -80,10 +80,17 @@
 
   <!-- Main -->
   <main class="main">
+    <header class="pets-head">
+      <div>
+        <h1>My Profile</h1>
+        <p class="pets-sub">Keep your details up to date and see your pets.</p>
+      </div>
+    </header>
+
     <section class="pr-card" aria-label="Your profile">
       <span class="pr-avatar" id="pr-avatar" aria-hidden="true"></span>
       <div class="pr-info">
-        <h1 id="pr-name">User</h1>
+        <h2 id="pr-name">User</h2>
         <p><strong>Member since:</strong> <span id="pr-since"></span></p>
         <p><strong>Email:</strong> <span id="pr-email"></span></p>
         <p><strong>Phone No:</strong> <span id="pr-phone"></span></p>
@@ -93,8 +100,11 @@
     </section>
 
     <div class="pr-pets-head">
-      <h2>My Pets</h2>
-      <a href="my-pets.html" class="pr-viewall" id="pr-viewall" hidden>View all</a>
+      <h2>Pets</h2>
+      <div class="pr-pets-actions">
+        <a href="my-pets.html" class="pr-viewall" id="pr-viewall" hidden>View all</a>
+        <a href="add-pet.html" class="pbtn pbtn-primary pbtn-sm">Add Pet</a>
+      </div>
     </div>
     <section class="pr-pets" id="pr-pets" aria-label="Your pets"></section>
 

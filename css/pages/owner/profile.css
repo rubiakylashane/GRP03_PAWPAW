@@ -30,7 +30,7 @@
   min-height: 36px;
   padding: 7px 20px;
   font: inherit;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 600;
   letter-spacing: -0.01em;
   text-decoration: none;
@@ -64,14 +64,14 @@
 .pet-id { min-width: 0; }
 .pet-id h2 {
   margin: 0;
-  font-size: 20px;
+  font-size: 16px;
   font-weight: 600;
   letter-spacing: -0.02em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.pet-id p { margin: 4px 0 0; font-size: 15px; color: #555; }
+.pet-id p { margin: 4px 0 0; font-size: 13px; color: #555; }
 
 .pet-facts {
   margin: 18px 0 0;
@@ -79,7 +79,7 @@
   border-top: 1px solid #888;
   border-bottom: 1px solid #888;
 }
-.pet-facts > div { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; font-size: 15px; }
+.pet-facts > div { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; font-size: 13px; }
 .pet-facts dt { color: #555; }
 .pet-facts dd { margin: 0; font-weight: 600; color: #333; text-align: right; }
 
@@ -93,7 +93,8 @@
   border-radius: 22px;
 }
 .pets-grid[hidden], .pets-empty[hidden], .pbtn[hidden] { display: none; }
-.pets-empty h2 { margin: 0 0 6px; font-size: 20px; }
+.pets-empty h2 { margin: 0 0 6px; font-size: 16px; }
+.pets-empty p { font-size: 13px; }
 .pets-empty p { margin: 0 0 18px; color: #555; }
 
 /* ---------- Toast ---------- */
@@ -104,7 +105,7 @@
   z-index: 50;
   padding: 11px 18px;
   color: #fff;
-  font-size: 14px;
+  font-size: 13px;
   background: #222;
   border-radius: 10px;
   opacity: 0;
@@ -114,17 +115,15 @@
 }
 .pets-toast.show { opacity: 1; transform: translate(-50%, 0); }
 
-.pbtn-sm { min-height: 36px; padding: 5px 24px; font-size: 14px; }
+.pbtn-sm { min-height: 36px; padding: 5px 24px; font-size: 12px; }
 
-/* ---------- My Profile ---------- */
+/* ---------- My Profile: wide profile card on top, then the pet cards ---------- */
 .pr-card {
   box-sizing: border-box;
-  position: relative;
   display: flex;
   align-items: center;
   gap: 48px;
-  min-height: 322px;
-  padding: 32px 40px;
+  padding: 32px 40px 38px;
   background: #fff;
   border: 1px solid #555;
   border-radius: 22px;
@@ -136,23 +135,26 @@
   background: #d9d9d9 center / cover no-repeat;
   border-radius: 50%;
 }
-.pr-info { min-width: 0; }
-.pr-info h1 { margin: 0 0 14px; font-size: 38px; font-weight: 700; line-height: 1.1; letter-spacing: -0.02em; overflow-wrap: anywhere; }
-.pr-info p { margin: 0 0 10px; font-size: 24px; color: #444; overflow-wrap: anywhere; }
-.pr-info strong { font-weight: 600; color: #111; }
-.pr-edit { position: absolute; right: 38px; bottom: 36px; }
+.pr-info { flex: 1; min-width: 0; }
+.pr-info h2 { margin: 0 0 14px; font-size: 24px; font-weight: 700; line-height: 1.15; letter-spacing: -0.02em; overflow-wrap: anywhere; }
+.pr-info p { margin: 4px 0 0; font-size: 16px; color: #333; overflow-wrap: anywhere; }
+.pr-info strong { font-weight: 700; color: #111; }
+.pr-edit { flex: none; margin-left: auto; min-width: 157px; min-height: 35px; padding: 0 18px; font-size: 11.5px; border-radius: 6px; }
 
-.pr-pets-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin: 38px 0 22px 0; }
-.pr-pets-head h2 { margin: 0; font-size: 36px; font-weight: 700; letter-spacing: -0.02em; }
-.pr-viewall { font-size: 14px; font-weight: 700; color: var(--green, #0f6b5c); text-decoration: none; }
-.pr-viewall:hover { text-decoration: underline; }
+.pr-pets-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 40px 0 22px 4px; }
+.pr-pets-head h2 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.02em; }
+.pr-pets-actions { display: flex; align-items: center; gap: 18px; }
+.pr-viewall { font-size: 13px; font-weight: 700; color: inherit; text-decoration: underline; }
+.pr-pets-actions .pbtn { min-height: 35px; padding: 7px 14px; font-size: 15px; border-radius: 6px; color: #111; background: var(--yellow, #f0b94a); }
+.pr-pets-actions .pbtn:hover { background: var(--yellow, #f0b94a); filter: brightness(1.06); }
 .pr-viewall[hidden], .pets-toast[hidden] { display: none; }
 
-.pr-pets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; }
-.pr-pet { display: block; color: inherit; text-decoration: none; transition: border-color 0.15s, transform 0.15s; }
+.pr-pets { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 30px; }
+.pr-pet { display: block; padding: 22px 22px 26px; border-radius: 16px; color: inherit; text-decoration: none; transition: border-color 0.15s, transform 0.15s; }
 .pr-pet:hover { text-decoration: none; border-color: var(--green, #0f6b5c); transform: translateY(-2px); }
-.pr-pet h3 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -0.02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pr-pet .pet-facts { margin-bottom: 0; padding-bottom: 28px; border-bottom: 0; }
+.pr-pet h3 { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: -0.02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pr-pet .pet-facts { margin: 14px 0 0; padding: 12px 0 0; border-bottom: 0; }
+.pr-pet .pet-card-top { gap: 18px; }
 
 /* ---------- Edit Profile ---------- */
 .pr-head { margin-bottom: 14px; }
@@ -179,23 +181,23 @@
 .pr-picture .pr-label { text-align: left; }
 
 .pr-field { min-width: 0; }
-.pr-field > label, .pr-label { display: block; margin-bottom: 6px; font-size: 17px; font-weight: 700; letter-spacing: -0.02em; }
+.pr-field > label, .pr-label { display: block; margin-bottom: 6px; font-size: 12px; font-weight: 700; letter-spacing: -0.02em; }
 
 .pr-field input[type="text"], .pr-field input[type="email"], .pr-field input[type="tel"],
 .pr-field input[type="password"], .pr-field textarea {
   display: block;
   box-sizing: border-box;
   width: 100%;
-  height: 46px;
+  height: 42px;
   padding: 0 14px;
   font: inherit;
-  font-size: 15px;
+  font-size: 13px;
   color: var(--ink, #111);
   background: #fff;
   border: 1px solid #555;
   border-radius: 8px;
 }
-.pr-field textarea { height: 104px; padding: 12px 14px; resize: vertical; }
+.pr-field textarea { height: 92px; padding: 12px 14px; resize: vertical; }
 .pr-field ::placeholder { color: #777; opacity: 1; }
 .pr-field input:focus-visible, .pr-field textarea:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--green, #0f6b5c) 35%, transparent);
@@ -218,7 +220,7 @@
   overflow: hidden;
   line-height: 1.3;
   color: #666;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 500;
   letter-spacing: 0;
   background: #fff;
@@ -234,7 +236,7 @@
   margin-top: 8px;
   padding: 0;
   font: inherit;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--green, #0f6b5c);
   background: none;
@@ -246,10 +248,10 @@
 
 /* change password */
 .pr-pass { padding-top: 18px; padding-bottom: 22px; }
-.pr-pass h2 { margin: 0 0 2px; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
-.pr-hint { margin: 0 0 12px; font-size: 13px; color: #555; }
+.pr-pass h2 { margin: 0 0 2px; font-size: 16px; font-weight: 700; letter-spacing: -0.02em; }
+.pr-hint { margin: 0 0 12px; font-size: 12px; color: #555; }
 .pr-pass-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px 40px; }
-.pr-pass .pr-field > label { font-size: 15px; }
+.pr-pass .pr-field > label { font-size: 12px; }
 .pr-pass input[type="password"], .pr-pass input[type="text"] { height: 38px; padding-right: 46px; }
 .pr-pw { position: relative; }
 .pr-pw input { padding-right: 46px; }
@@ -276,21 +278,16 @@
 
 /* buttons */
 .pr-actions { display: flex; justify-content: center; gap: 36px; margin: 2px 0 16px; }
-.pr-actions .pbtn { min-width: 178px; min-height: 50px; font-size: 17px; border-radius: 8px; }
+.pr-actions .pbtn { min-width: 178px; min-height: 44px; font-size: 13px; border-radius: 8px; }
 .pr-cancel { color: #e11d1d; }
 
 /* ---------- Smaller screens ---------- */
 @media (max-width: 1000px) {
-  .pr-pets { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
-  .pr-card { flex-direction: column; align-items: flex-start; gap: 22px; padding: 28px 24px 84px; }
-  .pr-avatar { width: 140px; height: 140px; }
-  .pr-info h1 { font-size: 30px; }
-  .pr-info p { font-size: 18px; }
-  .pr-edit { right: 24px; bottom: 24px; }
+  .pr-card { flex-direction: column; align-items: flex-start; gap: 20px; padding: 26px 24px; }
+  .pr-edit { margin-left: 0; }
   .pr-pass-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 760px) {
-  .pr-pets-head h2 { font-size: 28px; }
   .pr-grid { grid-template-columns: 1fr; }
   .pr-name, .pr-email, .pr-address, .pr-picture, .pr-phone { grid-column: 1; grid-row: auto; }
   .pr-picture { order: -1; }
@@ -300,4 +297,7 @@
 }
 @media (max-width: 560px) {
   .pr-pets { grid-template-columns: 1fr; }
+  .pr-avatar { width: 130px; height: 130px; }
+  .pr-edit { width: 100%; }
+  .pr-pets-head h2 { font-size: 20px; }
 }

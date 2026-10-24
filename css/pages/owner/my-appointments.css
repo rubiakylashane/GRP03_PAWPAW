@@ -22,7 +22,7 @@
   min-height: 40px;
   padding: 8px 20px;
   font: inherit;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 600;
   letter-spacing: -0.01em;
   text-decoration: none;
@@ -62,8 +62,8 @@
 .ap-field > label,
 .ap-label {
   display: block;
-  margin-bottom: 7px;
-  font-size: 14px;
+  margin-bottom: 6px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: -0.01em;
 }
@@ -74,16 +74,16 @@
   display: block;
   box-sizing: border-box;
   width: 100%;
-  height: 44px;
+  height: 42px;
   padding: 0 14px;
   font: inherit;
-  font-size: 15px;
+  font-size: 13px;
   color: var(--ink, #111);
   background: #fff;
   border: 1px solid #555;
   border-radius: 8px;
 }
-.ap-field textarea { height: 110px; padding: 12px 14px; resize: vertical; }
+.ap-field textarea { height: 96px; padding: 12px 14px; resize: vertical; }
 .ap-field ::placeholder { color: #777; opacity: 1; }
 .ap-field input:focus-visible,
 .ap-field select:focus-visible,
@@ -159,12 +159,12 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  min-height: 54px;
+  min-height: 48px;
   padding: 0 18px;
   cursor: pointer;
 }
-.ap-svc-name { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
-.ap-svc-price { flex: none; margin-left: auto; font-size: 15px; font-weight: 600; white-space: nowrap; }
+.ap-svc-name { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; }
+.ap-svc-price { flex: none; margin-left: auto; font-size: 13px; font-weight: 600; white-space: nowrap; }
 
 /* custom checkbox */
 .ap-svc-head input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
@@ -235,12 +235,12 @@
 .ap-summary h2 {
   margin: 0 0 14px;
   padding-bottom: 12px;
-  font-size: 20px;
+  font-size: 16px;
   font-weight: 700;
   letter-spacing: -0.02em;
   border-bottom: 1px solid #888;
 }
-.ap-sum-row { display: flex; justify-content: space-between; gap: 14px; padding: 6px 0; font-size: 15px; }
+.ap-sum-row { display: flex; justify-content: space-between; gap: 14px; padding: 6px 0; font-size: 13px; }
 .ap-sum-row > span:last-child, .ap-sum-row > strong { text-align: right; font-weight: 600; color: #333; }
 .ap-sum-rows .ap-sum-row > span:first-child { flex: none; }      /* Pet / Vet / When: label stays on one line, value wraps */
 .ap-sum-lines .ap-sum-row > span:first-child { flex: 1; min-width: 0; color: #555; }  /* service names wrap, price stays whole */
@@ -257,7 +257,7 @@
   margin-top: 8px;
   padding-top: 14px;
   border-top: 1px solid #888;
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 700;
   letter-spacing: -0.02em;
   white-space: nowrap;
@@ -265,7 +265,7 @@
 .ap-note { margin: 14px 0 18px; font-size: 11px; line-height: 1.35; color: #444; }
 .ap-sum-actions[hidden] { display: none; }
 .ap-sum-actions { display: flex; flex-direction: column; align-items: center; gap: 10px; }
-.ap-sum-actions .abtn { width: min(100%, 210px); padding: 8px 12px; font-size: 14px; white-space: nowrap; }
+.ap-sum-actions .abtn { width: min(100%, 210px); padding: 8px 12px; font-size: 13px; white-space: nowrap; }
 
 /* ---------- After sending ---------- */
 .ap-done {
@@ -288,12 +288,12 @@
   border-radius: 50%;
 }
 .ap-done-icon svg { width: 30px; height: 30px; }
-.ap-done h2 { margin: 0 0 8px; font-size: 20px; }
-.ap-done-text { margin: 0 0 12px; font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
-.ap-done-status { margin: 0 0 22px; font-size: 14px; color: #444; }
-.ap-pill { display: inline-block; padding: 1px 10px; margin-right: 6px; font-size: 12px; background: #f0d58a; border-radius: 999px; color: #3a3a3a; }
+.ap-done h2 { margin: 0 0 8px; font-size: 16px; }
+.ap-done-text { margin: 0 0 12px; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.ap-done-status { margin: 0 0 22px; font-size: 13px; color: #444; }
+.ap-pill { display: inline-block; padding: 1px 10px; margin-right: 6px; font-size: 11px; background: #f0d58a; border-radius: 999px; color: #3a3a3a; }
 .ap-done-actions { display: flex; flex-direction: column; align-items: center; gap: 10px; }
-.ap-done-actions .abtn { width: min(100%, 210px); padding: 8px 12px; font-size: 14px; white-space: nowrap; }
+.ap-done-actions .abtn { width: min(100%, 210px); padding: 8px 12px; font-size: 13px; white-space: nowrap; }
 
 /* ---------- Calendar popup (opened by the calendar icon; js/owner/calendar.js) ---------- */
 /* to resize it: change .pcal width and .pcal-day width/height. Selected-day color: --pcal-accent */
@@ -422,6 +422,7 @@
   .ap-sub { padding-left: 16px; }
   .ap-sub-row { grid-template-columns: minmax(0, 1fr) auto 66px; }
 }
+
 /* css/pages/my-appointments.css
    My Appointments and Reschedule Appointment. Load it after appointments.css.
    Classes start with ma- or rs- so they cannot clash with components.css. */
@@ -445,7 +446,7 @@
   height: 36px;
   padding: 0 40px 0 14px;
   font: inherit;
-  font-size: 14px;
+  font-size: 12px;
   color: var(--ink, #111);
   background: #fff;
   border: 1px solid #555;
@@ -459,7 +460,7 @@
   height: 34px;
   padding: 0 28px 0 12px;
   font: inherit;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--ink, #111);
   background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23333' stroke-width='1.4'/%3E%3C/svg%3E") no-repeat right 10px center;
@@ -478,24 +479,24 @@
   align-items: center;
   gap: 12px;
   padding: 12px 0;
-  font-size: 14px;
+  font-size: 13px;
 }
-.ma-head { padding: 10px 0 12px; font-size: 14px; font-weight: 600; text-transform: uppercase; color: #333; border-bottom: 1px solid #555; }
+.ma-head { padding: 10px 0 12px; font-size: 11px; font-weight: 600; text-transform: uppercase; color: #333; border-bottom: 1px solid #555; }
 #rows .ma-row { border-bottom: 1px solid #888; }
 #rows .ma-row:last-child { border-bottom: 0; }
-.ma-row strong { display: block; font-size: 14px; font-weight: 600; }
-.ma-row small { display: block; margin-top: 1px; font-size: 14px; font-weight: 600; color: #222; }
+.ma-row strong { display: block; font-size: 13px; font-weight: 600; }
+.ma-row small { display: block; margin-top: 1px; font-size: 11.5px; font-weight: 600; color: #222; }
 .ma-services { overflow-wrap: anywhere; }
 .ma-c { text-align: center; }
 
-.ma-pill { display: inline-block; min-width: 90px; padding: 2px 12px; font-size: 14px; line-height: 1.4; color: #2e5e43; text-align: center; background: #8fe0a8; border-radius: 999px; }
+.ma-pill { display: inline-block; min-width: 90px; padding: 2px 12px; font-size: 11px; line-height: 1.4; color: #2e5e43; text-align: center; background: #8fe0a8; border-radius: 999px; }
 .ma-pending { color: #6a5415; background: #f0d58a; }
 .ma-cancelled { color: #7a2222; background: #f3b1b1; }
 
 .ma-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
-.ma-btn { min-height: 36px; padding: 5px 16px; font-size: 14px; border-radius: 8px; }
+.ma-btn { min-height: 36px; padding: 5px 16px; font-size: 12px; border-radius: 8px; }
 .ma-none { color: #777; }
-.ma-empty { padding: 32px 4px; text-align: center; color: #555; }
+.ma-empty { padding: 32px 4px; text-align: center; font-size: 13px; color: #555; }
 .ma-empty a { color: var(--green, #0f6b5c); font-weight: 600; }
 
 /* ---------- Cancel confirmation (centered) ---------- */
@@ -514,15 +515,15 @@
 }
 .ma-dialog:not([open]) { display: none; }
 .ma-dialog::backdrop { background: rgba(0, 0, 0, 0.4); }
-.ma-dialog h2 { margin: 0 0 8px; font-size: 20px; }
-.ma-dialog p { margin: 0 0 22px; font-size: 15px; color: #444; overflow-wrap: anywhere; }
+.ma-dialog h2 { margin: 0 0 8px; font-size: 16px; }
+.ma-dialog p { margin: 0 0 22px; font-size: 13px; color: #444; overflow-wrap: anywhere; }
 .ma-dialog-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .abtn-danger { color: #fff; background: #d32f2f; }
 .abtn-danger:hover { background: #b71c1c; }
 
 .ma-toast {
   position: fixed; bottom: 24px; left: 50%; z-index: 50;
-  padding: 11px 18px; color: #fff; font-size: 14px; background: #222; border-radius: 10px;
+  padding: 11px 18px; color: #fff; font-size: 13px; background: #222; border-radius: 10px;
   opacity: 0; pointer-events: none; transform: translate(-50%, 16px); transition: opacity 0.25s, transform 0.25s;
 }
 .ma-toast.show { opacity: 1; transform: translate(-50%, 0); }
@@ -530,8 +531,8 @@
 /* ---------- Reschedule ---------- */
 .rs-layout { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 54px; align-items: start; }
 .rs-layout[hidden], .ap-done[hidden] { display: none; }
-.rs-summary h2 { margin: 0 0 14px; padding-bottom: 12px; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; border-bottom: 1px solid #888; }
-.rs-reason-title { margin: 18px 0 6px; font-size: 14px; font-weight: 600; color: #444; }
+.rs-summary h2 { margin: 0 0 14px; padding-bottom: 12px; font-size: 16px; font-weight: 700; letter-spacing: -0.02em; border-bottom: 1px solid #888; }
+.rs-reason-title { margin: 18px 0 6px; font-size: 12px; font-weight: 600; color: #444; }
 .rs-reason { margin: 0; font-size: 13px; font-weight: 600; line-height: 1.35; color: #333; white-space: pre-wrap; overflow-wrap: anywhere; }
 .rs-form { display: flex; flex-direction: column; gap: 18px; padding: 34px 40px 40px; }
 .rs-form .ap-sum-actions { margin-top: 10px; }

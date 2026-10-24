@@ -1,5 +1,5 @@
 /* js/owner/profile.js
-   My Profile: the owner's details and up to three of their pets. Needs pets-store.js and profile-store.js. */
+   My Profile: the owner's details and up to six of their pets. Needs pets-store.js and profile-store.js. */
 (() => {
   const { esc, load: loadPets, ageText, fmtDate, takeFlash } = window.PawPets;
   const $ = (id) => document.getElementById(id);
@@ -14,7 +14,7 @@
   if (p.photo) $("pr-avatar").style.backgroundImage = `url('${p.photo}')`;
 
   /* ----- pets (same card as My Pets) ----- */
-  const SHOW = 3;
+  const SHOW = 6;
   const pets = loadPets();
   const card = (x) => {
     const age = ageText(x.dob);

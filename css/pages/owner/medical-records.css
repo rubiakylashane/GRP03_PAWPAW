@@ -13,7 +13,7 @@
   height: 34px;
   padding: 0 28px 0 12px;
   font: inherit;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--ink, #111);
   background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23333' stroke-width='1.4'/%3E%3C/svg%3E") no-repeat right 10px center;
@@ -35,7 +35,7 @@
   border: 1px solid #555;
   border-radius: 22px;
 }
-.mr-card h2 { margin: 0 0 8px 12px; font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
+.mr-card h2 { margin: 0 0 8px 12px; font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
 
 /* tables: every column is centered, like the design */
 .mr-row {
@@ -43,18 +43,18 @@
   align-items: center;
   gap: 12px;
   padding: 14px 0;
-  font-size: 15px;
+  font-size: 13px;
   text-align: center;
   color: #444;
 }
 .mr-visits .mr-row { grid-template-columns: 1fr 1.2fr 1.3fr 1.3fr 1.3fr; }
 .mr-rx .mr-row { grid-template-columns: 1fr 1.2fr 1.2fr 1fr 1.5fr 1fr; }
-.mr-th { padding: 8px 0 12px; font-size: 14px; font-weight: 600; text-transform: uppercase; color: #333; border-bottom: 1px solid #555; }
+.mr-th { padding: 8px 0 12px; font-size: 11px; font-weight: 600; text-transform: uppercase; color: #333; border-bottom: 1px solid #555; }
 #visit-rows .mr-row, #rx-rows .mr-row { border-bottom: 1px solid #888; }
 #visit-rows .mr-row:last-child, #rx-rows .mr-row:last-child { border-bottom: 0; }
 .mr-strong { font-weight: 600; color: #111; }
 .mr-row span { min-width: 0; overflow-wrap: anywhere; }
-.mr-empty { margin: 0; padding: 26px 8px; text-align: center; font-size: 14px; color: #666; }
+.mr-empty { margin: 0; padding: 26px 8px; text-align: center; font-size: 13px; color: #666; }
 
 @media (max-width: 860px) {
   .mr-head h1 { font-size: 28px; }

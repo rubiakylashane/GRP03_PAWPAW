@@ -14,7 +14,7 @@
   height: 34px;
   padding: 0 28px 0 12px;
   font: inherit;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--ink, #111);
   background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23333' stroke-width='1.4'/%3E%3C/svg%3E") no-repeat right 10px center;
@@ -30,14 +30,14 @@
 .vh-stats { display: grid; grid-template-columns: repeat(3, 206px); gap: 20px; }
 .vh-stat {
   box-sizing: border-box;
-  min-height: 148px;
-  padding: 18px 14px;
+  min-height: 100px;
+  padding: 16px 14px;
   background: #fff;
   border: 2px solid;
   border-radius: 18px;
 }
-.vh-stat h3 { margin: 0; font-size: 15px; font-weight: 400; color: #222; }
-.vh-stat p { margin: 14px 0 0 10px; font-size: 36px; font-weight: 700; line-height: 1; }
+.vh-stat h3 { margin: 0; font-size: 12.5px; font-weight: 400; color: #222; }
+.vh-stat p { margin: 10px 0 0 10px; font-size: 28px; font-weight: 700; line-height: 1; }
 .vh-stat-overdue { border-color: #e03131; }
 .vh-stat-soon { border-color: #f5a623; }
 .vh-stat-ok { border-color: #3cb878; }
@@ -52,7 +52,7 @@
   border-radius: 22px;
 }
 .vh-card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 6px 8px 12px; }
-.vh-card-head h2 { margin: 0; font-size: 20px; font-weight: 500; letter-spacing: -0.01em; }
+.vh-card-head h2 { margin: 0; font-size: 16px; font-weight: 500; letter-spacing: -0.01em; }
 .vh-overdue .vh-card-head h2 { color: #e5484d; }
 .vh-soon .vh-card-head h2 { color: #f5a623; }
 .vh-ok .vh-card-head h2 { color: #3cb878; }
@@ -66,16 +66,16 @@
   align-items: center;
   gap: 12px;
   padding: 14px 0;
-  font-size: 15px;
+  font-size: 13px;
   text-align: center;
   color: #444;
 }
-.vh-th { padding: 8px 0 12px; font-size: 14px; font-weight: 600; text-transform: uppercase; color: #333; border-bottom: 1px solid #555; }
+.vh-th { padding: 8px 0 12px; font-size: 11px; font-weight: 600; text-transform: uppercase; color: #333; border-bottom: 1px solid #555; }
 .vh-table [id$="-rows"] .vh-row { border-bottom: 1px solid #888; }
 .vh-table [id$="-rows"] .vh-row:last-child { border-bottom: 0; }
 .vh-strong { font-weight: 600; color: #111; }
 .vh-row span { min-width: 0; overflow-wrap: anywhere; }
-.vh-empty { margin: 0; padding: 24px 8px; text-align: center; font-size: 14px; color: #666; }
+.vh-empty { margin: 0; padding: 24px 8px; text-align: center; font-size: 13px; color: #666; }
 
 @media (max-width: 1180px) {
   .vh-top { flex-direction: column-reverse; align-items: stretch; }

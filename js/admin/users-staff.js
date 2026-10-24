@@ -2,7 +2,12 @@
    Data and rules live in admin-store.js. */
 (() => {
   const A = window.PawAdmin, S = window.PawStaff, $ = (id) => document.getElementById(id);
-  let all = A.list(), filter = "all", current = null;
+  const toast = (m) => { try { if (S && S.toast) S.toast(m); } catch (_) { /* ignore */ } };
+  const fail = (msg) => { const box = $("u-rows"); if (box) box.innerHTML = `<p class="u-empty">Could not load the users: ${String(msg).replace(/[<>&]/g, "")}. Open the browser console (F12) for details.</p>`; };
+  if (!A) { fail("js/admin/admin-store.js did not load"); return; }
+  /* skip broken saved entries (a null or a record without a username) so one bad record cannot stop the whole page */
+  const load = () => { try { return A.list().filter((u) => u && typeof u.username === "string"); } catch (e) { console.error(e); loadFailed = e.message; return []; } };
+  let all = load(), filter = "all", current = null, loadFailed = "";
 
   const btn = (act, cls, label, id) => `<button type="button" class="u-act ${cls}" data-act="${act}" data-id="${A.esc(id)}">${label}</button>`;
   function actions(u) {
@@ -25,7 +30,8 @@
 
   function render() {
     const rows = all.filter((u) => filter === "all" || u.role === filter);
-    $("u-rows").innerHTML = rows.length ? rows.map(row).join("") : `<p class="u-empty">No users here yet.</p>`;
+    if (loadFailed) { fail(loadFailed); return; }
+    try { $("u-rows").innerHTML = rows.length ? rows.map(row).join("") : `<p class="u-empty">No users here yet.</p>`; } catch (e) { console.error(e); fail(e.message); }
     document.querySelectorAll(".u-tab").forEach((t) => { const on = t.dataset.role === filter; t.classList.toggle("on", on); t.setAttribute("aria-selected", String(on)); });
   }
 
@@ -41,16 +47,16 @@
   });
 
   $("role-cancel").addEventListener("click", () => roleDlg.close());
-  $("role-save").addEventListener("click", () => { const r = $("role-select").value; roleDlg.close(); if (r !== current.role) { A.setRole(current, r); render(); S.toast("Role changed to " + A.ROLES[r] + "."); } });
+  $("role-save").addEventListener("click", () => { const r = $("role-select").value; roleDlg.close(); if (r !== current.role) { A.setRole(current, r); render(); toast("Role changed to " + A.ROLES[r] + "."); } });
   $("pw-cancel").addEventListener("click", () => pwDlg.close());
   $("pw-save").addEventListener("click", () => {
     const v = $("pw-new").value;
     if (v.length < 8) { $("pw-err").textContent = "Use at least 8 characters."; $("pw-err").hidden = false; return; }
-    pwDlg.close(); A.resetPassword(current); S.toast("Password reset. " + current.username + " must change it at the next login.");   // the password itself is sent to the backend, never saved here
+    pwDlg.close(); A.resetPassword(current); toast("Password reset. " + current.username + " must change it at the next login.");   // the password itself is sent to the backend, never saved here
   });
   $("st-cancel").addEventListener("click", () => stDlg.close());
-  $("st-ok").addEventListener("click", () => { const to = $("st-ok").dataset.to; stDlg.close(); A.setStatus(current, to); render(); S.toast(current.username + (to === "active" ? " activated." : " deactivated.")); });
+  $("st-ok").addEventListener("click", () => { const to = $("st-ok").dataset.to; stDlg.close(); A.setStatus(current, to); render(); toast(current.username + (to === "active" ? " activated." : " deactivated.")); });
 
   render();
-  S.toast(A.takeFlash());
+  toast(A.takeFlash());
 })();

@@ -39,7 +39,7 @@ window.PawAdmin = (() => {
       localStorage.removeItem("pawpaw_vets"); localStorage.setItem("pawpaw_seed_v", "2");
     }
   } catch (_) { /* ignore */ }
-  const accounts = () => { let v = read(USERS, null); if (!Array.isArray(v)) { v = SEED.map((u) => ({ ...u })); write(USERS, v); } return v; };
+  const accounts = () => { let v = read(USERS, null); if (!Array.isArray(v)) { v = SEED.map((u) => ({ ...u })); write(USERS, v); } else if (v.some((u) => !u || typeof u !== "object")) { v = v.filter((u) => u && typeof u === "object"); write(USERS, v); } return v; };   // a broken saved entry is dropped instead of stopping every admin page
 
   /* signed-in admin (for the audit log and so you cannot lock yourself out) */
   function me() {

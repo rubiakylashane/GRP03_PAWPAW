@@ -4,7 +4,7 @@
 .adm .ap-tabs { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 14px 34px; }
 .adm .ap-tab { min-height: 32px; padding: 0 20px; font: inherit; font-size: 12.5px; font-weight: 500; color: #111; background: #fff; border: 1px solid #ccc; border-radius: 999px; cursor: pointer; }
 .adm .ap-tab:hover { background: #f3f3f3; }
-.adm .ap-tab.on { color: #1b1300; font-weight: 700; background: #f0b84a; border-color: #f0b84a; }
+.adm .ap-tab.on { color: #1b1300; font-weight: 700; background: #e29d1a; border-color: #c98712; }
 .adm .ap-tab:focus-visible, .adm .ap-page:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
 
 .adm .ap-card { margin: 0 26px 16px; padding: 14px 20px 22px; color: #111; background: #fff; border: 1px solid var(--line); border-radius: 14px; }
@@ -31,7 +31,7 @@
 .adm .ap-foot { display: flex; align-items: center; gap: 10px; margin-top: 12px; font-size: 12px; color: #444; }
 .adm .ap-foot #ap-count { margin-right: 4px; }
 .adm .ap-page { min-height: 26px; padding: 0 14px; font: inherit; font-size: 11px; font-weight: 600; color: #fff; background: var(--green); border: 0; border-radius: 6px; cursor: pointer; }
-.adm .ap-page-next { color: #1b1300; background: #f0b84a; }
+.adm .ap-page-next { color: #1b1300; background: #e29d1a; }
 .adm .ap-page:disabled { opacity: .45; cursor: default; }
 
 .adm .btn-cancel-red { color: #e11b1b; background: #fff; border: 1px solid #111; }

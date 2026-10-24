@@ -90,16 +90,17 @@
       
     </header>
 
+    <p class="v-warn" role="note"><strong>Delete is blocked for owners who already have pets, appointments, or records.</strong><br />Deactivate their login in Users and Staff instead.</p>
+
+    <div class="o-split">
     <section class="o-card" aria-label="Owners">
       <label class="o-label" for="o-search">Search owners</label>
       <input id="o-search" class="o-search" type="search" placeholder="Name, phone, or email" autocomplete="off" />
       <div class="o-row o-head" role="row">
-        <span role="columnheader">Owner</span><span role="columnheader">Phone</span><span role="columnheader">Pets</span><span role="columnheader">Registered</span><span role="columnheader">Actions</span>
+        <span role="columnheader">Owner</span><span role="columnheader">Pets</span><span role="columnheader">Registered</span><span role="columnheader">Actions</span>
       </div>
       <div id="o-rows"></div>
     </section>
-
-    <p class="v-warn" role="note"><strong>Delete is blocked for owners who already have pets, appointments, or records.</strong><br />Deactivate their login in Users and Staff instead.</p>
 
     <section class="o-card" aria-labelledby="pets-title">
       <div class="o-pets-head">
@@ -111,6 +112,8 @@
       </div>
       <div id="p-rows"></div>
     </section>
+    </div>
+
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 

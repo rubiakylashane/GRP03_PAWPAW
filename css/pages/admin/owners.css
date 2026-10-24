@@ -4,8 +4,22 @@
 .adm .o-label { display: block; margin-bottom: 6px; font-size: 12px; font-weight: 600; }
 .adm .o-search { width: min(520px, 100%); height: 38px; margin-bottom: 14px; padding: 0 16px; font: inherit; font-size: 13px; color: #111; background: #fff; border: 1px solid #bbb; border-radius: 999px; }
 .adm .o-search:focus-visible { outline: 3px solid rgba(15, 107, 92, .4); outline-offset: 1px; }
-.adm .o-row { display: grid; align-items: center; column-gap: 14px; padding: 9px 8px; min-height: 44px; font-size: 13px; border-bottom: 1px solid #e3e3e3; grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.1fr) 70px minmax(0, 1fr) 150px; }
+.adm .o-row { display: grid; align-items: center; column-gap: 14px; padding: 9px 8px; min-height: 44px; font-size: 13px; border-bottom: 1px solid #e3e3e3; grid-template-columns: minmax(0, 2.6fr) 70px minmax(0, 1fr) 150px; }
 .adm .o-prow { grid-template-columns: minmax(0, 1.2fr) minmax(0, .9fr) minmax(0, 1.1fr) minmax(0, .9fr) minmax(0, 1.1fr) 150px; padding-left: 0; padding-right: 0; }
+/* owners and pets side by side on wide screens (stacked below 1281px) */
+.adm .o-split { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; margin: 0 26px 16px; }
+.adm .o-split .o-card { margin: 0; }
+@media (min-width: 1281px) {
+  .adm .o-split { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); }
+  .adm .o-split .o-card { padding-left: 16px; padding-right: 16px; }
+  .adm .o-split .o-search { width: 100%; }
+  /* narrower cards: owner (name, email, phone) | pets | registered | actions */
+  .adm .o-split .o-row:not(.o-prow) { column-gap: 10px; padding-left: 4px; padding-right: 4px; grid-template-columns: minmax(0, 1fr) 36px 88px 112px; }
+  .adm .o-split .o-prow { column-gap: 10px; grid-template-columns: minmax(0, 1fr) minmax(0, .8fr) minmax(0, 1fr) minmax(0, .7fr) minmax(0, .9fr) 112px; }
+  .adm .o-split .o-acts { gap: 6px; }
+}
+@media (max-width: 900px) { .adm .o-split { margin-left: 0; margin-right: 0; } }
+
 .adm .o-row:last-child { border-bottom: 0; }
 .adm .o-head { min-height: 0; padding-top: 8px; padding-bottom: 8px; font-size: 11px; font-weight: 600; letter-spacing: .02em; text-transform: uppercase; color: #333; border-bottom: 1px solid #aaa; }
 .adm .o-orow { cursor: pointer; border-radius: 6px; }

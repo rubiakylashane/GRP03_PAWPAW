@@ -2,7 +2,7 @@
 .adm .rp-tabs { display: flex; flex-wrap: wrap; gap: 12px; margin: 0 0 14px 26px; }
 .adm .rp-tab { min-height: 34px; padding: 0 22px; font: inherit; font-size: 13px; font-weight: 500; color: #111; background: #fff; border: 1px solid #ccc; border-radius: 999px; cursor: pointer; }
 .adm .rp-tab:hover { background: #f3f3f3; }
-.adm .rp-tab.on { color: #1b1300; font-weight: 700; background: #f0b84a; border-color: #f0b84a; }
+.adm .rp-tab.on { color: #1b1300; font-weight: 700; background: #e29d1a; border-color: #c98712; }
 .adm .rp-tab:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
 .adm .rp-range { display: flex; flex-wrap: wrap; gap: 14px; margin: 0 0 14px 26px; }
 .adm .rp-range label { display: block; margin-bottom: 4px; font-size: 12px; font-weight: 600; color: #fff; }

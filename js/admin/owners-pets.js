@@ -15,8 +15,7 @@
     const rows = owners.filter((o) => !q || [o.name, o.phone, o.email].some((x) => q2(x).includes(q)));
     $("o-rows").innerHTML = rows.length ? rows.map((o) => `
       <div class="o-row o-orow${o.id === selected ? " sel" : ""}" role="row" data-owner="${esc(o.id)}">
-        <span role="cell"><span class="o-main">${esc(o.name)}</span><span class="o-sub">${esc(o.email || "-")}</span></span>
-        <span role="cell" data-label="Phone">${esc(phoneShow(o.phone))}</span>
+        <span role="cell"><span class="o-main">${esc(o.name)}</span><span class="o-sub">${esc(o.email || "-")}</span><span class="o-sub">${esc(phoneShow(o.phone))}</span></span>
         <span role="cell" data-label="Pets">${o.petCount}</span>
         <span role="cell" data-label="Registered">${esc(O.fmtShort(o.registered))}</span>
         <span role="cell" class="o-acts"><a class="u-act" href="owner-edit.html?id=${encodeURIComponent(o.id)}">Edit</a><button type="button" class="u-act u-act-red" data-del-owner="${esc(o.id)}">Delete</button></span>

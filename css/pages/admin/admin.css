@@ -169,3 +169,6 @@ body.sdash.adm { --admin-dark: #0d2a25; --orange: #e29d1a; --sidebar-bg: #0d2a25
   .adm .nav { padding-top: 12px; gap: 0; }
   .adm .nav-link { padding: 8px 14px; font-size: 17px; }
 }
+
+/* one orange for every admin button and active tab: #e29d1a, dark text, #c98712 edge */
+.adm .abtn, .adm .abtn-light, .adm .obtn-amber { color: #1b1300; background: #e29d1a; border: 1px solid #c98712; }

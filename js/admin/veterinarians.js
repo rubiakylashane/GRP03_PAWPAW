@@ -1,4 +1,4 @@
-/* js/admin/veterinarians.js - Veterinarians page: list, add (inline), edit, delete.
+/* js/admin/veterinarians.js - Veterinarians page: list, edit, delete (adding is done on register-vet.html).
    Delete is blocked when the vet already has appointments / records / prescriptions / vaccinations (history is never lost). */
 (() => {
   const A = window.PawAdmin, S = window.PawStaff, $ = (id) => document.getElementById(id);
@@ -16,18 +16,14 @@
   function render() {
     list = A.vets();
     $("v-rows").innerHTML = list.length ? list.map(row).join("") : `<p class="u-empty">No veterinarians yet.</p>`;
-    const sel = $("a-account"), keep = sel.value;
-    sel.innerHTML = `<option value="new">Create a new account</option>` + A.freeVetAccounts().map((u) => `<option value="${A.esc(u.id)}">Use account: ${A.esc(u.username)}</option>`).join("");
-    if ([...sel.options].some((o) => o.value === keep)) sel.value = keep;
-    sel.closest(".v-field").hidden = sel.options.length < 2;   // with only "Create a new account" there is nothing to choose, so the field is hidden
   }
 
   /* Specialization is a dropdown (the list lives in admin-store.js); an older saved value that is not in the list is kept as an extra option */
   const fillSpec = (sel, extra) => { const list = A.SPECS.slice(); if (extra && list.indexOf(extra) < 0) list.push(extra); sel.innerHTML = `<option value="" selected disabled>Select specialization</option>` + list.map((x) => `<option>${A.esc(x)}</option>`).join(""); };
-  fillSpec($("a-spec")); fillSpec($("e-spec"));
+  fillSpec($("e-spec"));
 
   const err = (p, k, m) => { const e = $("err-" + p + k), i = $(p + k); e.textContent = m || ""; e.hidden = !m; i.setAttribute("aria-invalid", m ? "true" : "false"); };
-  /* shared checks for add and edit; p = "a-" or "e-" */
+  /* checks for the edit form; p = "e-" */
   function check(p, exceptId) {
     const v = { name: $(p + "name").value.trim().replace(/\s+/g, " "), specialization: $(p + "spec").value.trim().replace(/\s+/g, " "), license: A.normLicense($(p + "license").value), phone: $(p + "phone").value.replace(/[\s-]/g, ""), email: $(p + "email").value.trim() }, e = {};
     if (!v.name) e.name = "Enter the veterinarian's name.";
@@ -46,21 +42,7 @@
     if (first) $(p + first).focus();
     return first ? null : v;
   }
-  ["a-", "e-"].forEach((p) => ["name", "spec", "license", "phone", "email"].forEach((k) => ["input", "change"].forEach((ev) => $(p + k).addEventListener(ev, () => err(p, k, "")))));
-
-  /* "Add veterinarian" stays disabled until every required field is filled (the format is still checked on submit) */
-  const addBtn = $("add-form").querySelector('button[type="submit"]');
-  const syncAdd = () => { addBtn.disabled = !["name", "spec", "license", "phone", "email"].every((k) => $("a-" + k).value.trim()); };
-  ["name", "spec", "license", "phone", "email"].forEach((k) => ["input", "change"].forEach((ev) => $("a-" + k).addEventListener(ev, syncAdd)));
-  syncAdd();
-
-  $("add-form").addEventListener("submit", (ev) => {
-    ev.preventDefault();
-    if (addBtn.disabled) return;
-    const v = check("a-"); if (!v) return;
-    const added = A.addVet({ ...v, account: $("a-account").value });
-    $("add-form").reset(); syncAdd(); render(); S.toast(added.name + " added.");
-  });
+  ["e-"].forEach((p) => ["name", "spec", "license", "phone", "email"].forEach((k) => ["input", "change"].forEach((ev) => $(p + k).addEventListener(ev, () => err(p, k, "")))));
 
   const editDlg = $("edit-dialog"), delDlg = $("del-dialog");
   document.addEventListener("click", (e) => {

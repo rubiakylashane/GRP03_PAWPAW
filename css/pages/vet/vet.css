@@ -70,6 +70,14 @@
 .sdash .vrow-rec > [role="cell"] { font-size: 13px; }
 .sdash .vrow-rec .o-name { font-size: 13px; }
 .sdash .vrow-rec .o-email { font-size: 11.5px; }
+/* Medical Record list: the two lists side by side on wide screens (stacked again below 1281px) */
+@media (min-width: 1281px) {
+  .sdash #rec-list { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+  .sdash #rec-list .rec-card { margin: 0; padding: 20px 20px 24px; }
+  /* both lists only hold completed visits, so the Status column is left out here to give the other columns room */
+  .sdash #rec-list .vrow-rec { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.2fr) minmax(0, 1.1fr) 104px; column-gap: 10px; }
+  .sdash #rec-list .vrow-rec > :nth-child(4) { display: none; }
+}
 .sdash .vr-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
 .sdash .vr-head h2 { margin: 0; }
 .sdash .vr-all { border: 0; background: none; cursor: pointer; font-family: inherit; }
@@ -98,7 +106,7 @@
 .sdash .ve-bhead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
 .sdash .ve-chip { padding: 3px 12px; border-radius: 999px; background: #e1e4ee; font-size: 12px; font-weight: 700; }
 .sdash .ve-chip-v { background: #f6e6c0; }
-.sdash .ve-remove { border: 0; background: none; color: #b3261e; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.sdash .ve-remove { border: 0; background: none; color: #b3261e; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
 .sdash .ve-remove:hover { text-decoration: underline; }
 .sdash .ve-two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .sdash .ve-three { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
@@ -109,7 +117,7 @@
 .sdash .ve-edit:hover { background: #eef1ee; }
 .sdash #ve-err { margin: 14px 0 0; padding: 10px 14px; border-radius: 8px; background: #fff; }
 .sdash .ve-actions { display: flex; gap: 24px; margin: 18px 0 8px; }
-.sdash .ve-cancel, .sdash .ve-save { min-width: 200px; min-height: 48px; border-radius: 8px; font: inherit; font-size: 18px; font-weight: 700; cursor: pointer; }
+.sdash .ve-cancel, .sdash .ve-save { min-width: 160px; min-height: 40px; border-radius: 8px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
 .sdash .ve-cancel { background: #fff; color: #e11b1b; border: 1px solid #111; }
 .sdash .ve-save { background: var(--orange); color: #111; border: 0; }
 .sdash .ve-save:hover { filter: brightness(1.05); }

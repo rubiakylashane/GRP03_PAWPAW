@@ -1,15 +1,17 @@
 /* js/staff/owner-details.js - owner profile + pet cards (owner-details.html?id=<owner>) */
 (() => {
   const O = window.PawOwners, S = window.PawStaff, $ = (id) => document.getElementById(id);
+  const put = (id, text) => { const el = $(id); if (el) el.textContent = text; };   /* a missing element never stops the rest of the page */
   const id = S.ownerId();
 
   if (!id || !O.exists(id)) { $("detail").hidden = true; $("missing").hidden = false; return; }
   const o = O.owner(id);
 
-  $("o-name").textContent = o.formal;
-  $("o-since").textContent = o.registered ? O.fmtLong(o.registered) : "-";
-  $("o-email").textContent = o.email || "-";
-  $("o-phone").textContent = o.phone || "-";
+  put("o-name", o.formal);
+  put("o-since", o.registered ? O.fmtLong(o.registered) : "-");
+  put("o-email", o.email || "-");
+  put("o-address", o.address || "-");
+  put("o-phone", o.phone || "-");
   if (o.photo) {
     const p = $("o-photo");
     p.style.backgroundImage = `url('${o.photo}')`;

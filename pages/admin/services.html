@@ -89,7 +89,7 @@
       <a href="service-form.html" class="a-btn a-btn-main">Add Service</a>
     </header>
 
-    <p class="sv-warn" role="note"><strong>Heads up: revenue reports use the current price, so changing a price also changes past revenue totals.</strong><br />A service already used in an appointment cannot be deleted.</p>
+    <p class="sv-warn" role="note"><strong>Heads up: revenue reports use the current price, so changing a price also changes past revenue totals.</strong><br />Services are deactivated, not deleted. An inactive service is hidden when booking, and past appointments and revenue are kept.</p>
 
     <section class="sv-card" aria-label="Services">
       <div class="sv-row sv-head" role="row">
@@ -101,11 +101,11 @@
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
     <dialog id="del-dialog" class="dlg" aria-labelledby="del-title">
-      <h2 id="del-title">Delete service</h2>
+      <h2 id="del-title">Deactivate service</h2>
       <p class="dlg-sub" id="del-sub"></p>
       <div class="dlg-actions">
         <button type="button" class="btn btn-outline" id="del-cancel">Cancel</button>
-        <button type="button" class="btn btn-danger" id="del-ok">Delete</button>
+        <button type="button" class="btn btn-danger" id="del-ok">Deactivate</button>
       </div>
     </dialog>
   </main>

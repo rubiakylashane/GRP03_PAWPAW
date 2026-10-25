@@ -14,8 +14,8 @@
   .adm .o-split .o-card { padding-left: 16px; padding-right: 16px; }
   .adm .o-split .o-search { width: 100%; }
   /* narrower cards: owner (name, email, phone) | pets | registered | actions */
-  .adm .o-split .o-row:not(.o-prow) { column-gap: 10px; padding-left: 4px; padding-right: 4px; grid-template-columns: minmax(0, 1fr) 36px 88px 112px; }
-  .adm .o-split .o-prow { column-gap: 10px; grid-template-columns: minmax(0, 1fr) minmax(0, .8fr) minmax(0, 1fr) minmax(0, .7fr) minmax(0, .9fr) 112px; }
+  .adm .o-split .o-row:not(.o-prow) { column-gap: 10px; padding-left: 4px; padding-right: 4px; grid-template-columns: minmax(0, 1fr) 36px 88px 132px; }
+  .adm .o-split .o-prow { column-gap: 10px; grid-template-columns: minmax(0, 1fr) minmax(0, .8fr) minmax(0, 1fr) minmax(0, .7fr) minmax(0, .9fr) 132px; }
   .adm .o-split .o-acts { gap: 6px; }
 }
 @media (max-width: 900px) { .adm .o-split { margin-left: 0; margin-right: 0; } }
@@ -47,3 +47,17 @@
 
 .adm .v-warn { margin: 0 26px 16px; padding: 12px 16px; font-size: 12px; line-height: 1.5; color: #7a4a00; background: #fdf1d9; border-radius: 10px; }
 @media (max-width: 900px) { .adm .v-warn { margin-left: 0; margin-right: 0; } }
+
+/* ---------- Add / Edit pet: compact so Cancel / Confirm show without scrolling ---------- */
+.adm #pet-form.pf-card { padding: 20px 28px 22px; border-radius: 22px; }
+.adm #pet-form .pf-grid { row-gap: 15px; }
+.adm #pet-form .pf-field > label, .adm #pet-form .pf-label { margin-bottom: 5px; }
+.adm #pet-form .pf-field input[type="text"], .adm #pet-form .pf-field select, .adm #pet-form .pf-date input { height: 38px; }
+.adm #pet-form .pf-field textarea { height: 80px; }
+.adm #pet-form .pf-field > .pf-photo-box { width: 160px; }
+.adm #pet-form .pf-actions { margin-top: 20px; }
+.adm #pet-form .obtn { min-height: 42px; }
+.adm:has(#pet-form) .head-row { margin-bottom: 22px; }
+
+/* Inactive owner / pet tag */
+.adm .o-tag { display: inline-block; margin-left: 6px; padding: 1px 8px; font-size: 10.5px; font-weight: 700; color: #555; background: #e4e4e4; border-radius: 999px; vertical-align: middle; }

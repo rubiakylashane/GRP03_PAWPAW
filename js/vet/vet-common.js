@@ -14,7 +14,9 @@ window.PawVet = (() => {
   }
   const words = login.toLowerCase().split(/[\s_.-]+/);
   const mine = A.VETS.find((v) => words.some((w) => w.length > 2 && w !== "dr" && v.toLowerCase().includes(w))) || null;
-  const display = mine ? "Dr. " + mine.replace(/^Dr\.\s*/, "").split(" ").pop() : (login || "Doctor");
+  let profName = "";
+  try { const pf = JSON.parse(localStorage.getItem("pawpaw_vet_profile:" + login.toLowerCase()) || "null"); if (pf && pf.name) profName = String(pf.name).replace(/^Dr\.?\s+/i, ""); } catch (_) { /* ignore */ }
+  const display = profName ? "Dr. " + profName.split(" ").pop() : mine ? "Dr. " + mine.replace(/^Dr\.\s*/, "").split(" ").pop() : (login || "Doctor");
   const hour = new Date().getHours();
   const greeting = (hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening") + ", " + display;
 

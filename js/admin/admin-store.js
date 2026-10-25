@@ -76,7 +76,7 @@ window.PawAdmin = (() => {
     }
     return "admin";
   }
-  /* log("registered staff account x", "create", "user")  - the text may hold esc()'d values; action and record are optional (guessed from the words) */
+  /* log("added staff account x", "create", "user")  - the text may hold esc()'d values; action and record are optional (guessed from the words) */
   function log(text, action, record) {
     const d = plain(text).trim();
     if (!action) action = /^(regist|add|creat|book)/i.test(d) ? "create" : /^(delet|remov|cancel)/i.test(d) ? "delete" : "update";
@@ -84,6 +84,31 @@ window.PawAdmin = (() => {
     const who = cap(me()), a = read(AUDIT, []);
     a.push({ at: new Date().toISOString(), user: who, role: myRole(), action, record, details: d.charAt(0).toUpperCase() + d.slice(1) + (/[.!?]$/.test(d) ? "" : "."), text: "<strong>" + esc(who) + "</strong> " + text });
     write(AUDIT, a.slice(-500));
+  }
+
+  /* ---------- the signed-in admin's / staff member's own profile (My Profile page) ----------
+     pawpaw_admin_profile:<name> or pawpaw_staff_profile:<name> (signed-in name, lower case)  { name, email, phone, photo }
+     name / email / phone are also written to the login account so the Users and Staff list stays the same. */
+  const profKey = () => (myRole() === "admin" ? "pawpaw_admin_profile:" : "pawpaw_" + myRole() + "_profile:") + me().toLowerCase();
+  function myAccount() {
+    const m = me().toLowerCase(), r = myRole();
+    return accounts().find((u) => u.role === r && (String(u.username).toLowerCase() === m || String(u.name || "").toLowerCase() === m)) || null;
+  }
+  function myProfile() {
+    const a = myAccount(), s = read(profKey(), {}) || {};
+    return { username: a ? a.username : me(), accountId: a ? a.id : null, name: s.name || (a && a.name) || cap(me()),
+      email: "email" in s ? s.email : (a ? a.email : ""), phone: "phone" in s ? s.phone : (a ? a.phone : ""), photo: s.photo || "" };
+  }
+  function saveMyProfile({ name, email, phone, photo }, passwordChanged) {
+    const vet = myRole() === "vet";
+    if (vet) name = withDr(name);
+    write(profKey(), { name, email, phone, photo: photo || "" });
+    const a = myAccount();
+    if (a) {
+      const all = accounts(), i = all.findIndex((x) => x.id === a.id); if (i >= 0) { all[i] = { ...all[i], name, email, phone }; write(USERS, all); }
+      if (vet) { const list = vets(), j = list.findIndex((v) => v.userId === a.id); if (j >= 0) { const old = list[j].name; list[j] = { ...list[j], name, email, phone }; write(VETS, list); renameVetEverywhere(old, name); } }
+    }
+    log("updated their own profile" + (passwordChanged ? " (password changed)" : ""), "update", "user");
   }
 
   /* username: first initial + last name ("Maria Santos" -> msantos), unique */
@@ -103,7 +128,7 @@ window.PawAdmin = (() => {
       write("pawpaw_profile:" + u.username, { name, email, phone: u.phone, memberSince: u.createdAt });
       u.id = "o:" + u.username; u.owner = true;
     } else { all.push(u); write(USERS, all); }
-    log("registered " + esc(ROLES[role].toLowerCase()) + " account " + esc(u.username), "create", role === "owner" ? "owner" : "user");
+    log("added " + esc(ROLES[role].toLowerCase()) + " account " + esc(u.username), "create", role === "owner" ? "owner" : "user");
     return u;
   }
   function patch(u, change, what) {
@@ -111,6 +136,34 @@ window.PawAdmin = (() => {
     else { const all = accounts(), i = all.findIndex((x) => x.id === u.id); if (i >= 0) { all[i] = { ...all[i], ...change }; write(USERS, all); } }
     Object.assign(u, change);
     log(what, "update", "user");
+  }
+  /* a veterinarian's name is how appointments, records and vaccines point to them, so a rename is carried over to all of them */
+  function renameVetEverywhere(oldName, newName) {
+    if (!oldName || !newName || oldName === newName) return;
+    try {
+      const keys = []; for (let i = 0; i < localStorage.length; i++) keys.push(localStorage.key(i) || "");
+      keys.forEach((k) => {
+        if (k.indexOf("pawpaw_appointments:") === 0) { const l = read(k, []); if (Array.isArray(l) && l.some((a) => a && a.vet === oldName)) write(k, l.map((a) => (a && a.vet === oldName ? { ...a, vet: newName } : a))); }
+        else if (k.indexOf("pawpaw_records:") === 0) {
+          const r = read(k, {}) || {}, fix = (arr) => (Array.isArray(arr) ? arr.map((x) => (x && x.vet === oldName ? { ...x, vet: newName } : x)) : arr);
+          if (JSON.stringify(r).indexOf(oldName) >= 0) write(k, { ...r, visits: fix(r.visits), prescriptions: fix(r.prescriptions) });
+        } else if (k.indexOf("pawpaw_vaccinations:") === 0) { const l = read(k, []); if (Array.isArray(l) && l.some((x) => x && x.administeredBy === oldName)) write(k, l.map((x) => (x && x.administeredBy === oldName ? { ...x, administeredBy: newName } : x))); }
+      });
+    } catch (_) { /* ignore */ }
+  }
+
+  /* edit the details of a staff / vet / admin account (name, phone, email); a vet's profile on the Veterinarians page is kept in step */
+  function updateUser(u, { name, phone, email }) {
+    phone = String(phone).replace(/[\s-]/g, "");
+    name = u.role === "vet" ? withDr(name) : String(name).trim().replace(/\s+/g, " ");
+    const all = accounts(), i = all.findIndex((x) => x.id === u.id); if (i < 0) return;
+    all[i] = { ...all[i], name, phone, email }; write(USERS, all);
+    if (u.role === "vet") {
+      const list = vets(), j = list.findIndex((v) => v.userId === u.id);
+      if (j >= 0) { const old = list[j].name; list[j] = { ...list[j], name, phone, email }; write(VETS, list); renameVetEverywhere(old, name); }
+    }
+    Object.assign(u, { name, phone, email });
+    log("updated the details of " + esc(ROLES[u.role].toLowerCase()) + " account " + esc(u.username), "update", "user");
   }
   const setRole = (u, role) => patch(u, { role }, "changed the role of " + esc(u.username) + " to " + esc(ROLES[role].toLowerCase()));
   const setStatus = (u, status) => patch(u, { status }, (status === "active" ? "activated " : "deactivated ") + "account " + esc(u.username));
@@ -166,7 +219,8 @@ window.PawAdmin = (() => {
   function updateVet(v, f) {
     const list = vets(), i = list.findIndex((x) => x.id === v.id); if (i < 0) return;
     f = { ...f, name: withDr(f.name), phone: f.phone.replace(/[\s-]/g, "") };
-    list[i] = { ...list[i], ...f }; write(VETS, list); Object.assign(v, list[i]);
+    const oldName = list[i].name;
+    list[i] = { ...list[i], ...f }; write(VETS, list); Object.assign(v, list[i]); renameVetEverywhere(oldName, v.name);
     if (v.userId) { const all = accounts(), j = all.findIndex((u) => u.id === v.userId); if (j >= 0) { all[j] = { ...all[j], name: v.name, email: v.email, phone: v.phone }; write(USERS, all); } }
     log("updated veterinarian " + esc(v.name), "update", "veterinarian");
   }
@@ -191,6 +245,17 @@ window.PawAdmin = (() => {
     return h;
   }
   const describe = (h) => [h.pets && h.pets + " pet" + (h.pets > 1 ? "s" : ""), h.appointments && h.appointments + " appointment" + (h.appointments > 1 ? "s" : ""), h.records && h.records + " record" + (h.records > 1 ? "s" : ""), h.vaccinations && h.vaccinations + " vaccination" + (h.vaccinations > 1 ? "s" : "")].filter(Boolean).join(", ");
+  /* deactivate / activate an owner or one of their pets (nothing is deleted; history stays) */
+  const ownerStatus = (key) => (read(OSTAT, {})[key] === "inactive" ? "inactive" : "active");
+  function setOwnerStatus(key, name, status) {
+    const s = read(OSTAT, {}); s[key] = status; write(OSTAT, s);
+    log((status === "active" ? "activated" : "deactivated") + " owner " + esc(name), "update", "owner");
+  }
+  function setPetStatus(key, petId, petName, ownerName, status) {
+    const list = readList("pawpaw_pets:" + key), i = list.findIndex((p) => p.id === petId); if (i < 0) return;
+    list[i] = { ...list[i], status }; write("pawpaw_pets:" + key, list);
+    log((status === "active" ? "activated" : "deactivated") + " pet " + esc(petName) + " of " + esc(ownerName), "update", "pet");
+  }
   function deleteOwner(key, name) {
     ["pawpaw_profile:", "pawpaw_pets:", "pawpaw_notifications:", "pawpaw_notif_toasted:"].forEach((pre) => { try { localStorage.removeItem(pre + key); } catch (_) { /* ignore */ } });
     write("pawpaw_walkins", readList("pawpaw_walkins").filter((w) => w.key !== key));
@@ -248,6 +313,13 @@ window.PawAdmin = (() => {
     if (bits.length) log(bits.join(". "), "update", "service");
     return all[i];
   }
+  /* deactivate / activate a service (it is kept; owners and staff just stop seeing it when booking) */
+  function setServiceStatus(id, status) {
+    const all = services(), i = all.findIndex((x) => x.id === id); if (i < 0) return null;
+    all[i] = { ...all[i], status }; write(SVC, all);
+    log((status === "active" ? "activated" : "deactivated") + " service " + esc(all[i].name), "update", "service");
+    return all[i];
+  }
   function deleteService(id) {
     const all = services(), sv = all.find((x) => x.id === id); if (!sv) return;
     write(SVC, all.filter((x) => x.id !== id));
@@ -258,5 +330,5 @@ window.PawAdmin = (() => {
   const takeFlash = () => { try { const m = sessionStorage.getItem(FLASH) || ""; sessionStorage.removeItem(FLASH); return m; } catch (_) { return ""; } };
   const fmtDate = (s) => { if (!s) return "-"; const d = new Date(s + "T00:00:00"); return isNaN(d) ? "-" : d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); };
 
-  return { services, addService, updateService, deleteService, serviceUses, serviceNameTaken, peso, log, ownerHistory, describe, deleteOwner, deletePet, VETS, SPECS, vets, history, addVet, updateVet, removeVet, withDr, phoneShow, normLicense, licenseTaken, vetEmailTaken, freeVetAccounts, validName: (s) => /^[A-Za-zÀ-ÿ.'\- ]{2,60}$/.test(s), ROLES, list, add, setRole, setStatus, resetPassword, validPhone, validEmail, emailTaken, setFlash, takeFlash, fmtDate, esc, me };
+  return { services, addService, updateService, deleteService, setServiceStatus, serviceUses, serviceNameTaken, peso, log, ownerHistory, describe, deleteOwner, deletePet, ownerStatus, setOwnerStatus, setPetStatus, VETS, SPECS, vets, history, addVet, updateVet, removeVet, withDr, phoneShow, normLicense, licenseTaken, vetEmailTaken, freeVetAccounts, validName: (s) => /^[A-Za-zÀ-ÿ.'\- ]{2,60}$/.test(s), ROLES, list, add, updateUser, myAccount, myProfile, saveMyProfile, setRole, setStatus, resetPassword, validPhone, validEmail, emailTaken, setFlash, takeFlash, fmtDate, esc, me };
 })();

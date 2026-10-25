@@ -74,13 +74,13 @@
     if (!user || !pass) {
       if (!user) username.classList.add("invalid");
       if (!pass) password.classList.add("invalid");
-      return showError("Enter your username and password.");
+      return showError("Enter your name or username and password.");
     }
     showError("");
 
     const original = submit.textContent;
     submit.disabled = true;
-    submit.textContent = "Signing in...";
+    submit.textContent = "Logging in...";
 
     try {
       const data = await login(user, pass);

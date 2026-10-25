@@ -1,146 +1,229 @@
-/* js/admin/appointments.js - admin Appointments: every appointment in the clinic.
-   Filter by status / veterinarian / date, edit (vet, date, time), cancel, and override a status with a reason.
-   Data comes from PawStaffAppts (the owners' appointment lists); every change is written to the audit log.
-   Backend: GET /api/admin/appointments?status=&vet=&from=&to=&page=  PATCH /api/admin/appointments/:id { vet, date, time }
-            POST /api/admin/appointments/:id/override { status, reason }   POST /api/admin/appointments/:id/cancel { reason } */
+/* js/staff/appointments.js - staff Appointments page
+   tabs, date filter, search, sort, show more, approve + assign, check in, reschedule,
+   no-show, decline (with reason), add appointment, vet conflict warning. */
 (() => {
-  const P = window.PawStaffAppts, O = window.PawOwners, A = window.PawAdmin, S = window.PawStaff, $ = (id) => document.getElementById(id);
-  const esc = A.esc, TBA = P.TBA, PAGE = 10;
-  const LABEL = { pending: "Pending", confirmed: "Approved", checked_in: "Checked-in", with_vet: "In Progress", completed: "Completed", cancelled: "Cancelled", no_show: "No-show" };
-  const OPEN = ["pending", "confirmed", "checked_in", "with_vet"];        // can still be edited / cancelled
+  const A = window.PawStaffAppts, O = window.PawOwners, S = window.PawStaff, $ = (id) => document.getElementById(id);
+  const esc = O.esc, PAGE = 6, TBA = A.TBA;
+  let all = A.load(), tab = "all", dateF = "", shown = PAGE;
+
   const pad = (n) => String(n).padStart(2, "0");
-  const todayIso = () => { const d = new Date(); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); };
-  const fmtDate = (iso) => new Date(iso + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-  const fmtTime = (t) => { const [h, m] = String(t || "00:00").split(":").map(Number); return new Date(2000, 0, 1, h, m).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }); };
-  const peso = (n) => "₱" + Number(n || 0).toLocaleString("en-US");
+  const iso = (d) => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  const today = () => iso(new Date());
+  const uid = (a) => a._key + "|" + a.id;
+  const find = (u) => all.find((a) => uid(a) === u);
 
-  let all = [], tab = "all", page = 0, cur = null;
-  const ownerName = (a) => { try { return O.owner(a.owner).name; } catch (_) { return a.owner; } };
-  const label = (a) => fmtDate(a.date).replace(/, \d{4}$/, "") + " · " + (a.petName || "Pet") + " · " + ownerName(a);
+  const ownerName = (a) => { try { return O.owner(a.owner).short; } catch (_) { return a.owner || "Owner"; } };
+  const petName = (a) => a.petName || a.pet || "-";
+  const vetName = (a) => a.vet || TBA;
+  const services = (a) => (a.services || []).map((s) => s.name).join(", ") || a.service || "-";
+  const stamp = (a) => (a.date || "") + " " + (a.time || "");
+  const fmtDate = (d) => new Date(d + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+  const fmtShort = (d) => new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  const fmtTime = (t) => { const [h, m] = String(t || "00:00").split(":").map(Number); return new Date(2000, 0, 1, h, m).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }); };
 
-  function load() { all = P.load(); }
-  function filtered() {
-    const vet = $("f-vet").value, from = $("f-from").value, to = $("f-to").value;
-    return all.filter((a) => (tab === "all" || a.status === tab) && (!vet || (vet === "__tba" ? (!a.vet || a.vet === TBA) : a.vet === vet)) && (!from || a.date >= from) && (!to || a.date <= to))
-      .sort((a, b) => {   // open ones first by date, then the finished ones, newest first
-        const ao = OPEN.indexOf(a.status) >= 0, bo = OPEN.indexOf(b.status) >= 0;
-        if (ao !== bo) return ao ? -1 : 1;
-        const k = (a.date + a.time).localeCompare(b.date + b.time);
-        return ao ? k : -k;
-      });
+  /* every half hour, 8:00 AM - 5:00 PM */
+  const TIMES = []; for (let h = 8; h <= 17; h++) [0, 30].forEach((m) => { if (!(h === 17 && m)) TIMES.push(pad(h) + ":" + pad(m)); });
+  const timeOptions = (sel) => TIMES.map((t) => `<option value="${t}"${t === sel ? " selected" : ""}>${fmtTime(t)}</option>`).join("");
+  const vetOptions = (sel, withTba) => (withTba ? `<option value="${TBA}">Assign later</option>` : "") + A.VETS.map((v) => `<option${v === sel ? " selected" : ""}>${esc(v)}</option>`).join("");
+
+  const sorters = {
+    soon: (a, b) => stamp(a).localeCompare(stamp(b)),
+    late: (a, b) => stamp(b).localeCompare(stamp(a)),
+    status: (a, b) => A.ORDER.indexOf(a.status) - A.ORDER.indexOf(b.status) || stamp(a).localeCompare(stamp(b)),
+    pet: (a, b) => petName(a).localeCompare(petName(b))
+  };
+
+  /* 9: same vet, same date and time as another active appointment */
+  const clash = (a) => A.ACTIVE.indexOf(a.status) >= 0 ? A.conflict(all, a.vet, a.date, a.time, a.id) : null;
+
+  /* ---------- tabs ---------- */
+  const TABS = [["all", "All"], ["pending", "Pending"], ["today", "Today"], ["scheduled", "Scheduled today"], ["walkins", "Walk-ins today"], ["confirmed", "Confirmed"], ["checked_in", "Checked in"], ["completed", "Completed"], ["cancelled", "Cancelled"]];
+  const inTab = (a, t) => t === "all" || (t === "today" ? a.date === today() : t === "scheduled" ? a.date === today() && ["confirmed", "checked_in", "with_vet"].indexOf(a.status) >= 0 : t === "walkins" ? !!a.walkIn && a.date === today() && a.status !== "cancelled" : a.status === t);
+  { const qt = new URLSearchParams(location.search).get("tab"); if (TABS.some((x) => x[0] === qt)) tab = qt; }   // dashboard cards open a ready-made tab (?tab=pending ...)
+  function renderTabs() {
+    $("tabs").innerHTML = TABS.map(([k, label]) => {
+      const n = all.filter((a) => inTab(a, k)).length;
+      return `<button type="button" role="tab" class="apt-tab${k === tab ? " on" : ""}" data-tab="${k}" aria-selected="${k === tab}">${label} <i>${n}</i></button>`;
+    }).join("");
   }
-  function render() {
-    const list = filtered(), pages = Math.max(1, Math.ceil(list.length / PAGE));
-    if (page >= pages) page = pages - 1;
-    const shown = list.slice(page * PAGE, page * PAGE + PAGE);
-    $("ap-rows").innerHTML = shown.length ? shown.map((a) => {
-      const open = OPEN.indexOf(a.status) >= 0, tba = !a.vet || a.vet === TBA;
-      return `<div class="ap-row" role="row">
-        <span role="cell" class="ap-when"><b>${esc(fmtDate(a.date))}</b><i>${esc(fmtTime(a.time))}</i></span>
-        <span role="cell" data-label="Pet">${esc(a.petName || "Pet")} · ${esc(ownerName(a))}</span>
-        <span role="cell" data-label="Vet" class="${tba ? "ap-tba" : ""}">${tba ? "Unassigned" : esc(a.vet)}</span>
-        <span role="cell" data-label="Services">${esc((a.services || []).map((s) => s.name).join(", ") || "-")}</span>
-        <span role="cell" class="ap-total" data-label="Total">${peso(a.total)}</span>
-        <span role="cell"><span class="ap-pill ap-${esc(a.status)}">${esc(LABEL[a.status] || a.status)}</span></span>
-        <span role="cell" class="ap-acts"><button type="button" class="u-act" data-act="edit" data-k="${esc(a._key)}|${esc(a.id)}">Edit</button>${open ? `<button type="button" class="u-act u-act-red" data-act="cancel" data-k="${esc(a._key)}|${esc(a.id)}">Cancel</button>` : ""}</span>
+
+  /* ---------- rows ---------- */
+  function actions(a) {
+    const u = `data-id="${esc(uid(a))}"`;
+    const btn = (act, cls, text) => `<button type="button" class="obtn ${cls} obtn-sm" data-act="${act}" ${u}>${text}</button>`;
+    switch (a.status) {
+      case "pending": return btn("approve", "obtn-green", "Approve &amp; Assign") + btn("decline", "obtn-cancel", "Decline");
+      case "confirmed": return btn("checkin", "obtn-green", "Check In") + btn("resched", "obtn-outline", "Reschedule") + btn("noshow", "obtn-outline", "No-show");
+      case "checked_in": return btn("assign", "obtn-outline", "Assign Vet");
+      case "with_vet": return "";                                   // the vet completes the visit
+      case "completed": return `<a class="obtn obtn-outline obtn-sm" href="medical-records.html?owner=${encodeURIComponent(a.owner)}&petid=${encodeURIComponent(a.petId || "")}&q=${encodeURIComponent(petName(a))}">View Record</a>`;
+      default: return "";
+    }
+  }
+  function row(a) {
+    const c = clash(a);
+    const warn = c ? `<span class="a-warn"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.5"/></svg>Same time as ${esc(petName(c))}</span>` : "";
+    return `
+      <div class="orow arow${c ? " is-clash" : ""}" role="row" tabindex="0" data-open="${esc(uid(a))}" aria-label="Details of ${esc(petName(a))}">
+        <span role="cell"><span class="o-name">${esc(a.date ? fmtDate(a.date) : "-")}</span><span class="o-email">${esc(fmtTime(a.time))}</span></span>
+        <span role="cell"><span class="o-name">${esc(petName(a))}</span><span class="o-email">${esc(ownerName(a))}</span></span>
+        <span role="cell"><span class="${vetName(a) === TBA ? "a-muted" : ""}">${esc(vetName(a))}</span>${warn}</span>
+        <span role="cell">${esc(services(a))}</span>
+        <span role="cell"><span class="spill spill-${esc(a.status)}">${esc(A.STATUS[a.status] || a.status)}</span>${a.status === "pending" && a.rescheduledFrom ? `<span class="resch-tag" title="Was ${esc(a.rescheduledFrom.date)} ${esc(a.rescheduledFrom.time)}">Rescheduled</span>` : ""}</span>
+        <span role="cell" class="a-actions">${actions(a)}</span>
       </div>`;
-    }).join("") : `<p class="u-empty">No appointments match.</p>`;
-    $("ap-count").textContent = list.length ? "Showing " + (page * PAGE + 1) + "-" + (page * PAGE + shown.length) + " of " + list.length : "Showing 0 of 0";
-    $("ap-prev").disabled = page === 0; $("ap-next").disabled = page >= pages - 1;
-    document.querySelectorAll(".ap-tab").forEach((t) => { const on = t.dataset.s === tab; t.classList.toggle("on", on); t.setAttribute("aria-selected", String(on)); });
   }
 
-  /* filters */
-  $("f-vet").innerHTML = `<option value="">All veterinarians</option><option value="__tba">Unassigned</option>` + P.VETS.map((v) => `<option>${esc(v)}</option>`).join("");
-  ["f-vet", "f-from", "f-to"].forEach((id) => $(id).addEventListener("change", () => { page = 0; render(); }));
-  document.querySelector(".ap-tabs").addEventListener("click", (e) => { const t = e.target.closest("[data-s]"); if (t) { tab = t.dataset.s; page = 0; render(); } });
-  $("ap-prev").addEventListener("click", () => { page--; render(); });
-  $("ap-next").addEventListener("click", () => { page++; render(); });
-
-  const find = (k) => { const [key, id] = k.split("|"); return all.find((a) => a._key === key && String(a.id) === id); };
-  const done = (msg) => { load(); render(); S.toast(msg); };
-  const tell = (a, type, title, text) => P.notify(a.owner, type, title, text);   // owner's bell (the server does this when there is a backend)
-
-  /* ----- edit (vet, date, time) ----- */
-  const eDlg = $("edit-dialog");
-  const slots = (keep) => { const out = []; for (let m = 9 * 60; m < 17 * 60; m += 30) out.push(pad(Math.floor(m / 60)) + ":" + pad(m % 60)); if (keep && out.indexOf(keep) < 0) out.push(keep); return out.sort(); };
-  function hint() {
-    const c = P.conflict(all, $("e-vet").value, $("e-date").value, $("e-time").value, cur && cur.id);
-    $("e-hint").textContent = c ? "Warning: " + c.vet + " already has " + (c.petName || "a patient") + " at this time." : "";
-    $("e-hint").className = "dlg-hint" + (c ? " bad" : "");
+  function render() {
+    renderTabs();
+    const q = $("search").value.trim().toLowerCase();
+    const list = all
+      .filter((a) => inTab(a, tab) && (!dateF || a.date === dateF) &&
+        (!q || [petName(a), ownerName(a), vetName(a), services(a), A.STATUS[a.status] || a.status, a.date].join(" ").toLowerCase().includes(q)))
+      .sort(sorters[$("sort").value] || sorters.soon);
+    const part = list.slice(0, shown);
+    $("appt-rows").innerHTML = part.length
+      ? part.map(row).join("")
+      : `<p class="o-empty">${all.length ? "No appointments match your filters." : "No appointment requests yet."}</p>`;
+    $("count").textContent = list.length ? `Showing 1-${part.length} of ${list.length}` : "";
+    $("more").hidden = list.length <= part.length;
+    $("date-label").textContent = dateF ? fmtShort(dateF) : "All dates";
+    $("date-clear").hidden = !dateF;
   }
-  function openEdit(a) {
-    cur = a;
-    $("edit-sub").textContent = label(a) + " · " + (LABEL[a.status] || a.status);
-    const open = OPEN.indexOf(a.status) >= 0;
-    $("e-vet").innerHTML = `<option value="${TBA}">Unassigned</option>` + P.VETS.concat(a.vet && a.vet !== TBA && P.VETS.indexOf(a.vet) < 0 ? [a.vet] : []).map((v) => `<option>${esc(v)}</option>`).join("");
-    $("e-vet").value = a.vet || TBA;
-    $("e-date").value = a.date; $("e-time").innerHTML = slots(a.time).map((t) => `<option value="${t}">${fmtTime(t)}</option>`).join(""); $("e-time").value = a.time;
-    ["e-vet", "e-date", "e-time", "e-save"].forEach((id) => { $(id).disabled = !open; });   // finished appointments: only the status override
-    hint(); eDlg.showModal();
+
+  /* ---------- dialogs ---------- */
+  const D = { detail: $("detail-dialog"), approve: $("approve-dialog"), vet: $("vet-dialog"), resched: $("resched-dialog"), decline: $("decline-dialog"), add: $("add-dialog") };
+  let cur = null;
+  const who = (a) => petName(a) + " - " + ownerName(a);
+  const when = (a) => (a.date ? fmtDate(a.date) : "") + " " + fmtTime(a.time);
+  const hint = (el, c) => { el.textContent = c ? "Warning: " + vetName(c) + " already has " + petName(c) + " at this time." : ""; el.className = "dlg-hint" + (c ? " bad" : ""); };
+
+  function openDetails(a) {
+    const rows = [["Pet", petName(a)], ["Owner", ownerName(a)], ["Date", a.date ? fmtDate(a.date) : "-"], ["Time", fmtTime(a.time)],
+      ["Veterinarian", vetName(a)], ["Services", services(a)], ["Reason", a.reason || "-"],
+      ["Estimated", a.total ? "₱" + Number(a.total).toLocaleString("en-US") : "-"], ["Status", A.STATUS[a.status] || a.status]];
+    if (a.declineReason) rows.push(["Decline reason", a.declineReason]);
+    if (a.rescheduleReason) rows.push(["Reschedule note", a.rescheduleReason]);
+    $("detail-facts").innerHTML = rows.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join("");
+    D.detail.showModal();
   }
-  ["e-vet", "e-date", "e-time"].forEach((id) => $(id).addEventListener("change", hint));
-  $("e-cancel").addEventListener("click", () => eDlg.close());
-  $("e-save").addEventListener("click", () => {
-    const patch = { vet: $("e-vet").value, date: $("e-date").value, time: $("e-time").value };
-    if (!patch.date) { $("e-hint").textContent = "Choose a date."; $("e-hint").className = "dlg-hint bad"; return; }
-    if (patch.date < todayIso()) { $("e-hint").textContent = "Choose today or a later date."; $("e-hint").className = "dlg-hint bad"; return; }
-    const was = { ...cur }, moved = patch.date !== was.date || patch.time !== was.time, vetChanged = patch.vet !== (was.vet || TBA);
-    if (!moved && !vetChanged) { eDlg.close(); return; }
-    eDlg.close(); P.change(cur, patch, true);
-    const bits = [];
-    if (vetChanged) bits.push("reassigned to " + (patch.vet === TBA ? "no vet" : patch.vet));
-    if (moved) { bits.push("moved to " + fmtDate(patch.date) + " " + fmtTime(patch.time)); tell(cur, "appointment", "Appointment rescheduled", (cur.petName || "") + ", " + patch.date + " " + patch.time + "."); }
-    A.log("edited the appointment of " + esc(cur.petName) + " (" + esc(ownerName(cur)) + "): " + esc(bits.join(", ")), "update", "appointment");
-    done("Appointment updated.");
-  });
-  $("e-override").addEventListener("click", () => { eDlg.close(); openOverride(cur); });
-
-  /* ----- override status ----- */
-  const oDlg = $("ov-dialog");
-  function openOverride(a) {
-    cur = a; $("ov-appt").value = label(a);
-    $("ov-status").innerHTML = P.ORDER.map((s) => `<option value="${s}">${esc(LABEL[s])}</option>`).join(""); $("ov-status").value = a.status;
-    $("ov-reason").value = ""; $("ov-err").hidden = true; oDlg.showModal();
+  function openApprove(a) {
+    cur = a; $("approve-sub").textContent = who(a) + ", " + when(a);
+    $("approve-vet").innerHTML = vetOptions(A.VETS.includes(a.vet) ? a.vet : A.VETS[0], true);
+    checkApprove(); D.approve.showModal();
   }
-  $("ov-cancel").addEventListener("click", () => oDlg.close());
-  $("ov-ok").addEventListener("click", () => {
-    const status = $("ov-status").value, reason = $("ov-reason").value.trim();
-    const err = (m) => { $("ov-err").textContent = m; $("ov-err").hidden = false; };
-    if (status === cur.status) return err("Choose a different status.");
-    if (reason.length < 5) return err("Enter a reason (at least 5 characters).");
-    oDlg.close();
-    const patch = { status, overrideReason: reason };
-    if (status === "cancelled") patch.declineReason = reason;
-    P.change(cur, patch, true);
-    if (status === "cancelled") tell(cur, "appointment", "Appointment cancelled", (cur.petName || "") + ", " + cur.date + " " + cur.time + ". Reason: " + reason);
-    else if (status === "confirmed") tell(cur, "appointment", "Appointment approved", (cur.petName || "") + ", " + cur.date + " " + cur.time + ".");
-    A.log("overrode the status of " + esc(cur.petName) + " (" + esc(ownerName(cur)) + ") to " + esc(LABEL[status]) + ". Reason: " + esc(reason), "update", "appointment");
-    done("Status changed to " + LABEL[status] + ".");
-  });
+  const checkApprove = () => hint($("approve-hint"), A.conflict(all, $("approve-vet").value, cur.date, cur.time, cur.id));
+  function openAssign(a) {
+    cur = a; $("vet-sub").textContent = who(a);
+    $("vet-select").innerHTML = vetOptions(A.VETS.includes(a.vet) ? a.vet : A.VETS[0], false);
+    checkAssign(); D.vet.showModal();
+  }
+  const checkAssign = () => hint($("vet-hint"), A.conflict(all, $("vet-select").value, cur.date, cur.time, cur.id));
+  function openResched(a) {
+    cur = a; $("resched-sub").textContent = who(a) + ", now " + when(a);
+    $("resched-date").min = today(); $("resched-date").value = a.date || today();
+    $("resched-time").innerHTML = timeOptions(a.time); $("resched-reason").value = "";
+    checkResched(); D.resched.showModal();
+  }
+  const checkResched = () => hint($("resched-hint"), A.conflict(all, cur.vet, $("resched-date").value, $("resched-time").value, cur.id));
+  function openDecline(a) { cur = a; $("decline-sub").textContent = who(a) + ", " + when(a); $("decline-reason").value = ""; D.decline.showModal(); }
 
-  /* ----- cancel ----- */
-  const cDlg = $("cx-dialog");
-  function openCancel(a) { cur = a; $("cx-sub").textContent = label(a); $("cx-reason").value = ""; cDlg.showModal(); }
-  $("cx-keep").addEventListener("click", () => cDlg.close());
-  $("cx-ok").addEventListener("click", () => {
-    const reason = $("cx-reason").value.trim(); cDlg.close();
-    P.change(cur, { status: "cancelled", declineReason: reason }, true);
-    tell(cur, "appointment", "Appointment cancelled", (cur.petName || "") + ", " + cur.date + " " + cur.time + "." + (reason ? " Reason: " + reason : ""));
-    A.log("cancelled the appointment of " + esc(cur.petName) + " (" + esc(ownerName(cur)) + ")" + (reason ? ". Reason: " + esc(reason) : ""), "update", "appointment");
-    done("Appointment cancelled.");
-  });
+  /* 10: add appointment */
+  function openAdd() {
+    const owners = O.list().filter((o) => o.id);
+    if (!owners.length) { S.toast("Register an owner first."); return; }
+    $("add-owner").innerHTML = owners.map((o) => `<option value="${esc(o.id)}">${esc(o.short || o.name)}</option>`).join("");
+    $("add-service").innerHTML = A.SERVICES.map((s) => `<option>${esc(s)}</option>`).join("");
+    $("add-date").min = today(); $("add-date").value = today();
+    $("add-time").innerHTML = timeOptions("09:00"); $("add-vet").innerHTML = vetOptions(A.VETS[0], true);
+    fillPets(); checkAdd(); D.add.showModal();
+  }
+  function fillPets() {
+    const pets = O.petsOf($("add-owner").value);
+    $("add-pet").innerHTML = pets.length ? pets.map((p) => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join("") : `<option value="">No pets yet</option>`;
+  }
+  const checkAdd = () => hint($("add-hint"), A.conflict(all, $("add-vet").value, $("add-date").value, $("add-time").value));
 
+  /* tell the owner (notification bell) what the clinic just did */
+  function tell(a, before, patch) {
+    const what = petName(a) + ", " + (a.date ? fmtShort(a.date) : "") + " " + fmtTime(a.time);
+    const n = (title, text) => A.notify(a.owner, "appointment", title, text);
+    if (patch.date || patch.time) n("Appointment rescheduled", what + (patch.rescheduleReason ? ". Reason: " + patch.rescheduleReason : "") + ".");
+    else if (patch.status === "confirmed" && before === "pending") n("Appointment approved", what + (a.vet && a.vet !== TBA ? " with " + a.vet : "") + ".");
+    else if (patch.status === "cancelled") n("Request declined", petName(a) + ", " + (a.date ? fmtShort(a.date) : "") + "." + (patch.declineReason ? " Reason: " + patch.declineReason : ""));
+    else if (patch.status === "completed") n("Visit completed", petName(a) + " has finished the visit.");
+    else if (patch.status === "no_show") n("Marked as no-show", petName(a) + " did not arrive for the " + fmtShort(a.date) + " appointment.");
+  }
+  function set(a, patch, msg) { const before = a.status; A.change(a, patch); tell(a, before, patch); render(); S.toast(msg); }
+
+  /* ---------- events ---------- */
   document.addEventListener("click", (e) => {
-    const b = e.target.closest("[data-act]"); if (!b) return;
-    const a = find(b.dataset.k); if (!a) return;
-    if (b.dataset.act === "edit") openEdit(a); else openCancel(a);
+    const t = e.target.closest("[data-tab]");
+    if (t) { tab = t.dataset.tab; shown = PAGE; render(); return; }
+    if (e.target.closest("[data-close]")) { e.target.closest("dialog").close(); return; }
+    const b = e.target.closest("[data-act]");
+    if (b) {
+      e.stopPropagation();
+      const a = find(b.dataset.id); if (!a) return;
+      ({
+        approve: () => openApprove(a), decline: () => openDecline(a), assign: () => openAssign(a), resched: () => openResched(a),
+        checkin: () => set(a, { status: "checked_in" }, petName(a) + " checked in."),
+        noshow: () => set(a, { status: "no_show" }, petName(a) + " marked as no-show.")
+      })[b.dataset.act]();
+      return;
+    }
+    if (e.target.closest("a")) return;
+    const r = e.target.closest("[data-open]");
+    if (r) { const a = find(r.dataset.open); if (a) openDetails(a); }
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" || e.target.closest("button, a, dialog")) return;
+    const r = e.target.closest("[data-open]");
+    if (r) { const a = find(r.dataset.open); if (a) openDetails(a); }
   });
 
-  /* links from the Dashboard: appointments.html?status=pending  or  ?vet=unassigned */
-  const q = new URLSearchParams(location.search);
-  if (q.get("status") && document.querySelector('.ap-tab[data-s="' + q.get("status") + '"]')) tab = q.get("status");
-  if (q.get("vet") === "unassigned") $("f-vet").value = "__tba";
+  $("detail-close").addEventListener("click", () => D.detail.close());
+  $("more").addEventListener("click", () => { shown += PAGE; render(); });
+  $("search").addEventListener("input", () => { shown = PAGE; render(); });
+  $("sort").addEventListener("change", render);
+  $("add-btn").addEventListener("click", openAdd);
 
-  load(); render();
+  /* 2: date filter (calendar popup) */
+  $("date-btn").addEventListener("click", () => {
+    window.PawCalendar.open({ anchor: $("date-btn"), value: dateF || today(), onPick: (v) => { dateF = v; shown = PAGE; render(); } });
+  });
+  $("date-clear").addEventListener("click", () => { dateF = ""; render(); });
+
+  $("approve-vet").addEventListener("change", checkApprove);
+  $("approve-ok").addEventListener("click", () => {
+    const vet = $("approve-vet").value; D.approve.close();
+    set(cur, { status: "confirmed", vet }, "Request approved" + (vet !== TBA ? " - " + vet + "." : "."));
+  });
+  $("vet-select").addEventListener("change", checkAssign);
+  $("vet-save").addEventListener("click", () => { const vet = $("vet-select").value; D.vet.close(); set(cur, { vet, status: "with_vet" }, "Assigned to " + vet + "."); });
+
+  $("resched-date").addEventListener("change", checkResched);
+  $("resched-time").addEventListener("change", checkResched);
+  $("resched-ok").addEventListener("click", () => {
+    const date = $("resched-date").value, time = $("resched-time").value;
+    if (!date) { S.toast("Pick a new date."); return; }
+    D.resched.close();
+    set(cur, { date, time, rescheduleReason: $("resched-reason").value.trim(), rescheduledAt: new Date().toISOString() }, "Rescheduled to " + fmtShort(date) + ", " + fmtTime(time) + ".");
+  });
+
+  $("decline-ok").addEventListener("click", () => { const r = $("decline-reason").value.trim(); D.decline.close(); set(cur, { status: "cancelled", declineReason: r }, "Request declined."); });
+
+  $("add-owner").addEventListener("change", fillPets);
+  ["add-vet", "add-date", "add-time"].forEach((id) => $(id).addEventListener("change", checkAdd));
+  $("add-ok").addEventListener("click", () => {
+    const key = $("add-owner").value, petId = $("add-pet").value, date = $("add-date").value;
+    if (!petId) { S.toast("This owner has no pet yet."); return; }
+    if (!date) { S.toast("Pick a date."); return; }
+    const pet = O.getPet(key, petId), svc = $("add-service").value;
+    const a = A.add(key, { petId, petName: pet ? pet.name : "", vet: $("add-vet").value, date, time: $("add-time").value, services: [{ name: svc, price: 0 }] });
+    A.notify(a.owner, "appointment", "Appointment booked", petName(a) + ", " + fmtShort(a.date) + " " + fmtTime(a.time) + ", " + services(a) + ".");
+    all.push(a); D.add.close(); render(); S.toast("Appointment added for " + petName(a) + ".");
+  });
+
+  render();
 })();

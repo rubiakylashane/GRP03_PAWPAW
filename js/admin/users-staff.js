@@ -1,4 +1,4 @@
-/* js/admin/users-staff.js - Users and Staff list (filter by role, edit role, reset password, activate / deactivate).
+/* js/admin/users-staff.js - Users and Staff list (filter by role, edit details, edit role, reset password, activate / deactivate).
    Data and rules live in admin-store.js. */
 (() => {
   const A = window.PawAdmin, S = window.PawStaff, $ = (id) => document.getElementById(id);
@@ -10,13 +10,13 @@
   let all = load(), filter = "all", current = null, loadFailed = "";
 
   const btn = (act, cls, label, id) => `<button type="button" class="u-act ${cls}" data-act="${act}" data-id="${A.esc(id)}">${label}</button>`;
+  /* every account shows the same buttons: Edit details, Edit role (not for owners), Reset password, Deactivate / Activate */
   function actions(u) {
-    const me = A.me().toLowerCase(), self = u.username.toLowerCase() === me;
+    const edit = u.role === "owner" ? `<a class="u-act" href="owner-edit.html?id=${encodeURIComponent(u.username)}">Edit details</a>` : btn("edit", "", "Edit details", u.id);
+    const role = u.role === "owner" ? "" : btn("role", "", "Edit role", u.id);
     const reset = btn("reset", "", "Reset password", u.id);
     const toggle = u.status === "active" ? btn("deactivate", "u-act-red", "Deactivate", u.id) : btn("activate", "u-act-green", "Activate", u.id);
-    if (u.role === "admin") return reset;                                   // admins: only reset password
-    if (u.role === "owner") return u.status === "active" ? reset + toggle : toggle;
-    return u.status === "active" ? btn("role", "", "Edit role", u.id) + reset + toggle : btn("role", "", "Edit role", u.id) + toggle;
+    return edit + role + reset + toggle;
   }
   const row = (u) => `
     <div class="u-row" role="row">
@@ -37,17 +37,42 @@
 
   document.querySelector(".u-tabs").addEventListener("click", (e) => { const t = e.target.closest("[data-role]"); if (t) { filter = t.dataset.role; render(); } });
 
-  const roleDlg = $("role-dialog"), pwDlg = $("pw-dialog"), stDlg = $("st-dialog");
+  const roleDlg = $("role-dialog"), pwDlg = $("pw-dialog"), stDlg = $("st-dialog"), edDlg = $("ed-dialog");
   document.addEventListener("click", (e) => {
     const b = e.target.closest("[data-act]"); if (!b) return;
     current = all.find((u) => u.id === b.dataset.id); if (!current) return;
-    if (b.dataset.act === "role") { $("role-sub").textContent = current.username + " (" + A.ROLES[current.role] + ")"; $("role-select").value = current.role; roleDlg.showModal(); }
+    if (b.dataset.act === "edit") {
+      $("ed-sub").textContent = current.username + " (" + A.ROLES[current.role] + ")";
+      $("ed-name").value = current.name || ""; $("ed-phone").value = current.phone || ""; $("ed-email").value = current.email || "";
+      ["name", "phone", "email"].forEach((k) => edErr(k, "")); $("ed-note").hidden = current.role !== "vet";
+      edDlg.showModal(); $("ed-name").focus();
+    }
+    else if (b.dataset.act === "role") { $("role-sub").textContent = current.username + " (" + A.ROLES[current.role] + ")"; $("role-select").value = current.role; $("role-err").hidden = true; roleDlg.showModal(); }
     else if (b.dataset.act === "reset") { $("pw-sub").textContent = current.username + " · " + (current.email || ""); $("pw-new").value = ""; $("pw-err").hidden = true; pwDlg.showModal(); $("pw-new").focus(); }
+    else if (b.dataset.act === "deactivate" && current.role === "admin" && (current.username.toLowerCase() === A.me().toLowerCase() || all.filter((u) => u.role === "admin" && u.status === "active").length < 2)) {
+      toast(current.username.toLowerCase() === A.me().toLowerCase() ? "You cannot deactivate your own account." : "This is the only active admin, so it cannot be deactivated.");
+    }
     else { const on = b.dataset.act === "deactivate"; $("st-title").textContent = on ? "Deactivate account" : "Activate account"; $("st-sub").textContent = on ? current.username + " will not be able to sign in until you activate the account again." : current.username + " will be able to sign in again."; $("st-ok").textContent = on ? "Deactivate" : "Activate"; $("st-ok").className = "btn " + (on ? "btn-danger" : "btn-primary"); $("st-ok").dataset.to = on ? "inactive" : "active"; stDlg.showModal(); }
   });
 
+  const edErr = (k, m) => { const e = $("ed-err-" + k); e.textContent = m || ""; e.hidden = !m; $("ed-" + k).setAttribute("aria-invalid", m ? "true" : "false"); };
+  ["name", "phone", "email"].forEach((k) => $("ed-" + k).addEventListener("input", () => edErr(k, "")));
+  $("ed-cancel").addEventListener("click", () => edDlg.close());
+  $("ed-save").addEventListener("click", () => {
+    const v = { name: $("ed-name").value.trim().replace(/\s+/g, " "), phone: $("ed-phone").value.replace(/[\s-]/g, ""), email: $("ed-email").value.trim() }, e = {};
+    if (!v.name) e.name = "Enter the full name."; else if (!A.validName(v.name)) e.name = "Use letters only.";
+    if (!v.phone) e.phone = "Enter the phone number."; else if (!A.validPhone(v.phone)) e.phone = "Use a mobile number like 09XXXXXXXXX.";
+    if (!v.email) e.email = "Enter the email address."; else if (!A.validEmail(v.email)) e.email = "Enter a valid email address."; else if (A.emailTaken(v.email, current.id)) e.email = "This email is already used by another account.";
+    ["name", "phone", "email"].forEach((k) => edErr(k, e[k]));
+    const bad = ["name", "phone", "email"].find((k) => e[k]); if (bad) { $("ed-" + bad).focus(); return; }
+    edDlg.close(); A.updateUser(current, v); render(); toast("Details updated for " + current.username + ".");
+  });
   $("role-cancel").addEventListener("click", () => roleDlg.close());
-  $("role-save").addEventListener("click", () => { const r = $("role-select").value; roleDlg.close(); if (r !== current.role) { A.setRole(current, r); render(); toast("Role changed to " + A.ROLES[r] + "."); } });
+  $("role-save").addEventListener("click", () => {
+    const r = $("role-select").value;
+    /* keep at least one active admin, otherwise nobody could manage the system */
+    if (current.role === "admin" && r !== "admin" && all.filter((u) => u.role === "admin" && u.status === "active").length < 2) { $("role-err").textContent = "This is the only active admin. Add or promote another admin first."; $("role-err").hidden = false; return; }
+    roleDlg.close(); if (r !== current.role) { A.setRole(current, r); render(); toast("Role changed to " + A.ROLES[r] + "."); } });
   $("pw-cancel").addEventListener("click", () => pwDlg.close());
   $("pw-save").addEventListener("click", () => {
     const v = $("pw-new").value;

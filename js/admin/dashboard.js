@@ -229,6 +229,7 @@
     for (const store of ["sessionStorage", "localStorage"]) {
       try { const u = JSON.parse(window[store].getItem("pawpaw_user") || "null"); if (u && u.name) { name = String(u.name).trim(); break; } } catch (_) { /* ignore */ }
     }
+    try { const pf = JSON.parse(localStorage.getItem("pawpaw_admin_profile:" + name.toLowerCase()) || "null"); if (pf && pf.name) name = pf.name; } catch (_) { /* ignore */ }
     if (name && name === name.toLowerCase()) name = name.charAt(0).toUpperCase() + name.slice(1);
     const h = new Date().getHours();
     $("greeting").textContent = (h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening") + (name ? ", " + name : "");

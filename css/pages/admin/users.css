@@ -20,7 +20,7 @@
 /* table */
 .adm .u-card { color: #111; background: #fff; border: 1px solid var(--line); border-radius: 12px; }
 .adm .u-card:not(.u-form) { margin: 0 26px; padding: 12px 20px 26px; }
-.adm .u-row { display: grid; align-items: center; column-gap: 14px; padding: 12px 0; min-height: 46px; border-bottom: 1px solid #e3e3e3; font-size: 13px; grid-template-columns: minmax(0, .9fr) minmax(0, 1.7fr) minmax(0, .95fr) 78px minmax(0, .95fr) 288px; }
+.adm .u-row { display: grid; align-items: center; column-gap: 14px; padding: 12px 0; min-height: 46px; border-bottom: 1px solid #e3e3e3; font-size: 13px; grid-template-columns: minmax(0, .9fr) minmax(0, 1.7fr) minmax(0, .95fr) 78px minmax(0, .95fr) 372px; }
 .adm .u-row:last-child { border-bottom: 0; }
 .adm .u-head { min-height: 0; padding: 8px 0; font-size: 11px; font-weight: 600; letter-spacing: .02em; text-transform: uppercase; color: #333; border-bottom: 1px solid #aaa; }
 .adm .u-name { font-weight: 700; overflow-wrap: anywhere; }
@@ -70,3 +70,6 @@
   .adm .u-row > span.u-name::before { content: none; }
   .adm .u-actions-cell { flex-basis: 100%; }
 }
+
+/* "Edit details" of an owner is a link: same size as the buttons */
+.adm .u-actions-cell a.u-act { display: inline-flex; align-items: center; box-sizing: border-box; text-decoration: none; }

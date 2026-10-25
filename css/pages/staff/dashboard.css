@@ -15,6 +15,8 @@ body.sdash {
   --pill-yellow: #f0d58a;
   --pill-blue: #b9d5f2;
   --sidebar-w: 318px;
+  --sidebar-bg: var(--orange);   /* also painted as a full-height strip behind the fixed sidebar, so a "capture full page" screenshot has no gap */
+  --strip: var(--sidebar-w);
 
   margin: 0;
   min-height: 100vh;
@@ -24,6 +26,7 @@ body.sdash {
   /* same picture as the other dashboards; "multiply" tints the grey silhouette to a darker green */
   background: url("../../../assets/images/dashboard-bg.svg") 25vw -10vh / 100vw auto no-repeat fixed, var(--green);
   background-blend-mode: multiply, normal;
+  position: relative;
 }
 .sdash *, .sdash *::before, .sdash *::after { box-sizing: border-box; }
 .sdash a { color: inherit; text-decoration: none; }
@@ -31,6 +34,8 @@ body.sdash {
 .sdash [hidden] { display: none !important; }
 
 /* ---------- Sidebar ---------- */
+/* the sidebar colour also runs behind it for the whole page height, so a "capture full page" screenshot has no green gap above or below the sidebar */
+body.sdash::before { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: var(--strip); background: var(--sidebar-bg); pointer-events: none; }
 .sdash .sidebar {
   position: fixed; inset: 0 auto 0 0;
   width: var(--sidebar-w);
@@ -88,6 +93,11 @@ body.sdash {
   color: var(--ink); background: #fff;
   border: 1px solid var(--line); border-radius: 26px;
 }
+/* the cards are links (appointments filtered by status) */
+.sdash a.stat-link { display: block; text-decoration: none; color: var(--ink); cursor: pointer; transition: transform .15s ease, box-shadow .15s ease; }
+.sdash a.stat-link:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0, 0, 0, .18); }
+.sdash a.stat-link:focus-visible { outline: 3px solid #e29d1a; outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .sdash a.stat-link { transition: none; } .sdash a.stat-link:hover { transform: none; } }
 .sdash .stat h3 { font-size: 12.5px; font-weight: 400; color: #333; letter-spacing: 0; }
 .sdash .stat-value { margin-top: 10px; padding-left: 8px; font-size: 28px; font-weight: 700; line-height: 1; }
 
@@ -195,6 +205,7 @@ body.sdash {
   .sdash .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 900px) {
+  body.sdash { --strip: 0px; }   /* the sidebar slides in on phones: no strip */
   .sdash .mobile-bar {
     position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 12px;
     padding: 12px 16px; color: var(--on-lemon); background: var(--orange);
@@ -218,3 +229,10 @@ body.sdash {
 .sdash .dlg-hint { margin-top: 10px; min-height: 18px; font-size: 13px; color: #2e7d32; font-weight: 600; }
 .sdash .dlg-hint.bad { color: #b36b00; }
 .sdash .resch-tag { display: inline-block; margin-left: 6px; padding: 2px 8px; border-radius: 999px; background: #e8d5f5; color: #4a2a63; font-size: 11px; font-weight: 700; vertical-align: middle; }
+
+/* sidebar: picture and name open My Profile (a long name is cut with "...") */
+.sdash .user-link { display: block; flex: none; color: inherit; text-decoration: none; border-radius: 50%; }
+.sdash .user-meta .user-link { flex: 0 1 auto; min-width: 0; max-width: 100%; overflow: hidden; border-radius: 4px; }
+.sdash .user-meta .user-link strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sdash .user-meta .user-link:hover strong { text-decoration: underline; }
+.sdash .user-link:focus-visible { outline: 3px solid #e29d1a; outline-offset: 2px; }

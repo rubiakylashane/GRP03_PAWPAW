@@ -83,9 +83,9 @@
     <header class="head-row">
       <div class="page-head">
         <h1>Users and Staff</h1>
-        <p class="sub">Create accounts, assign roles, activate or deactivate access, and reset passwords.</p>
+        <p class="sub">Add accounts, edit details, assign roles, activate or deactivate access, and reset passwords.</p>
       </div>
-      <a href="register-user.html" class="a-btn a-btn-main">Register User</a>
+      <a href="register-user.html" class="a-btn a-btn-main">Add User</a>
     </header>
 
     <div class="u-tabs" role="tablist" aria-label="Filter by role">
@@ -106,6 +106,26 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+    <!-- Edit details (staff, veterinarian, admin) -->
+    <dialog id="ed-dialog" class="dlg" aria-labelledby="ed-title">
+      <h2 id="ed-title">Edit details</h2>
+      <p class="dlg-sub" id="ed-sub"></p>
+      <label class="dlg-label" for="ed-name">Name</label>
+      <input id="ed-name" class="dlg-select" type="text" maxlength="60" autocomplete="off" />
+      <p class="dlg-hint bad" id="ed-err-name" role="alert" hidden></p>
+      <label class="dlg-label" for="ed-phone">Phone number</label>
+      <input id="ed-phone" class="dlg-select" type="text" inputmode="numeric" maxlength="13" placeholder="09XXXXXXXXX" autocomplete="off" />
+      <p class="dlg-hint bad" id="ed-err-phone" role="alert" hidden></p>
+      <label class="dlg-label" for="ed-email">Email</label>
+      <input id="ed-email" class="dlg-select" type="email" maxlength="80" autocomplete="off" />
+      <p class="dlg-hint bad" id="ed-err-email" role="alert" hidden></p>
+      <p class="dlg-sub" id="ed-note" hidden>Specialization and license number are edited on the Veterinarians page.</p>
+      <div class="dlg-actions">
+        <button type="button" class="btn btn-outline" id="ed-cancel">Cancel</button>
+        <button type="button" class="btn btn-primary" id="ed-save">Save</button>
+      </div>
+    </dialog>
+
     <!-- Edit role -->
     <dialog id="role-dialog" class="dlg" aria-labelledby="role-title">
       <h2 id="role-title">Edit role</h2>
@@ -114,6 +134,7 @@
       <select id="role-select" class="dlg-select">
         <option value="staff">Staff</option><option value="vet">Veterinarian</option><option value="admin">Admin</option>
       </select>
+      <p class="dlg-hint bad" id="role-err" role="alert" hidden></p>
       <div class="dlg-actions">
         <button type="button" class="btn btn-outline" id="role-cancel">Cancel</button>
         <button type="button" class="btn btn-primary" id="role-save">Save</button>

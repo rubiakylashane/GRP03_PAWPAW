@@ -42,3 +42,10 @@
   .adm .v-acts { flex-basis: 100%; }
   .adm .v-grid, .adm .v-grid-2 { grid-template-columns: 1fr; }
 }
+
+/* Add Veterinarian: smaller Cancel / Confirm buttons */
+.adm #vet-form .u-actions { gap: 12px; margin-top: 8px; }
+.adm #vet-form .u-btn { min-width: 140px; min-height: 44px; padding: 0 24px; font-size: 15px; }
+@media (max-width: 900px) {
+  .adm #vet-form .u-btn { width: 100%; min-height: 46px; font-size: 15px; }
+}

@@ -48,3 +48,7 @@
   .adm .sv-btn { width: 100%; }
 }
 .adm .sv-acts .u-act { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
+
+/* Inactive service */
+.adm .sv-off .sv-name, .adm .sv-off .sv-desc, .adm .sv-off .sv-price { color: #777; }
+.adm .sv-tag { display: inline-block; margin-left: 6px; padding: 1px 8px; font-size: 10.5px; font-weight: 700; color: #555; background: #e4e4e4; border-radius: 999px; vertical-align: middle; }

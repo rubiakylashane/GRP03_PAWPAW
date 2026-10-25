@@ -174,3 +174,16 @@ body.sdash.adm { --admin-dark: #0d2a25; --orange: #e29d1a; --sidebar-bg: #0d2a25
 
 /* one orange for every admin button and active tab: #e29d1a, dark text, #c98712 edge */
 .adm .abtn, .adm .abtn-light, .adm .obtn-amber { color: #1b1300; background: #e29d1a; border: 1px solid #c98712; }
+
+/* Dashboard top cards are links (owners, pets, appointments, reports) */
+.adm a.stat-link { display: block; text-decoration: none; color: var(--ink); cursor: pointer; transition: transform .15s ease, box-shadow .15s ease; }
+.adm a.stat-link:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0, 0, 0, .18); }
+.adm a.stat-link:focus-visible { outline: 3px solid #e29d1a; outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .adm a.stat-link { transition: none; } .adm a.stat-link:hover { transform: none; } }
+
+/* sidebar: the admin's picture and name open My Profile */
+.adm .user-link { display: block; flex: none; color: inherit; text-decoration: none; border-radius: 50%; }
+.adm .user-meta .user-link { min-width: 0; overflow: hidden; border-radius: 4px; }
+.adm .user-meta .user-link:hover strong { text-decoration: underline; }
+.adm .user-link:focus-visible { outline: 3px solid #e29d1a; outline-offset: 2px; }
+.adm a.user-link:hover .avatar { filter: brightness(.94); }

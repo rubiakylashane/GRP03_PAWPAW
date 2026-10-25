@@ -30,7 +30,7 @@
       .sort(sorters[$("sort").value] || sorters["name-asc"]);
     rowsEl.innerHTML = list.length
       ? list.map(row).join("")
-      : `<p class="o-empty">${owners.length ? "No owners match your search." : 'No owners yet. Click "Register Walk-in Customer" to add one.'}</p>`;
+      : `<p class="o-empty">${owners.length ? "No owners match your search." : "No owners yet."}</p>`;
   }
 
   $("search").addEventListener("input", render);

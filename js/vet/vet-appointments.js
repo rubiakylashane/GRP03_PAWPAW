@@ -7,7 +7,16 @@
 (() => {
   const V = window.PawVet, A = V.A, O = V.O, S = window.PawStaff, $ = (id) => document.getElementById(id), esc = O.esc;
   const { fmtDate, fmtTime, ownerName, petName, services } = V;
-  let all = A.load(), cur = null;
+  let all = A.load(), cur = null, tab = "all";
+
+  /* tabs: the same groups as the cards on the vet Dashboard (the cards open this page with ?tab=...) */
+  const TABS = [["all", "All"], ["today", "Today"], ["progress", "In progress"], ["done_today", "Completed today"], ["upcoming", "Upcoming"]];
+  const inTab = (a, k) => { const t = V.today(); return k === "all" || (k === "today" ? a.date === t : k === "progress" ? a.status === "with_vet" : k === "done_today" ? a.status === "completed" && a.date === t : a.status === "confirmed" && a.date > t); };
+  { const qt = new URLSearchParams(location.search).get("tab"); if (TABS.some((x) => x[0] === qt)) tab = qt; }
+  function renderTabs() {
+    $("tabs").innerHTML = TABS.map(([k, label]) => `<button type="button" role="tab" class="apt-tab${k === tab ? " on" : ""}" data-tab="${k}" aria-selected="${k === tab}">${label} <i>${all.filter(V.visible).filter((a) => inTab(a, k)).length}</i></button>`).join("");
+  }
+  $("tabs").addEventListener("click", (e) => { const b = e.target.closest("[data-tab]"); if (b) { tab = b.dataset.tab; render(); } });
 
   const ORDER = { with_vet: 0, checked_in: 1, confirmed: 2, completed: 3 };
   const SORTS = {
@@ -26,7 +35,8 @@
   }
   function render() {
     const q = $("search").value.trim().toLowerCase();
-    const list = all.filter(V.visible).filter((a) => !q || [petName(a), ownerName(a), services(a), a.reason || ""].join(" ").toLowerCase().includes(q)).sort(SORTS[$("sort").value] || SORTS.soon);
+    renderTabs();
+    const list = all.filter(V.visible).filter((a) => inTab(a, tab)).filter((a) => !q || [petName(a), ownerName(a), services(a), a.reason || ""].join(" ").toLowerCase().includes(q)).sort(SORTS[$("sort").value] || SORTS.soon);
     $("pt-rows").innerHTML = list.length ? list.map((a) => `
       <div class="orow vrow-ap" role="row">
         <span role="cell"><span class="o-name">${esc(fmtDate(a.date))}</span><span class="o-email">${esc(fmtTime(a.time))}</span></span>
@@ -35,7 +45,7 @@
         <span role="cell">${esc(services(a))}</span>
         <span role="cell"><span class="spill spill-${esc(a.status)}">${esc(V.label(a))}</span></span>
         <span role="cell" class="a-actions">${action(a)}</span>
-      </div>`).join("") : `<p class="o-empty">${all.some(V.visible) ? "Nothing matches your search." : "No appointments assigned to you yet."}</p>`;
+      </div>`).join("") : `<p class="o-empty">${all.some(V.visible) ? (q ? "Nothing matches your search." : "No appointments in this group.") : "No appointments assigned to you yet."}</p>`;
   }
 
   const dlg = $("done-dialog");

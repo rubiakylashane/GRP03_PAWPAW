@@ -39,6 +39,12 @@
   /* ---------- tabs ---------- */
   const TABS = [["all", "All"], ["pending", "Pending"], ["today", "Today"], ["confirmed", "Confirmed"], ["checked_in", "Checked in"], ["completed", "Completed"], ["cancelled", "Cancelled"]];
   const inTab = (a, t) => t === "all" || (t === "today" ? a.date === today() : a.status === t);
+  /* the dashboard cards open this page with ?tab=...: a real tab, or "scheduled" (today's confirmed / checked-in / with-vet visits, shown under the Today tab) */
+  let sub = "";
+  { const qt = new URLSearchParams(location.search).get("tab");
+    if (qt === "scheduled") { tab = "today"; sub = qt; }
+    else if (TABS.some((x) => x[0] === qt)) tab = qt; }
+  const inSub = (a) => !sub || ["confirmed", "checked_in", "with_vet"].indexOf(a.status) >= 0;
   function renderTabs() {
     $("tabs").innerHTML = TABS.map(([k, label]) => {
       const n = all.filter((a) => inTab(a, k)).length;
@@ -77,7 +83,7 @@
     renderTabs();
     const q = $("search").value.trim().toLowerCase();
     const list = all
-      .filter((a) => inTab(a, tab) && (!dateF || a.date === dateF) &&
+      .filter((a) => inTab(a, tab) && inSub(a) && (!dateF || a.date === dateF) &&
         (!q || [petName(a), ownerName(a), vetName(a), services(a), A.STATUS[a.status] || a.status, a.date].join(" ").toLowerCase().includes(q)))
       .sort(sorters[$("sort").value] || sorters.soon);
     const part = list.slice(0, shown);
@@ -158,7 +164,7 @@
   /* ---------- events ---------- */
   document.addEventListener("click", (e) => {
     const t = e.target.closest("[data-tab]");
-    if (t) { tab = t.dataset.tab; shown = PAGE; render(); return; }
+    if (t) { tab = t.dataset.tab; sub = ""; shown = PAGE; render(); return; }
     if (e.target.closest("[data-close]")) { e.target.closest("dialog").close(); return; }
     const b = e.target.closest("[data-act]");
     if (b) {

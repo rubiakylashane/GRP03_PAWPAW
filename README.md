@@ -2,12 +2,16 @@
 
 ## Run the integrated app
 
-The Express server serves the frontend and API from the same origin. From `server/`, configure the database values in `.env` (see `.env.example`), then run:
+The Express server serves the frontend and API from the same origin. Each developer needs a local PostgreSQL database; Git does not copy database accounts or records. Create an empty database named `pawpaw_clinic` (or use another name in `server/.env`), then from `server/` configure `.env` using `.env.example` and run:
 
 ```powershell
+npm install
 npm run migrate
+npm run seed
 npm start
 ```
+
+`npm run migrate` creates the base tables and applies the later migrations. `npm run seed` creates a local bootstrap administrator only when no active administrator exists, and prints a randomly generated temporary password once. Keep that password private. Sign in at `http://localhost:5000/`, then create staff or veterinarian test accounts from the admin dashboard. Pet owners can register from the login page.
 
 Open `http://localhost:5000/`. The server redirects to the existing login page; its styling and layout remain in `css/`.
 

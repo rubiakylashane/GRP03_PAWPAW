@@ -1,69 +1,9 @@
 /* js/owner/dashboard.js
-   Sample data is used until the backend is ready.
-   Set USE_BACKEND = true and edit API to load real data. */
+   Loads the signed-in owner's dashboard data from the clinic API. */
 (() => {
-  const USE_BACKEND = false;
-  const API = {
-    me: "/api/me",                          // { name, avatar }
-    appointments: "/api/appointments",      // [{ date, time, pet, doctor, service, status }]
-    pets: "/api/pets",                      // [{ name, species, breed, photo }]
-    overdue: "/api/vaccinations/overdue"    // [{ pet, photo }]
-  };
-
-  /* ---------- Demo data (NOT used now, kept for testing the layout) ---------- */
-  const DEMO_DATA = {
-    user: { name: "User", avatar: "" },
-    appointments: [
-      { date: "2026-10-20", time: "09:00", pet: "Bruno",  doctor: "Dr. Maria Santos", service: "Checkup",     status: "confirmed" },
-      { date: "2026-10-24", time: "14:30", pet: "Luna",   doctor: "Dr. Jose Reyes",   service: "Vaccination", status: "confirmed" },
-      { date: "2026-10-27", time: "10:00", pet: "Bruno",  doctor: "Dr. Maria Santos", service: "Grooming",    status: "pending" },
-      { date: "2026-10-30", time: "16:00", pet: "Milo",   doctor: "Dr. Jose Reyes",   service: "Dental",      status: "pending" }
-    ],
-    pets: [
-      { name: "Bruno", species: "Dog", breed: "Aspin",       photo: "" },
-      { name: "Luna",  species: "Cat", breed: "Puspin",      photo: "" },
-      { name: "Milo",  species: "Dog", breed: "Shih Tzu",    photo: "" }
-    ],
-    overdue: [
-      { pet: "Bruno", photo: "" },
-      { pet: "Milo",  photo: "" }
-    ]
-  };
-
   const $ = (id) => document.getElementById(id);
-
-  // Empty for now: a new user has no appointments, pets or vaccinations yet.
-  // To preview the filled layout, replace this with: const SAMPLE = DEMO_DATA;
-  const SAMPLE = {
-    user: { name: "User", avatar: "" },
-    appointments: [],
-    pets: [],
-    overdue: []
-  };
-
-  // Pets added on the Add pet page (saved by pets-store.js in demo mode)
-  try { if (window.PawPets) SAMPLE.pets = window.PawPets.load(); } catch (_) {}
-
-  // Appointments and vaccinations saved in demo mode (the staff pages update the same lists)
   const pad = (n) => String(n).padStart(2, "0");
   const todayIso = () => { const d = new Date(); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); };
-  const readList = (base) => {
-    let name = "guest";
-    for (const store of ["sessionStorage", "localStorage"]) {
-      try { const u = JSON.parse(window[store].getItem("pawpaw_user") || "null"); if (u && u.name) { name = String(u.name).trim().toLowerCase(); break; } } catch (_) {}
-    }
-    try { const v = JSON.parse(localStorage.getItem(base + ":" + name) || "null"); return Array.isArray(v) ? v : []; } catch (_) { return []; }
-  };
-  SAMPLE.appointments = readList("pawpaw_appointments").map((a) => ({
-    date: a.date, time: a.time || "00:00", pet: a.petName || a.pet || "-",
-    doctor: a.vet || a.doctor || "To be assigned",
-    service: (a.services || []).map((x) => x.name).join(", ") || a.service || "-",
-    status: a.status || "pending",
-    note: a.status === "cancelled" ? (a.declineReason || "") : (["pending", "confirmed"].indexOf(a.status) >= 0 ? (a.rescheduleReason || "") : "")
-  }));
-  SAMPLE.overdue = readList("pawpaw_vaccinations")
-    .filter((r) => r.nextDue && r.nextDue < todayIso())
-    .map((r) => { const p = SAMPLE.pets.find((x) => x.name === r.pet); return { pet: r.pet, photo: p ? p.photo : "" }; });
 
   // colours for the statuses the clinic staff can set
   (function () {
@@ -89,21 +29,45 @@
 
   async function get(url) {
     const res = await fetch(url, { headers: { Accept: "application/json" } });
-    if (!res.ok) throw new Error("Request failed: " + url);
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || `Request failed (${res.status}): ${url}`);
+    }
     return res.json();
   }
 
   async function loadData() {
-    if (!USE_BACKEND) return SAMPLE;
-    try {
-      const [user, appointments, pets, overdue] = await Promise.all([
-        get(API.me), get(API.appointments), get(API.pets), get(API.overdue)
-      ]);
-      return { user, appointments, pets, overdue };
-    } catch (err) {
-      console.warn("[dashboard] backend failed, using sample data:", err.message);
-      return SAMPLE;
-    }
+    const { user } = await get("/api/auth/me");
+    if (!user || !user.ownerId) throw new Error("The signed-in account has no owner profile.");
+
+    const ownerId = encodeURIComponent(user.ownerId);
+    const [appointments, pets] = await Promise.all([
+      get(`/api/appointments/owner/${ownerId}`),
+      get(`/api/pets/owner/${ownerId}`)
+    ]);
+    const vaccinations = await Promise.all(
+      pets.map((pet) => get(`/api/vaccinations/pet/${encodeURIComponent(pet.id)}`))
+    );
+    const overdue = vaccinations.flat().filter((record) =>
+      record.nextDue && String(record.nextDue).slice(0, 10) < todayIso()
+    ).map((record) => {
+      const pet = pets.find((item) => item.id === record.petId);
+      return { pet: pet ? pet.name : record.pet, photo: pet ? pet.photo : "" };
+    });
+
+    return {
+      user: { name: user.name || user.username, avatar: "" },
+      appointments: appointments.map((appointment) => ({
+        date: String(appointment.date).slice(0, 10),
+        time: String(appointment.time || "00:00").slice(0, 5),
+        pet: appointment.petName,
+        doctor: appointment.vet,
+        service: (appointment.services || []).map((service) => service.name).join(", ") || "-",
+        status: appointment.status
+      })),
+      pets,
+      overdue
+    };
   }
 
   /* ---------- Formatting ---------- */
@@ -149,7 +113,7 @@
   }
 
   function render(data) {
-    const name = SAMPLE.user.name !== "User" ? SAMPLE.user.name : (data.user.name || "User");
+    const name = data.user.name || "User";
     $("greeting-name").textContent = name;
     $("sidebar-name").textContent = name;
     // profile picture: the one saved on Edit Profile (per user), else the one from the API
@@ -200,6 +164,18 @@
       : `<li class="empty">No overdue vaccinations.</li>`;
   }
 
+  function showLoadError(error) {
+    console.error("Could not load owner dashboard:", error);
+    $("stat-upcoming").textContent = "-";
+    $("stat-pending").textContent = "-";
+    $("stat-overdue").textContent = "-";
+    $("stat-pets").textContent = "-";
+    $("upcoming-rows").innerHTML = '<p class="empty">Dashboard data could not be loaded. Please refresh and try again.</p>';
+    $("pending-rows").innerHTML = '<p class="empty">Dashboard data could not be loaded. Please refresh and try again.</p>';
+    $("pets-list").innerHTML = '<li class="empty">Pet data could not be loaded.</li>';
+    $("vax-list").innerHTML = '<li class="empty">Vaccination data could not be loaded.</li>';
+  }
+
   /* ---------- Mobile menu ---------- */
   const sidebar = $("sidebar"), overlay = $("overlay"), menuBtn = $("menu-btn");
   function setMenu(open) {
@@ -217,5 +193,5 @@
     // then follows href="login.html"
   });
 
-  loadData().then(render);
+  loadData().then(render).catch(showLoadError);
 })();

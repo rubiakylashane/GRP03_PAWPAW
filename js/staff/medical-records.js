@@ -1,43 +1,34 @@
-/* js/staff/medical-records.js - Records page, shared by staff (view only) and vet (view + add): visit records + prescriptions of every pet
-   Demo storage (same lists the owner's Medical Records page reads):
-     "pawpaw_records:<owner>" = { visits: [{ id, pet, date, diagnosis, treatment, notes }],
-                                  prescriptions: [{ id, pet, date, medication, dose, instructions, quantity }] }
-   Backend: set USE_BACKEND = true.
-     GET  /api/staff/records            -> { visits: [{ ..., owner }], prescriptions: [{ ..., owner }] }
-     POST /api/staff/records/visits           body: { owner, pet, date, diagnosis, treatment, notes }
-     POST /api/staff/records/prescriptions    body: { owner, pet, date, medication, dose, instructions, quantity }
+/* js/staff/medical-records.js - Staff view of persisted visit records and prescriptions.
    Open with ?q=<pet name> to start with the search filled in (used by Appointments > View Record). */
 (() => {
-  const USE_BACKEND = false;
-  const O = window.PawOwners, S = window.PawStaff, $ = (id) => document.getElementById(id), esc = O.esc;
-  const KEY = "pawpaw_records:";
-
-  const read = (key) => { try { const v = JSON.parse(localStorage.getItem(KEY + key) || "null"); return { visits: (v && v.visits) || [], prescriptions: (v && v.prescriptions) || [] }; } catch (_) { return { visits: [], prescriptions: [] }; } };
-  const write = (key, v) => { try { localStorage.setItem(KEY + key, JSON.stringify(v)); } catch (_) {} };
-  const uid = () => "r-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
-  const pad = (n) => String(n).padStart(2, "0");
-  const today = () => { const d = new Date(); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); };
+  const O = window.PawOwners, $ = (id) => document.getElementById(id), esc = O.esc;
   const fmt = (iso) => { const d = new Date(iso + "T00:00:00"); return !iso || isNaN(d) ? "-" : d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" }); };
-  const ownerName = (key) => { try { return O.owner(key).short; } catch (_) { return key; } };
 
   let visits = [], rxs = [];
-  function load() {
-    visits = []; rxs = [];
-    try {
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (!k || k.indexOf(KEY) !== 0) continue;
-        const owner = k.slice(KEY.length), d = read(owner);
-        d.visits.forEach((v) => visits.push({ ...v, owner }));
-        d.prescriptions.forEach((r) => rxs.push({ ...r, owner }));
-      }
-    } catch (_) { /* storage blocked */ }
+  const ownerNames = new Map();
+  const ownerName = (key) => ownerNames.get(String(key)) || String(key || "-");
+  async function load() {
+    const response = await fetch("/api/medical-records/all", { headers: { Accept: "application/json" } });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || "Could not load medical records.");
+    ownerNames.clear();
+    visits = result.map((record) => {
+      ownerNames.set(String(record.ownerId), record.owner);
+      return {
+        ...record, id: String(record.id), owner: record.ownerId,
+        ownerDisplay: record.owner, date: record.date
+      };
+    });
+    rxs = result.flatMap((record) => (record.prescriptions || []).map((prescription) => ({
+      ...prescription, id: String(prescription.id), owner: record.ownerId,
+      ownerDisplay: record.owner, petId: record.petId, pet: record.pet, date: record.date
+    })));
   }
 
   /* opened from "View Record": only this owner's pet (matched by pet id; older records without an id by name) */
   const params = new URLSearchParams(location.search);
   let scope = params.get("owner") ? { owner: params.get("owner"), petId: params.get("petid") || "", name: params.get("q") || "" } : null;
-  const inScope = (r) => !scope || (r.owner === scope.owner && (scope.petId && r.petId ? r.petId === scope.petId : !scope.name || r.pet === scope.name));
+  const inScope = (r) => !scope || (String(r.owner) === String(scope.owner) && (scope.petId && r.petId ? String(r.petId) === String(scope.petId) : !scope.name || r.pet === scope.name));
   function drawScope() {
     const el = $("scope"); if (!el) return;
     el.hidden = !scope;
@@ -82,65 +73,13 @@
   });
   document.addEventListener("keydown", (e) => { if (e.key === "Enter") { const r = e.target.closest("[data-kind]"); if (r) details(r.dataset.kind, r.dataset.id); } });
 
-  /* ----- add dialogs ----- */
-  /* the add buttons and dialogs exist only on the vet page (staff only view records) */
-  const on = (id, ev, fn) => { const el = $(id); if (el) el.addEventListener(ev, fn); };
-  const petNameOf = (owner, id) => { const p = O.petsOf(owner).find((x) => x.id === id); return p ? p.name : ""; };
-  const owners = () => O.list().filter((o) => o.id);
-  function fillOwner(prefix) {
-    const list = owners();
-    $(prefix + "-owner").innerHTML = list.map((o) => `<option value="${esc(o.id)}">${esc(o.short || o.name)}</option>`).join("");
-    fillPets(prefix);
-  }
-  function fillPets(prefix) {
-    const pets = O.petsOf($(prefix + "-owner").value);
-    $(prefix + "-pet").innerHTML = pets.length ? pets.map((p) => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join("") : `<option value="">No pets yet</option>`;
-  }
-  const err = (id, m) => { $(id).textContent = m || ""; $(id).hidden = !m; return !m; };
-  function openAdd(dialog, prefix) {
-    if (!owners().length) { S.toast("Register an owner first."); return; }
-    fillOwner(prefix); $(prefix + "-date").value = today(); $(prefix + "-date").max = today(); err(prefix + "-err", "");
-    $(dialog).showModal();
-  }
-  async function save(owner, kind, rec) {
-    if (USE_BACKEND) {
-      const res = await fetch("/api/staff/records/" + (kind === "v" ? "visits" : "prescriptions"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ owner, ...rec }) });
-      if (!res.ok) throw new Error("Request failed");
-      rec = { ...rec, ...(await res.json()) };
-    } else {
-      const d = read(owner); d[kind === "v" ? "visits" : "prescriptions"].push(rec); write(owner, d);
-    }
-    load(); render();
-  }
-  on("add-visit", "click", () => openAdd("visit-dialog", "v"));
-  on("add-rx", "click", () => openAdd("rx-dialog", "r"));
-  on("v-owner", "change", () => fillPets("v"));
-  on("r-owner", "change", () => fillPets("r"));
-
-  on("v-save", "click", async () => {
-    const owner = $("v-owner").value, petId = $("v-pet").value, pet = petNameOf(owner, petId), date = $("v-date").value, diagnosis = $("v-diag").value.trim();
-    if (!petId) return err("v-err", "This owner has no pet yet.");
-    if (!date) return err("v-err", "Pick the visit date.");
-    if (!diagnosis) return err("v-err", "Enter the diagnosis.");
-    try { await save(owner, "v", { id: uid(), petId, pet, date, diagnosis, treatment: $("v-treat").value.trim(), notes: $("v-notes").value.trim() }); }
-    catch (_) { return err("v-err", "Could not save. Try again."); }
-    ["v-diag", "v-treat", "v-notes"].forEach((id) => { $(id).value = ""; });
-    $("visit-dialog").close(); S.toast("Visit record saved.");
-  });
-  on("r-save", "click", async () => {
-    const owner = $("r-owner").value, petId = $("r-pet").value, pet = petNameOf(owner, petId), date = $("r-date").value, medication = $("r-med").value.trim();
-    if (!petId) return err("r-err", "This owner has no pet yet.");
-    if (!date) return err("r-err", "Pick the date.");
-    if (!medication) return err("r-err", "Enter the medication.");
-    try { await save(owner, "r", { id: uid(), petId, pet, date, medication, dose: $("r-dose").value.trim(), instructions: $("r-inst").value.trim(), quantity: $("r-qty").value.trim() }); }
-    catch (_) { return err("r-err", "Could not save. Try again."); }
-    ["r-med", "r-dose", "r-qty", "r-inst"].forEach((id) => { $(id).value = ""; });
-    $("rx-dialog").close(); S.toast("Prescription saved.");
-  });
-
   document.addEventListener("click", (e) => { if (e.target.id === "scope-clear") { scope = null; $("search").value = ""; render(); } });
   $("search").addEventListener("input", render);
   $("sort").addEventListener("change", render);
   if (!scope) { try { const q = params.get("q"); if (q) $("search").value = q; } catch (_) {} }
-  load(); render();
+  load().then(render).catch((error) => {
+    console.error("Could not load medical records:", error);
+    $("visit-rows").innerHTML = `<p class="o-empty">${esc(error.message || "Could not load medical records.")}</p>`;
+    $("rx-rows").innerHTML = `<p class="o-empty">${esc(error.message || "Could not load medical records.")}</p>`;
+  });
 })();

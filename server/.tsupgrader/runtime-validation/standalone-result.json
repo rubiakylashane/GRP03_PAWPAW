@@ -1,0 +1,160 @@
+{
+  "planHash": "7f63c0db51f282c8678287653b762651a644988d21abd4d6434230a492645116",
+  "phase": "standalone",
+  "recordedAtUtc": "2026-10-25T04:30:52.0436943Z",
+  "retryCount": 5,
+  "resetBaseline": false,
+  "complete": true,
+  "result": {
+    "setupSucceeded": true,
+    "setupDurationMs": 5677,
+    "setupFailureOutput": null,
+    "assertions": [
+      {
+        "name": "tests-pass",
+        "kind": "process",
+        "verificationMethod": "test-results",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": 0,
+        "outputSample": "npm warn Unknown env config \u0022scripts-prepend-node-path\u0022. This will stop working in the next major version of npm. See \u0060npm help npmrc\u0060 for supported config options.\r\n\r\n\u003E server@1.0.0 test\r\n\u003E vitest run\r\n\r\n\r\n RUN  v4.1.12 C:/Users/jenma/Downloads/PAWPAW_CLINIC/DBA_PAWPAW/server\r\n\r\n\r\n Test Files  1 passed (1)\r\n      Tests  7 passed (7)\r\n   Start at  12:30:49\r\n   Duration  294ms (transform 28ms, setup 0ms, import 50ms, tests 4ms, environment 0ms)\r\n\r\n",
+        "durationMs": 2697,
+        "testResults": {
+          "testFramework": "vitest",
+          "runnerDetectedFrom": "package_json",
+          "testsTotal": 7,
+          "testsPassed": 7,
+          "testsFailed": 0,
+          "testsSkipped": 0,
+          "parseFailed": false
+        }
+      },
+      {
+        "name": "database-health",
+        "kind": "http-probe",
+        "verificationMethod": "http-status",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": null,
+        "outputSample": "HTTP 200\n{\u0022status\u0022:\u0022success\u0022,\u0022dbTime\u0022:\u00222026-10-25T04:30:50.992Z\u0022}\n--- server output ---\nnpm warn Unknown env config \u0022scripts-prepend-node-path\u0022. This will stop working in the next major version of npm. See \u0060npm help npmrc\u0060 for supported config options.\r\n\r\n\u003E server@1.0.0 start\r\n\u003E node server.js\r\n\r\n\u25C7 injected env (5) from .env\r\n\u25C7 injected env (0) from .env\r\nPawpaw backend server running on port 5057\r\n",
+        "durationMs": 1099
+      },
+      {
+        "name": "login-page-redirect",
+        "kind": "http-probe",
+        "verificationMethod": "output-contains",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": null,
+        "outputSample": "HTTP 200\n\u003C!DOCTYPE html\u003E\r\n\u003Chtml lang=\u0022en\u0022\u003E\r\n\u003Chead\u003E\r\n  \u003Cmeta charset=\u0022UTF-8\u0022 /\u003E\r\n  \u003Cmeta name=\u0022viewport\u0022 content=\u0022width=device-width, initial-scale=1\u0022 /\u003E\r\n  \u003Ctitle\u003ESign in | Pawpaw Clinic\u003C/title\u003E\r\n  \u003Clink rel=\u0022preconnect\u0022 href=\u0022https://fonts.googleapis.com\u0022 /\u003E\r\n  \u003Clink rel=\u0022preconnect\u0022 href=\u0022https://fonts.gstatic.com\u0022 crossorigin /\u003E\r\n  \u003Clink href=\u0022https://fonts.googleapis.com/css2?family=IBM\u002BPlex\u002BMono:wght@400;500;600;700\u0026display=swap\u0022 rel=\u0022stylesheet\u0022 /\u003E\r\n  \u003Clink rel=\u0022stylesheet\u0022 href=\u0022../../css/base.css\u0022 /\u003E\r\n  \u003Clink rel=\u0022stylesheet\u0022 href=\u0022../../css/pages/auth.css\u0022 /\u003E\r\n\u003C/head\u003E\r\n\u003Cbody\u003E\r\n  \u003Cmain class=\u0022page\u0022\u003E\r\n    \u003C!-- Left panel --\u003E\r\n    \u003Csection class=\u0022brand\u0022 aria-label=\u0022Pawpaw Clinic\u0022\u003E\r\n      \u003Cdiv class=\u0022brand-top\u0022\u003E\r\n        \u003Cimg class=\u0022brand-logo\u0022 src=\u0022../../assets/images/logo.svg\u0022 alt=\u0022\u0022 /\u003E\r\n        \u003Cspan class=\u0022brand-name\u0022\u003EPAWPAW Clinic\u003C/span\u003E\r\n      \u003C/div\u003E\r\n\r\n      \u003Cdiv class=\u0022brand-copy\u0022\u003E\r\n        \u003Ch2\u003ECare for every pets\u003C/h2\u003E\r\n        \u003Cp\u003EBook visits, keep medical records, and stay on top of every vaccine.\u003C/p\u003E\r\n      \u003C/div\u003E\r\n    \u003C/section\u003E\r\n\r\n    \u003C!-- Right panel --\u003E\r\n    \u003Csection class=\u0022form-side\u0022\u003E\r\n      \u003Cdiv class=\u0022form-wrap\u0022\u003E\r\n        \u003Ch1\u003EWelcome back\u003C/h1\u003E\r\n        \u003Cp class=\u0022subtitle\u0022\u003ELog in to your Pawpaw Clinic account.\u003C/p\u003E\r\n\r\n        \u003Cform id=\u0022login-form\u0022 novalidate\u003E\r\n          \u003Cdiv class=\u0022field\u0022\u003E\r\n            \u003Clabel for=\u0022username\u0022\u003EUsername\u003C/label\u003E\r\n            \u003Cinput id=\u0022username\u0022 name=\u0022username\u0022 type=\u0022text\u0022 placeholder=\u0022Enter your username\u0022 autocomplete=\u0022username\u0022 required /\u003E\r\n          \u003C/div\u003E\r\n\r\n          \u003Cdiv class=\u0022field\u0022\u003E\r\n            \u003Clabel for=\u0022password\u0022\u003EPassword\u003C/label\u003E\r\n            \u003Cdiv class=\u0022input-wrap\u0022\u003E\r\n              \u003Cinput id=\u0022password\u0022 name=\u0022password\u0022 type=\u0022password\u0022 class=\u0022has-toggle\u0022 placeholder=\u0022Enter your password\u0022 autocomplete=\u0022current-password\u0022 required /\u003E\r\n              \u003Cbutton type=\u0022button\u0022 class=\u0022toggle\u0022 id=\u0022toggle-password\u0022 aria-label=\u0022Show password\u0022 aria-pressed=\u0022false\u0022\u003E\r\n                \u003Csvg class=\u0022eye-on\u0022 viewBox=\u00220 0 24 24\u0022 fill=\u0022currentColor\u0022 aria-hidden=\u0022true\u0022\u003E\r\n                  \u003Cpath d=\u0022M12 5C6.5 5 2.7 9 1 12c1.7 3 5.5 7 11 7s9.3-4 11-7c-1.7-3-5.5-7-11-7Zm0 11.5a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9Zm0-7a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5Z\u0022/\u003E\r\n                \u003C/svg\u003E\r\n                \u003Csvg class=\u0022eye-off\u0022 viewBox=\u00220 0 24 24\u0022 fill=\u0022none\u0022 stroke=\u0022currentColor\u0022 stroke-width=\u00222\u0022 stroke-linecap=\u0022round\u0022 stroke-linejoin=\u0022round\u0022 aria-hidden=\u0022true\u0022\u003E\r\n                  \u003Cpath d=\u0022M3 3l18 18M10.6 6.1A9.8 9.8 0 0 1 12 6c5 0 8.3 3.6 10 6-.8 1.2-2 2.6-3.6 3.8M6.5 7.6C4.5 9 3 10.8 2 12c1.7 2.4 5 6 10 6 1.5 0 2.8-.3 4-.8M9.9 9.9a3 3 0 0 0 4.2 4.2\u0022/\u003E\r\n                \u003C/svg\u003E\r\n              \u003C/button\u003E\r\n            \u003C/div\u003E\r\n            \u003Ca href=\u0022forgot-password.html\u0022 class=\u0022forgot\u0022\u003EForget password?\u003C/a\u003E\r\n          \u003C/div\u003E\r\n\r\n          \u003Cbutton type=\u0022submit\u0022 class=\u0022submit\u0022\u003ESign In\u003C/button\u003E\r\n        \u003C/form\u003E\r\n\r\n        \u003Cp class=\u0022signup\u0022\u003E\u003Cspan\u003ENew pet owner?\u003C/span\u003E\u003Ca href=\u0022register.html\u0022\u003ECreate an account\u003C/a\u003E\u003C/p\u003E\r\n      \u003C/div\u003E\r\n    \u003C/section\u003E\r\n  \u003C/main\u003E\r\n \u003Cscript src=\u0022../../js/auth/brand-carousel.js\u0022\u003E\u003C/script\u003E\r\n  \u003Cscript src=\u0022../../js/auth/login.js\u0022\u003E\u003C/script\u003E\r\n\u003C/body\u003E\r\n\u003C/html\u003E\n--- server output ---\nnpm warn Unknown env config \u0022scripts-prepend-node-path\u0022. This will stop working in the next major version of npm. See \u0060npm help npmrc\u0060 for supported config options.\r\n\r\n\u003E server@1.0.0 start\r\n\u003E node server.js\r\n\r\n\u25C7 injected env (5) from .env\r\n\u25C7 injected env (0) from .env\r\nPawpaw backend server running on port 5057\r\n",
+        "durationMs": 1043
+      }
+    ],
+    "executions": [
+      {
+        "source": "setup[0]",
+        "resolvedExecutable": "C:\\Program Files\\nodejs\\npm.cmd",
+        "args": [
+          "ci"
+        ],
+        "cwd": "C:\\Users\\jenma\\Downloads\\PAWPAW_CLINIC\\DBA_PAWPAW\\server",
+        "env": {},
+        "prependPath": [],
+        "platform": "win32",
+        "nodeExecutable": "C:\\Program Files\\nodejs\\node.EXE",
+        "nodeVersion": "v26.12.0",
+        "packageManager": "npm",
+        "packageManagerExecutable": "C:\\Program Files\\nodejs\\npm.cmd",
+        "packageManagerVersion": "11.20.0",
+        "cleanup": {
+          "RootProcessId": 27952,
+          "Completed": true,
+          "ProcessesObserved": 9,
+          "ProcessesTerminated": 1,
+          "Failure": null
+        }
+      },
+      {
+        "source": "tests-pass",
+        "resolvedExecutable": "C:\\Program Files\\nodejs\\npm.cmd",
+        "args": [
+          "test"
+        ],
+        "cwd": "C:\\Users\\jenma\\Downloads\\PAWPAW_CLINIC\\DBA_PAWPAW\\server",
+        "env": {},
+        "prependPath": [],
+        "platform": "win32",
+        "nodeExecutable": "C:\\Program Files\\nodejs\\node.EXE",
+        "nodeVersion": "v26.12.0",
+        "packageManager": "npm",
+        "packageManagerExecutable": "C:\\Program Files\\nodejs\\npm.cmd",
+        "packageManagerVersion": "11.20.0",
+        "cleanup": {
+          "RootProcessId": 27828,
+          "Completed": true,
+          "ProcessesObserved": 11,
+          "ProcessesTerminated": 1,
+          "Failure": null
+        }
+      },
+      {
+        "source": "database-health",
+        "resolvedExecutable": "C:\\Program Files\\nodejs\\npm.cmd",
+        "args": [
+          "run",
+          "start"
+        ],
+        "cwd": "C:\\Users\\jenma\\Downloads\\PAWPAW_CLINIC\\DBA_PAWPAW\\server",
+        "env": {
+          "PORT": "5057"
+        },
+        "prependPath": [],
+        "platform": "win32",
+        "nodeExecutable": "C:\\Program Files\\nodejs\\node.EXE",
+        "nodeVersion": "v26.12.0",
+        "packageManager": "npm",
+        "packageManagerExecutable": "C:\\Program Files\\nodejs\\npm.cmd",
+        "packageManagerVersion": "11.20.0",
+        "cleanup": {
+          "RootProcessId": 27708,
+          "Completed": true,
+          "ProcessesObserved": 7,
+          "ProcessesTerminated": 5,
+          "Failure": null
+        }
+      },
+      {
+        "source": "login-page-redirect",
+        "resolvedExecutable": "C:\\Program Files\\nodejs\\npm.cmd",
+        "args": [
+          "run",
+          "start"
+        ],
+        "cwd": "C:\\Users\\jenma\\Downloads\\PAWPAW_CLINIC\\DBA_PAWPAW\\server",
+        "env": {
+          "PORT": "5057"
+        },
+        "prependPath": [],
+        "platform": "win32",
+        "nodeExecutable": "C:\\Program Files\\nodejs\\node.EXE",
+        "nodeVersion": "v26.12.0",
+        "packageManager": "npm",
+        "packageManagerExecutable": "C:\\Program Files\\nodejs\\npm.cmd",
+        "packageManagerVersion": "11.20.0",
+        "cleanup": {
+          "RootProcessId": 17444,
+          "Completed": true,
+          "ProcessesObserved": 7,
+          "ProcessesTerminated": 5,
+          "Failure": null
+        }
+      }
+    ]
+  }
+}

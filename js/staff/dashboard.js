@@ -1,18 +1,7 @@
-/* js/staff/dashboard.js
-   Staff dashboard (demo mode).
-   Reads the appointment requests that owners made (saved in this browser's localStorage by
-   js/owner/appts-store.js, one list per owner: "pawpaw_appointments:<owner name>").
-   Set USE_BACKEND = true and edit API when the backend is ready. */
+/* js/staff/dashboard.js - appointment dashboard backed by the clinic API. */
 (() => {
-  const USE_BACKEND = false;
-  const API = {
-    appointments: "/api/staff/appointments",   // GET   -> [{ id, owner, petName, vet, date, time, services:[{name}], status, walkIn }]
-    update: "/api/staff/appointments/"         // PATCH /:id  { status, vet }
-  };
-  const VETS = (window.PawStaffAppts && window.PawStaffAppts.VETS) || ["Dr. Anajoy N. Abila", "Dr. Sean Kurvie G. Buerano", "Dr. Roxanne N. Regulacion", "Dr. Jenmarc M. Ronquillo", "Dr. Kyla Shane T. Rubia"];
-  const SHOW_DEMO = false; // true = fill the page with sample rows to preview the layout
-
-  const KEY = "pawpaw_appointments:";
+  const A = window.PawStaffAppts;
+  const VETS = A.VETS;
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -20,73 +9,10 @@
   const todayIso = () => { const d = new Date(); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); };
 
   /* ---------- Data ---------- */
-  const DEMO = () => [
-    { id: "d1", owner: "Ana", petName: "Bruno", vet: "Dr. Maria Santos", date: todayIso(), time: "09:00", services: [{ name: "Checkup" }], status: "confirmed" },
-    { id: "d2", owner: "Ana", petName: "Luna", vet: "To be assigned", date: todayIso(), time: "10:30", services: [{ name: "Vaccination" }], status: "checked_in" },
-    { id: "d3", owner: "Ben", petName: "Milo", vet: "Dr. Jose Reyes", date: todayIso(), time: "11:00", services: [{ name: "Grooming" }], status: "with_vet" },
-    { id: "d4", owner: "Cara", petName: "Coco", vet: "To be assigned", date: todayIso(), time: "13:30", services: [{ name: "Deworming" }], status: "pending" },
-    { id: "d5", owner: "Ben", petName: "Rex", vet: "To be assigned", date: todayIso(), time: "15:00", services: [{ name: "Dental" }], status: "pending" }
-  ];
-  let memory = [];
+  async function load() { return A.load(); }
 
-  function readAll() {
-    if (SHOW_DEMO) return memory.length ? memory : (memory = DEMO());
-    const out = [];
-    try {
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (!k || k.indexOf(KEY) !== 0) continue;
-        const owner = k.slice(KEY.length);
-        (JSON.parse(localStorage.getItem(k) || "[]") || []).forEach((a) => out.push({ ...a, owner, _key: k }));
-      }
-    } catch (_) { /* storage blocked */ }
-    return out;
-  }
-
-  async function load() {
-    if (!USE_BACKEND) return readAll();
-    try {
-      const res = await fetch(API.appointments, { headers: { Accept: "application/json" } });
-      if (!res.ok) throw new Error("Request failed");
-      return await res.json();
-    } catch (err) {
-      console.warn("[staff dashboard] backend failed:", err.message);
-      return [];
-    }
-  }
-
-  /* save a change (status / vet) back to the owner's list */
   async function change(appt, patch) {
-    if (USE_BACKEND) {
-      try { await fetch(API.update + encodeURIComponent(appt.id), { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch) }); }
-      catch (err) { console.warn(err); }
-    } else if (SHOW_DEMO) {
-      Object.assign(memory.find((a) => a.id === appt.id) || {}, patch);
-    } else {
-      try {
-        const list = JSON.parse(localStorage.getItem(appt._key) || "[]");
-        const i = list.findIndex((a) => a.id === appt.id);
-        if (i >= 0) { list[i] = { ...list[i], ...patch, updatedAt: new Date().toISOString() }; localStorage.setItem(appt._key, JSON.stringify(list)); }
-      } catch (_) { /* ignore */ }
-    }
-    tellOwner(appt, patch);
-    if (!USE_BACKEND && window.PawStaffAppts) window.PawStaffAppts.vetChanged({ ...appt }, patch);
-    Object.assign(appt, patch);
-  }
-
-  /* message for the owner's notification bell (the server does this itself when there is a backend) */
-  function tellOwner(appt, patch) {
-    if (USE_BACKEND || SHOW_DEMO || !appt.owner) return;
-    let title = "", text = "";
-    const what = (appt.petName || "") + ", " + appt.date + " " + (appt.time || "");
-    if (patch.status === "confirmed" && appt.status === "pending") { title = "Appointment approved"; text = what + "."; }
-    else if (patch.status === "cancelled") { title = "Request declined"; text = what + "." + (patch.declineReason ? " Reason: " + patch.declineReason : ""); }
-    if (!title) return;
-    try {
-      const k = "pawpaw_notifications:" + appt.owner, list = JSON.parse(localStorage.getItem(k) || "[]");
-      list.push({ id: "n-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), type: "appointment", title, text, createdAt: new Date().toISOString(), readAt: null });
-      localStorage.setItem(k, JSON.stringify(list.slice(-50)));
-    } catch (_) { /* ignore */ }
+    return A.change(appt, patch);
   }
 
   /* ---------- Formatting ---------- */
@@ -102,7 +28,6 @@
 
   /* ---------- Render ---------- */
   let all = [];
-  const A = window.PawStaffAppts;
   const vetOf = (a) => a.vet || "To be assigned";
   const hint = (el, c) => { el.textContent = c ? "Warning: " + vetOf(c) + " already has " + (c.petName || c.pet) + " at this time." : ""; el.className = "dlg-hint" + (c ? " bad" : ""); };
 
@@ -172,6 +97,10 @@
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => toast.classList.remove("show"), 2400);
   }
+  function reportActionError(error) {
+    console.error("Staff action failed:", error);
+    say(error.message || "The change could not be saved. Please try again.");
+  }
   const find = (id) => all.find((a) => String(a.id) === String(id));
 
   const reviewDlg = $("review-dialog"), vetDlg = $("vet-dialog");
@@ -222,23 +151,33 @@
     if (b.dataset.act === "approve") openReview(a);
     else if (b.dataset.act === "review") openReview(a);
     else if (b.dataset.act === "assign") openVet(a);
-    else if (b.dataset.act === "checkin") { await change(a, { status: "checked_in" }); render(); say(a.petName + " checked in."); }
+    else if (b.dataset.act === "checkin") {
+      try { await change(a, { status: "checked_in" }); render(); say(a.petName + " checked in."); }
+      catch (error) { reportActionError(error); }
+    }
   });
 
   $("review-close").addEventListener("click", () => reviewDlg.close());
-  $("review-approve").addEventListener("click", async () => { reviewDlg.close(); await approve(current, $("review-vet").value); });
+  $("review-approve").addEventListener("click", async () => {
+    reviewDlg.close();
+    try { await approve(current, $("review-vet").value); } catch (error) { reportActionError(error); }
+  });
   $("review-decline").addEventListener("click", async () => {
     const reason = $("review-reason").value.trim();
     reviewDlg.close();
-    await change(current, { status: "cancelled", declineReason: reason });
-    render(); say("Request declined.");
+    try {
+      await change(current, { status: "cancelled", declineReason: reason });
+      render(); say("Request declined.");
+    } catch (error) { reportActionError(error); }
   });
   $("vet-cancel").addEventListener("click", () => vetDlg.close());
   $("vet-save").addEventListener("click", async () => {
     const vet = $("vet-select").value;
     vetDlg.close();
-    await change(current, { vet, status: "with_vet" });
-    render(); say("Assigned to " + vet + ".");
+    try {
+      await change(current, { vet, status: "with_vet" });
+      render(); say("Assigned to " + vet + ".");
+    } catch (error) { reportActionError(error); }
   });
 
   /* ---------- Page chrome ---------- */
@@ -275,5 +214,9 @@
     try { localStorage.removeItem("token"); localStorage.removeItem("pawpaw_user"); sessionStorage.clear(); } catch (_) { /* ignore */ }
   });
 
-  load().then((list) => { all = list; render(); });
+  load().then((list) => { all = list; render(); }).catch((error) => {
+    console.error("Could not load staff appointments:", error);
+    $("today-rows").innerHTML = '<p class="empty">Appointments could not be loaded. Please refresh and try again.</p>';
+    $("pending-list").innerHTML = '<p class="empty">Appointments could not be loaded.</p>';
+  });
 })();

@@ -1,7 +1,7 @@
 /* js/owner/reschedule-appointment.js
    Reschedule one appointment (reschedule-appointment.html?id=...).
    The new date and time are saved and the request goes back to "pending" until staff confirm. */
-(() => {
+ (async () => {
   const { esc } = window.PawPets;
   const Appts = window.PawAppts;
   const $ = (id) => document.getElementById(id);
@@ -24,7 +24,15 @@
   }
 
   const id = new URLSearchParams(location.search).get("id");
-  const appt = id ? Appts.get(id) : null;
+  let appt;
+  try {
+    appt = id ? await Appts.get(id) : null;
+  } catch (error) {
+    console.error("Could not load appointment for rescheduling:", error);
+    $("rs-missing").hidden = false;
+    $("rs-missing").querySelector("p").textContent = "Appointment details could not be loaded. Please refresh and try again.";
+    return;
+  }
   if (!appt || ["pending", "confirmed"].indexOf(appt.status) < 0 || appt.date < new Date().toISOString().slice(0, 10)) { $("rs-missing").hidden = false; return; }
   $("rs-layout").hidden = false;
 
@@ -104,7 +112,7 @@
   f.time.addEventListener("change", () => setError("time", ""));
   buildTimes();
 
-  $("rs-form").addEventListener("submit", (e) => {
+  $("rs-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const iso = parseDate(f.date.value);
     let bad = false;
@@ -116,7 +124,16 @@
     else if (iso === appt.date && f.time.value === appt.time) { setError("time", "That is your current schedule. Choose a different date or time."); bad = true; }
     if (bad) return;
 
-    Appts.update(appt.id, { date: iso, time: f.time.value, status: "pending", rescheduledFrom: { date: appt.date, time: appt.time } });
+    const submit = $("rs-form").querySelector('[type="submit"]');
+    if (submit) submit.disabled = true;
+    try {
+      await Appts.update(appt.id, { date: iso, time: f.time.value, status: "pending" });
+    } catch (error) {
+      console.error("Could not submit reschedule request:", error);
+      setError("time", error.message || "The reschedule request could not be saved. Please try again.");
+      if (submit) submit.disabled = false;
+      return;
+    }
     try { sessionStorage.setItem("pawpaw_flash", "Reschedule requested. The clinic will confirm it."); } catch (_) { /* ignore */ }
     location.href = "my-appointments.html";
   });

@@ -95,6 +95,12 @@
         <p class="u-error" id="err-name" role="alert" hidden></p>
       </div>
       <div class="u-field">
+        <label for="username">Username</label>
+        <input id="username" type="text" minlength="4" maxlength="20" pattern="[A-Za-z0-9_]{4,20}" autocomplete="off" required />
+        <p class="u-hint">Use 4–20 letters, numbers, or underscores. The user signs in with this username.</p>
+        <p class="u-error" id="err-username" role="alert" hidden></p>
+      </div>
+      <div class="u-field">
         <label for="phone">Phone Number</label>
         <input id="phone" type="text" inputmode="numeric" maxlength="13" placeholder="09XXXXXXXXX" autocomplete="off" required />
         <p class="u-error" id="err-phone" role="alert" hidden></p>
@@ -106,15 +112,15 @@
       </div>
       <div class="u-field">
         <label for="password">Temporary Password</label>
-        <input id="password" type="text" maxlength="40" autocomplete="off" required />
-        <p class="u-hint" id="hint-password">At least 8 characters. The user changes it after the first login.</p>
+        <input id="password" type="password" maxlength="72" autocomplete="new-password" required />
+        <p class="u-hint" id="hint-password">Use at least 8 characters. Share it securely with the new user.</p>
         <p class="u-error" id="err-password" role="alert" hidden></p>
       </div>
       <div class="u-field">
         <label for="role">Role</label>
         <select id="role" required>
           <option value="" selected disabled></option>
-          <option value="owner">Owner</option><option value="staff">Staff</option><option value="admin">Admin</option>
+          <option value="staff">Staff</option><option value="admin">Admin</option>
         </select>
         <p class="u-hint">Veterinarians are added on the Veterinarians page.</p>
         <p class="u-error" id="err-role" role="alert" hidden></p>
@@ -124,6 +130,19 @@
         <button type="submit" class="u-btn u-btn-ok">Confirm</button>
       </div>
     </form>
+
+    <section id="created-credentials" class="u-card u-form" aria-labelledby="credentials-title" aria-live="polite" hidden>
+      <h2 id="credentials-title">Account created</h2>
+      <p>Share these sign-in details with the user through a secure channel. The password will not be shown again after leaving this page.</p>
+      <div class="u-field"><label for="created-username">Username</label><input id="created-username" type="text" readonly /></div>
+      <div class="u-field"><label for="created-password">Temporary password</label><input id="created-password" type="text" readonly /></div>
+      <p id="credentials-status" class="u-hint" role="status" aria-live="polite" hidden></p>
+      <p class="u-error" id="credentials-error" role="alert" hidden></p>
+      <div class="u-actions">
+        <button type="button" class="u-btn u-btn-ok" id="copy-credentials">Copy sign-in details</button>
+        <a href="users-staff.html" class="u-btn u-btn-cancel">Done</a>
+      </div>
+    </section>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
   </main>

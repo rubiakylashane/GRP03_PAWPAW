@@ -29,13 +29,7 @@
     const role = String(e.role || (String(user).toLowerCase() === "admin" ? "admin" : "")).toLowerCase();
     return { at: e.at, t: Date.parse(e.at) || 0, user, role, action, record, details };
   }
-  function load() {
-    let raw = [];
-    try { const v = JSON.parse(localStorage.getItem("pawpaw_audit") || "[]"); if (Array.isArray(v)) raw = v; } catch (_) { /* ignore */ }
-    return raw.map((e, i) => ({ ...normal(e), i })).sort((a, b) => b.t - a.t || b.i - a.i);   // newest first (same-second entries: the later one first)
-  }
-
-  const all = load();
+  let all = [];
   let page = 1;
   const pad = (n) => String(n).padStart(2, "0");
   const dayOf = (t) => { const d = new Date(t); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); };   // local date, to match the date pickers
@@ -48,14 +42,26 @@
      plus any name that is only found in the log (in the demo the log uses the username typed at login, e.g. "staff" or "vet"). */
   const A = window.PawAdmin;
   const people = [];
-  try { (A ? A.list() : []).forEach((u) => people.push({ label: u.name, role: u.role, keys: [String(u.name).toLowerCase(), String(u.username || "").toLowerCase()].filter(Boolean) })); } catch (_) { /* ignore */ }
   const personOf = (name) => { const n = String(name).toLowerCase(); const i = people.findIndex((p) => p.keys.indexOf(n) >= 0); return i; };
-  all.forEach((e) => { if (personOf(e.user) < 0) people.push({ label: e.user, role: e.role, keys: [String(e.user).toLowerCase()] }); });
-  const opts = people.map((p, i) => ({ i, label: p.label + (p.role && String(p.label).toLowerCase() !== String(ROLE[p.role] || p.role).toLowerCase() ? " (" + (ROLE[p.role] || p.role) + ")" : "") })).sort((a, b) => a.label.localeCompare(b.label));
-  $("f-user").innerHTML = '<option value="">All users</option>' + opts.map((o) => `<option value="${o.i}">${esc(o.label)}</option>`).join("");
-  $("f-action").innerHTML = '<option value="">All actions</option>' + Object.keys(ACTIONS).map((a) => `<option value="${a}">${a.charAt(0).toUpperCase() + a.slice(1)}</option>`).join("");
-  const recs = [...new Set([...RECORDS, ...all.map((e) => e.record)])];
-  $("f-record").innerHTML = '<option value="">All records</option>' + recs.map((r) => `<option value="${esc(r)}">${esc(recLabel(r))}</option>`).join("");
+  function populateFilters(users) {
+    users.forEach((user) => people.push({
+      label: user.name,
+      role: user.role,
+      keys: [String(user.name).toLowerCase(), String(user.username || "").toLowerCase()].filter(Boolean)
+    }));
+    all.forEach((entry) => {
+      if (personOf(entry.user) < 0) people.push({ label: entry.user, role: entry.role, keys: [String(entry.user).toLowerCase()] });
+    });
+    const options = people.map((person, index) => ({
+      index,
+      label: person.label + (person.role && String(person.label).toLowerCase() !== String(ROLE[person.role] || person.role).toLowerCase()
+        ? " (" + (ROLE[person.role] || person.role) + ")" : "")
+    })).sort((a, b) => a.label.localeCompare(b.label));
+    $("f-user").innerHTML = '<option value="">All users</option>' + options.map((option) => `<option value="${option.index}">${esc(option.label)}</option>`).join("");
+    $("f-action").innerHTML = '<option value="">All actions</option>' + Object.keys(ACTIONS).map((action) => `<option value="${action}">${action.charAt(0).toUpperCase() + action.slice(1)}</option>`).join("");
+    const records = [...new Set([...RECORDS, ...all.map((entry) => entry.record)])];
+    $("f-record").innerHTML = '<option value="">All records</option>' + records.map((record) => `<option value="${esc(record)}">${esc(recLabel(record))}</option>`).join("");
+  }
 
   function filtered() {
     const u = $("f-user").value, a = $("f-action").value, r = $("f-record").value, from = $("f-from").value, to = $("f-to").value;
@@ -105,5 +111,24 @@
     S.toast("Exported " + rows.length + (rows.length === 1 ? " entry." : " entries."));
   });
 
-  render();
+  Promise.all([
+    fetch("/api/admin/audit", { headers: { Accept: "application/json" } }).then(async (response) => {
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || "Could not load the audit log.");
+      return result;
+    }),
+    fetch("/api/admin/users", { headers: { Accept: "application/json" } }).then(async (response) => {
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || "Could not load user accounts.");
+      return result;
+    })
+  ]).then(([entries, users]) => {
+    all = entries.map((entry, index) => ({ ...normal(entry), i: index }))
+      .sort((a, b) => b.t - a.t || b.i - a.i);
+    populateFilters(users);
+    render();
+  }).catch((error) => {
+    console.error("Could not load the audit log:", error);
+    $("au-rows").innerHTML = `<p class="au-empty">${esc(error.message || "Could not load the audit log.")}</p>`;
+  });
 })();

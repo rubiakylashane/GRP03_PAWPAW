@@ -9,21 +9,13 @@
   const VACCINES = ["Anti Rabies", "5-in-1 (DHPP)", "6-in-1", "4-in-1 (Cat)", "Kennel Cough", "Other"];
   const now = new Date(); now.setHours(0, 0, 0, 0);
   const daysTo = (iso) => Math.round((new Date(iso + "T00:00:00") - now) / 86400000);
-  const KEY = "pawpaw_vaccinations:";
-
-  function readAll() {
-    const rows = [];
-    try {
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (!k || k.indexOf(KEY) !== 0) continue;
-        const owner = k.slice(KEY.length);
-        (V.readJson(k, []) || []).forEach((r) => { if (!V.mine || !r.administeredBy || r.administeredBy === V.mine) rows.push({ ...r, owner }); });
-      }
-    } catch (_) { /* storage blocked */ }
-    return rows;
+  let rows = [], patients = [];
+  async function request(url, options) {
+    const response = await fetch(url, options);
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || "Could not load vaccination data.");
+    return result;
   }
-  let rows = readAll();
 
   const cls = (r) => { if (!r.nextDue) return "ok"; const d = daysTo(r.nextDue); return d < 0 ? "late" : d <= SOON ? "soon" : "ok"; };
   const SORTS = {
@@ -34,7 +26,7 @@
 
   function render() {
     const q = $("search").value.trim().toLowerCase();
-    const list = rows.filter((r) => !q || [r.pet, r.vaccine, V.ownerName(r.owner)].join(" ").toLowerCase().includes(q)).sort(SORTS[$("sort").value] || SORTS.recent);
+    const list = rows.filter((r) => !q || [r.pet, r.vaccine, r.owner].join(" ").toLowerCase().includes(q)).sort(SORTS[$("sort").value] || SORTS.recent);
     $("vx-rows").innerHTML = list.length ? list.map((r) => `
       <div class="orow vrow-vx" role="row">
         <span role="cell" class="o-name">${esc(r.pet || "-")}</span>
@@ -49,34 +41,52 @@
   const err = (m) => { $("rv-err").textContent = m || ""; $("rv-err").hidden = !m; return !m; };
   const suggest = (from) => { const d = new Date(from + "T00:00:00"); d.setFullYear(d.getFullYear() + 1); return V.iso(d); };
   function fillPets() {
-    const pets = O.petsOf($("rv-owner").value);
-    $("rv-pet").innerHTML = pets.length ? pets.map((p) => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join("") : `<option value="">No pets</option>`;
+    const pets = patients.filter((patient) => String(patient.ownerId) === String($("rv-owner").value));
+    $("rv-pet").innerHTML = pets.length
+      ? pets.map((pet) => `<option value="${esc(pet.petId)}">${esc(pet.name)}</option>`).join("")
+      : `<option value="">No assigned patients</option>`;
   }
   function openRecord() {
-    const owners = O.list();
-    $("rv-owner").innerHTML = owners.map((o) => `<option value="${esc(o.id)}">${esc(o.short)}</option>`).join("");
+    const owners = [...new Map(patients.map((patient) => [String(patient.ownerId), {
+      id: patient.ownerId, name: patient.ownerName
+    }])).values()];
+    $("rv-owner").innerHTML = owners.map((owner) => `<option value="${esc(owner.id)}">${esc(owner.name)}</option>`).join("");
     $("rv-vaccine").innerHTML = VACCINES.map((v) => `<option>${esc(v)}</option>`).join("");
     $("rv-other").value = ""; $("rv-other-box").hidden = true;
     $("rv-date").value = V.today(); $("rv-due").value = suggest(V.today()); $("rv-notes").value = "";
     fillPets(); err(""); dlg.showModal();
   }
-  function save() {
-    const owner = $("rv-owner").value, petId = $("rv-pet").value;
+  async function save() {
+    const petId = $("rv-pet").value;
     let vaccine = $("rv-vaccine").value; if (vaccine === "Other") vaccine = $("rv-other").value.trim();
     const given = $("rv-date").value, due = $("rv-due").value;
-    if (!owner) return err("Pick an owner.");
-    if (!petId) return err("This owner has no pet yet.");
+    if (!patients.length) return err("No patients are assigned to your account.");
+    if (!petId) return err("Choose one of your assigned patients.");
     if (!vaccine) return err("Enter the vaccine name.");
     if (!given) return err("Pick the date given.");
     if (given > V.today()) return err("The date given cannot be in the future.");
     if (!due) return err("Pick the next due date.");
     if (due <= given) return err("The next due date must be after the date given.");
-    const pet = O.getPet(owner, petId), k = KEY + owner, list = V.readJson(k, []);
-    list.push({ id: "vx-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), apptId: "", petId, pet: pet ? pet.name : "", vaccine, dateAdministered: given, nextDue: due, administeredBy: V.mine || "Vet", notes: $("rv-notes").value.trim() });
-    try { localStorage.setItem(k, JSON.stringify(list)); } catch (_) { return err("Could not save. Storage is blocked."); }
-    window.PawOwners.audit("create", "vaccination", "Recorded " + vaccine + " vaccination for " + (pet ? pet.name : "a pet") + ".");
-    window.PawStaffAppts.notify(owner, "record", "Vaccination recorded", vaccine + " given to " + (pet ? pet.name : "your pet") + ". See Vaccination History for the next due date.");
-    rows = readAll(); dlg.close(); render(); S.toast("Vaccination recorded.");
+    const pet = patients.find((patient) => String(patient.petId) === String(petId));
+    const saveButton = $("rv-ok");
+    saveButton.disabled = true;
+    try {
+      const result = await request("/api/vaccinations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          pet_id: petId, vaccine, date_administered: given,
+          next_due_date: due, notes: $("rv-notes").value.trim()
+        })
+      });
+      rows.unshift({ ...result.vaccination, pet: pet.name, owner: pet.ownerName });
+      dlg.close(); render(); S.toast("Vaccination recorded.");
+    } catch (error) {
+      console.error("Could not record vaccination:", error);
+      err(error.message || "Could not record vaccination.");
+    } finally {
+      saveButton.disabled = false;
+    }
   }
   $("record-btn").addEventListener("click", openRecord);
   $("rv-owner").addEventListener("change", fillPets);
@@ -86,5 +96,15 @@
   $("rv-cancel").addEventListener("click", () => dlg.close());
   $("search").addEventListener("input", render);
   $("sort").addEventListener("change", render);
-  render();
+  Promise.all([
+    request("/api/veterinarians/patients", { headers: { Accept: "application/json" } }),
+    request("/api/vaccinations/clinical", { headers: { Accept: "application/json" } })
+  ]).then(([assignedPatients, vaccinations]) => {
+    patients = assignedPatients;
+    rows = vaccinations;
+    render();
+  }).catch((error) => {
+    console.error("Could not load vaccination page:", error);
+    $("vx-rows").innerHTML = `<p class="o-empty">${esc(error.message || "Could not load vaccination records.")}</p>`;
+  });
 })();

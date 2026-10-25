@@ -4,7 +4,8 @@
      -> { stats, today: [appointment], upcoming: [appointment], recent: [appointment] } */
 (() => {
   const V = window.PawVet, A = V.A, S = window.PawStaff, O = window.PawOwners, $ = (id) => document.getElementById(id), esc = O.esc;
-  const all = A.load().filter(V.visible), t = V.today();
+  A.load().then((appointments) => {
+  const all = appointments.filter(V.visible), t = V.today();
   const by = (a, b) => V.stamp(a).localeCompare(V.stamp(b));
 
   $("greeting").textContent = V.greeting;
@@ -55,4 +56,10 @@
         <a class="btn btn-primary" href="medical-records.html?${V.recQuery(a)}">View Record</a>
       </div>
     </div>`).join("") : `<p class="empty">No completed visits yet.</p>`;
+  }).catch((error) => {
+    console.error("Could not load veterinarian dashboard:", error);
+    $("today-rows").innerHTML = '<p class="empty">Appointments could not be loaded. Please refresh and try again.</p>';
+    $("upcoming-rows").innerHTML = '<p class="empty">Appointments could not be loaded.</p>';
+    $("recent-list").innerHTML = '<p class="empty">Appointments could not be loaded.</p>';
+  });
 })();

@@ -59,9 +59,9 @@
       </div>`;
   }
 
-  function visible() {
+  function visible(all) {
     const q = search.value.trim().toLowerCase();
-    let list = Appts.load();
+    let list = all.slice();
     if (q) {
       list = list.filter((a) => [a.petName, a.vet, a.status, longDate(a.date), (a.services || []).map((l) => l.name).join(" ")]
         .join(" ").toLowerCase().includes(q));
@@ -76,9 +76,9 @@
     return list.sort(by[sortEl.value] || by.soon);
   }
 
-  function render() {
-    const all = Appts.load();
-    const list = visible();
+  let appointments = [];
+  function render(all) {
+    const list = visible(all);
     rowsEl.innerHTML = list.length
       ? list.map(row).join("")
       : `<div class="ma-empty">${all.length
@@ -88,10 +88,17 @@
 
   /* ----- Cancel ----- */
   let cancelId = null;
-  rowsEl.addEventListener("click", (e) => {
+  rowsEl.addEventListener("click", async (e) => {
     const btn = e.target.closest("[data-cancel]");
     if (!btn) return;
-    const a = Appts.get(btn.dataset.cancel);
+    let a;
+    try {
+      a = await Appts.get(btn.dataset.cancel);
+    } catch (error) {
+      console.error("Could not load appointment:", error);
+      showToast(error.message || "Could not load the appointment.");
+      return;
+    }
     if (!a) return;
     cancelId = a.id;
     $("cancel-text").textContent = a.petName + " · " + longDate(a.date) + ", " + time12(a.time);
@@ -99,12 +106,22 @@
   });
   $("cancel-keep").addEventListener("click", () => dialog.close());
   dialog.addEventListener("click", (e) => { if (e.target === dialog) dialog.close(); });
-  $("cancel-yes").addEventListener("click", () => {
-    if (cancelId) Appts.update(cancelId, { status: "cancelled" });
-    cancelId = null;
-    dialog.close();
-    render();
-    showToast("Appointment cancelled.");
+  $("cancel-yes").addEventListener("click", async () => {
+    const button = $("cancel-yes");
+    if (!cancelId) return;
+    button.disabled = true;
+    try {
+      await Appts.update(cancelId, { status: "cancelled" });
+      cancelId = null;
+      dialog.close();
+      await refresh();
+      showToast("Appointment cancelled.");
+    } catch (error) {
+      console.error("Could not cancel appointment:", error);
+      showToast(error.message || "Could not cancel the appointment.");
+    } finally {
+      button.disabled = false;
+    }
   });
 
   function showToast(msg) {
@@ -113,10 +130,19 @@
     setTimeout(() => toast.classList.remove("show"), 2800);
   }
 
-  search.addEventListener("input", render);
-  sortEl.addEventListener("change", render);
+  async function refresh() {
+    try {
+      appointments = await Appts.load();
+      render(appointments);
+    } catch (error) {
+      console.error("Could not load appointments:", error);
+      rowsEl.innerHTML = `<div class="ma-empty">Appointments could not be loaded. Please refresh and try again.</div>`;
+    }
+  }
 
-  render();
+  search.addEventListener("input", () => render(appointments));
+  sortEl.addEventListener("change", () => render(appointments));
+  refresh();
   try {
     const m = sessionStorage.getItem("pawpaw_flash");
     if (m) { sessionStorage.removeItem("pawpaw_flash"); showToast(m); }

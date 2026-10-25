@@ -6,23 +6,26 @@
   const profile = window.PawProfile;
   const { setFlash } = window.PawPets;
 
-  /* Password change. Demo mode cannot check the current password (the login accepts anything),
-     so only the rules are checked. With a backend: POST { current, next } to API.password and show its error. */
-  const USE_BACKEND = false;
-  const API = { password: "/api/me/password" };
   const MIN_PASSWORD = 8;
 
   const f = { name: $("name"), email: $("email"), address: $("address"), phone: $("phone"), photo: $("photo"),
               current: $("current"), new: $("new"), confirm: $("confirm") };
   let photoData = "";
+  const submitButton = $("pr-form").querySelector('[type="submit"]');
+  if (submitButton) submitButton.disabled = true;
 
   /* ----- fill the form ----- */
-  const p = profile.load();
-  f.name.value = p.name;
-  f.email.value = p.email;
-  f.address.value = p.address;
-  f.phone.value = p.phone;
-  setPhoto(p.photo);
+  profile.load().then((p) => {
+    f.name.value = p.name;
+    f.email.value = p.email;
+    f.address.value = p.address;
+    f.phone.value = p.phone;
+    setPhoto(p.photo);
+    if (submitButton) submitButton.disabled = false;
+  }).catch((error) => {
+    console.error("Could not load owner profile:", error);
+    setError("name", "Your profile could not be loaded. Please refresh and try again.");
+  });
 
   function setError(key, msg) {
     const el = $("err-" + key);
@@ -103,24 +106,24 @@
     const first = ["name", "email", "phone", "current", "new", "confirm"].find((k) => errs[k]);
     if (first) { f[first].focus(); return; }
 
-    if (changing && USE_BACKEND) {
-      try {
-        const res = await fetch(API.password, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ current: f.current.value, next: f.new.value })
-        });
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          setError("current", data.message || "Current password is incorrect.");
-          f.current.focus();
-          return;
-        }
-      } catch (_) { setError("current", "Could not reach the server. Try again."); return; }
+    if (submitButton) submitButton.disabled = true;
+    try {
+      const saved = await profile.save({
+        name, email, phone: f.phone.value.trim(), address: f.address.value.trim(), photo: photoData,
+        ...(changing ? { currentPassword: f.current.value, newPassword: f.new.value } : {})
+      });
+      const user = JSON.parse(sessionStorage.getItem("pawpaw_user") || "null");
+      if (user) {
+        user.name = saved.name;
+        sessionStorage.setItem("pawpaw_user", JSON.stringify(user));
+      }
+      setFlash(changing ? "Profile and password updated." : "Profile updated.");
+      location.href = "profile.html";
+    } catch (error) {
+      console.error("Profile save failed:", error);
+      if (/current password/i.test(error.message)) setError("current", error.message);
+      else setError("email", error.message || "Your profile could not be saved. Please try again.");
+      if (submitButton) submitButton.disabled = false;
     }
-
-    profile.save({ name, email, phone: f.phone.value.trim(), address: f.address.value.trim(), photo: photoData });
-    setFlash(changing ? "Profile and password updated." : "Profile updated.");
-    location.href = "profile.html";
   });
 })();

@@ -1,21 +1,43 @@
 /* js/owner/profile.js
    My Profile: the owner's details and up to six of their pets. Needs pets-store.js and profile-store.js. */
-(() => {
+(async () => {
   const { esc, load: loadPets, ageText, fmtDate, takeFlash } = window.PawPets;
   const $ = (id) => document.getElementById(id);
 
-  const p = window.PawProfile.load();
+  let p;
+  try {
+    p = await window.PawProfile.load();
+  } catch (error) {
+    console.error("Could not load owner profile:", error);
+    $("pr-name").textContent = "Profile unavailable";
+    $("pr-pets").innerHTML = '<p class="empty">Your profile could not be loaded. Please refresh and try again.</p>';
+    $("pr-viewall").hidden = true;
+    return;
+  }
   $("pr-name").textContent = p.name;
   $("pr-email").textContent = p.email || "-";
   $("pr-phone").textContent = p.phone || "-";
-  $("pr-since").textContent = new Date(p.memberSince + "T00:00:00")
-    .toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  const memberSince = String(p.memberSince || "").slice(0, 10);
+  const memberSinceDate = /^\d{4}-\d{2}-\d{2}$/.test(memberSince)
+    ? new Date(memberSince + "T00:00:00")
+    : null;
+  $("pr-since").textContent = memberSinceDate && !Number.isNaN(memberSinceDate.getTime())
+    ? memberSinceDate.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+    : "-";
   if (p.address) { $("pr-address").textContent = p.address; $("pr-address-row").hidden = false; }
   if (p.photo) $("pr-avatar").style.backgroundImage = `url('${p.photo}')`;
 
   /* ----- pets (same card as My Pets) ----- */
   const SHOW = 6;
-  const pets = loadPets();
+  let pets;
+  try {
+    pets = await loadPets();
+  } catch (error) {
+    console.error("Could not load profile pets:", error);
+    $("pr-pets").innerHTML = '<p class="empty">Pet information could not be loaded. Please refresh and try again.</p>';
+    $("pr-viewall").hidden = true;
+    return;
+  }
   const card = (x) => {
     const age = ageText(x.dob);
     return `

@@ -9,7 +9,7 @@
        weekRevenue: [Mon..Sun amounts], topServices: [{ name, n }] (this week),
        today: [{ time: "09:00", pet, owner, vet, status }] } */
 (() => {
-  const USE_BACKEND = false;
+  const USE_BACKEND = true;
   const API = "/api/admin/summary";
 
   const $ = (id) => document.getElementById(id);
@@ -162,8 +162,10 @@
 
   async function load() {
     if (USE_BACKEND) {
-      try { const r = await fetch(API, { headers: { Accept: "application/json" } }); if (r.ok) return await r.json(); } catch (err) { console.warn("[admin dashboard] backend failed:", err.message); }
-      return { owners: 0, pets: 0, appointmentsThisMonth: 0, revenueThisMonth: 0, revenueByService: [], activity: [] };
+      const r = await fetch(API, { headers: { Accept: "application/json" } });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error || "Could not load the clinic summary.");
+      return data;
     }
     return fromStorage() || SAMPLE;
   }
@@ -236,5 +238,8 @@
 
   $("today").textContent = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
 
-  load().then(render);
+  load().then(render).catch((error) => {
+    console.error("Could not load the admin dashboard:", error);
+    $("subtitle").textContent = error.message || "Dashboard data could not be loaded. Please refresh and try again.";
+  });
 })();

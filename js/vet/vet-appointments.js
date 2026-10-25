@@ -7,7 +7,7 @@
 (() => {
   const V = window.PawVet, A = V.A, O = V.O, S = window.PawStaff, $ = (id) => document.getElementById(id), esc = O.esc;
   const { fmtDate, fmtTime, ownerName, petName, services } = V;
-  let all = A.load(), cur = null;
+  let all = [], cur = null;
 
   const ORDER = { with_vet: 0, checked_in: 1, confirmed: 2, completed: 3 };
   const SORTS = {
@@ -40,24 +40,28 @@
 
   const dlg = $("done-dialog");
   const find = (u) => all.find((a) => a.owner + "|" + a.id === u);
-  function finish(goRecord) {
-    const a = cur; dlg.close();
-    A.change(a, { status: "completed" });
-    A.notify(a.owner, "appointment", "Visit completed", petName(a) + " has finished the visit. The medical record will be added by the vet.");
-    if (goRecord) { location.href = V.recordHref(a); return; }
-    render(); S.toast(petName(a) + " marked as completed.");
+  function finish() {
+    const a = cur;
+    dlg.close();
+    location.href = V.recordHref(a);
   }
 
-  document.addEventListener("click", (e) => {
+  document.addEventListener("click", async (e) => {
     if (e.target.closest("[data-close]")) { e.target.closest("dialog").close(); return; }
     const b = e.target.closest("[data-act]"); if (!b) return;
     const a = find(b.dataset.id); if (!a) return;
-    if (b.dataset.act === "start") { A.change(a, { status: "with_vet" }); render(); S.toast("Visit started for " + petName(a) + "."); }
+    if (b.dataset.act === "start") {
+      try { await A.change(a, { status: "with_vet" }); render(); S.toast("Visit started for " + petName(a) + "."); }
+      catch (error) { console.error("Could not start visit:", error); S.toast(error.message || "Could not start the visit."); }
+    }
     else { cur = a; $("done-sub").textContent = petName(a) + " - " + ownerName(a) + ", " + fmtDate(a.date) + " " + fmtTime(a.time); dlg.showModal(); }
   });
-  $("done-ok").addEventListener("click", () => finish(false));
-  $("done-record").addEventListener("click", () => finish(true));
+  $("done-ok").addEventListener("click", finish);
+  $("done-record").addEventListener("click", finish);
   $("search").addEventListener("input", render);
   $("sort").addEventListener("change", render);
-  render();
+  A.load().then((appointments) => { all = appointments; render(); }).catch((error) => {
+    console.error("Could not load veterinarian appointments:", error);
+    $("pt-rows").innerHTML = '<p class="o-empty">Appointments could not be loaded. Please refresh and try again.</p>';
+  });
 })();

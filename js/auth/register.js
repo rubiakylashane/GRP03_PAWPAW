@@ -94,21 +94,72 @@ document.querySelectorAll("[data-toggle]").forEach((btn) =>
 const photo = document.getElementById("photo");
 const preview = document.getElementById("photo-preview");
 const hint = document.getElementById("photo-hint");
+let photoData = "";
+let photoProcessing = Promise.resolve();
+
+function resizePhoto(file, max = 480) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      const ratio = Math.min(1, max / Math.max(image.width, image.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(image.width * ratio);
+      canvas.height = Math.round(image.height * ratio);
+      const context = canvas.getContext("2d");
+      URL.revokeObjectURL(url);
+      if (!context) {
+        reject(new Error("Could not process that image."));
+        return;
+      }
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL("image/jpeg", 0.85));
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Could not read that image."));
+    };
+    image.src = url;
+  });
+}
 
 photo.addEventListener("change", () => {
+  photoProcessing = (async () => {
   const file = photo.files[0];
+  setError(photo, "");
   if (!file) {
+    photoData = "";
     preview.hidden = true;
     hint.hidden = false;
     return;
   }
-  preview.src = URL.createObjectURL(file);
-  preview.hidden = false;
-  hint.hidden = true;
+  if (!file.type.startsWith("image/")) {
+    photo.value = "";
+    photoData = "";
+    setError(photo, "Please choose an image file.");
+    return;
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    photo.value = "";
+    photoData = "";
+    setError(photo, "Image must be 5 MB or smaller.");
+    return;
+  }
+  try {
+    photoData = await resizePhoto(file);
+    preview.src = photoData;
+    preview.hidden = false;
+    hint.hidden = true;
+  } catch (error) {
+    photo.value = "";
+    photoData = "";
+    setError(photo, error.message || "Could not process that image.");
+  }
+  })();
 });
 
 /* ---------- Submit ---------- */
-form.addEventListener("submit", (e) => {
+form.addEventListener("submit", async (e) => {
   e.preventDefault();
 
   // Re-check steps 1 and 2 in case something was skipped
@@ -118,15 +169,60 @@ form.addEventListener("submit", (e) => {
       return;
     }
   }
+  await photoProcessing;
+  if (photo.getAttribute("aria-invalid") === "true") {
+    showStep(2);
+    return;
+  }
 
   const data = new FormData(form);
-  data.delete("confirm_password");
-  console.log("register:", Object.fromEntries(data));
-  // TODO: send `data` to your backend register endpoint
-
-  // Feedback while there is no backend yet
   const btn = form.querySelector('button[type="submit"]');
+  let error = form.querySelector(".register-error");
+  if (!error) {
+    error = document.createElement("p");
+    error.className = "error register-error";
+    error.setAttribute("role", "alert");
+    btn.before(error);
+  }
+  error.textContent = "";
+  error.hidden = true;
+
   btn.disabled = true;
-  btn.textContent = "Account created!";
-  setTimeout(() => (window.location.href = "login.html"), 1200);
+  const originalText = btn.textContent;
+  btn.textContent = "Creating account...";
+
+  try {
+    const response = await fetch("/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: [
+          data.get("first_name"),
+          data.get("middle_name"),
+          data.get("last_name")
+        ].filter((part) => String(part || "").trim()).join(" "),
+        firstName: data.get("first_name"),
+        middleName: data.get("middle_name"),
+        lastName: data.get("last_name"),
+        email: data.get("email"),
+        phone: data.get("contact_number"),
+        address: data.get("address"),
+        username: data.get("username"),
+        password: data.get("password"),
+        photo: photoData || null
+      })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(result.message || result.error || "Unable to create your account. Please try again.");
+    }
+
+    btn.textContent = "Account created!";
+    window.setTimeout(() => { window.location.href = "login.html"; }, 1200);
+  } catch (err) {
+    error.textContent = err.message || "Unable to create your account. Please try again.";
+    error.hidden = false;
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
 });

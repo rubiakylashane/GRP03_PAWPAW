@@ -29,7 +29,7 @@
     try { const v = JSON.parse(localStorage.getItem("pawpaw_services") || "null"); if (Array.isArray(v) && v.length) return v; } catch (_) { /* default */ }
     return Array.isArray(window.PawServices) ? window.PawServices : [];
   }
-  const CAT = catalog();
+  let CAT = catalog();
   /* one appointment line -> { name: base service name, amount: current price x qty } */
   function priceLine(l) {
     const qty = Number(l.qty) || 1, id = String(l.id || ""), [base, opt] = id.split(":");
@@ -104,17 +104,24 @@
   };
 
   let kind = "this", data = null;
-  const hasReal = () => P.load().length > 0;
-
-  function render() {
-    const all = P.load(), real = all.length > 0;
+  async function render() {
+    try {
+    const [all, services] = await Promise.all([
+      P.load(),
+      fetch("/api/services", { headers: { Accept: "application/json" } }).then(async (response) => {
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || "Could not load clinic services.");
+        return result;
+      })
+    ]);
+    CAT = services.map((service) => ({ id: String(service.id), name: service.name, price: Number(service.price) }));
     const r = range(kind);
     const bad = kind === "custom" && (!r.from || !r.to || r.from > r.to);
     $("rp-period").classList.toggle("bad", !!bad);
-    $("rp-period").textContent = bad ? (!r.from || !r.to ? "Pick both dates to see the report." : "The From date must be on or before the To date.") : (real ? nice(r.from) + " to " + nice(r.to) : "");
-    data = !real ? SAMPLE : bad ? compute([], "2000-01-01", "2000-01-31") : compute(all, r.from, r.to);
+    $("rp-period").textContent = bad ? (!r.from || !r.to ? "Pick both dates to see the report." : "The From date must be on or before the To date.") : nice(r.from) + " to " + nice(r.to);
+    data = bad ? compute([], "2000-01-01", "2000-01-31") : compute(all, r.from, r.to);
     data.range = r;
-    $("subtitle").textContent = real ? "Revenue and activity for the clinic." : "Revenue and activity for the clinic. Sample figures for the prototype.";
+    $("subtitle").textContent = "Revenue and activity for the clinic.";
 
     $("k-rev-l").textContent = LABEL[kind];
     $("k-rev").textContent = peso(data.revenue);
@@ -131,6 +138,11 @@
     const st = STATUS_ORDER.filter((k) => ALWAYS.indexOf(k) >= 0 || (data.byStatus[k] || 0) > 0);
     $("c-status").innerHTML = bars(st.map((k) => ({ nameHtml: `<span class="rp-pill rp-st-${k}">${STATUS_LABEL[k]}</span>`, value: data.byStatus[k] || 0 })), (n) => n, "rp-bar-status");
     $("c-vet").innerHTML = data.perVet.length ? bars(data.perVet.map((v) => ({ name: v.name, value: v.count })), (n) => n) : `<p class="rp-empty">No veterinarians yet.</p>`;
+    } catch (error) {
+      console.error("Could not load clinic report:", error);
+      $("rp-period").textContent = "Report data could not be loaded.";
+      $("subtitle").textContent = error.message || "Please refresh and try again.";
+    }
   }
 
   document.querySelector(".rp-tabs").addEventListener("click", (e) => {

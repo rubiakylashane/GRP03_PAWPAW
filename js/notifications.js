@@ -1,50 +1,30 @@
-/* js/owner/notifications.js - notification bell for the owner pages
+/* js/notifications.js - notification bell for authenticated users
    Add ONE line before </body> on every owner page (after the other scripts):
        <script src="../../js/owner/notifications.js"></script>
    The bell is added by this script (top right), no HTML or CSS changes needed.
 
-   Demo data: localStorage "pawpaw_notifications:<owner>" = [{ id, type, title, text, createdAt, readAt }]
-   (the staff pages write to it). Backend: set USE_BACKEND = true and match API below:
+   Backend:
      GET   /api/notifications            -> [{ id, type, title, text, createdAt, readAt }]
      PATCH /api/notifications/:id/read
      POST  /api/notifications/read-all */
 (() => {
-  const USE_BACKEND = false;
   const API = { list: "/api/notifications", read: (id) => "/api/notifications/" + encodeURIComponent(id) + "/read", readAll: "/api/notifications/read-all" };
 
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-  /* who is signed in: owner (own list), staff / admin (shared "staff" list), vet (list of that vet).
-     VETS mirrors js/staff/staff-appts-store.js; a vet login that matches none of them sees every vet's list. */
-  const VETS = (() => { try { const v = JSON.parse(localStorage.getItem("pawpaw_vets") || "null"); if (Array.isArray(v) && v.length) return v.map((x) => x.name); } catch (_) { /* default */ } return ["Dr. Anajoy N. Abila", "Dr. Sean Kurvie G. Buerano", "Dr. Roxanne N. Regulacion", "Dr. Jenmarc M. Ronquillo", "Dr. Kyla Shane T. Rubia"]; })();
+  /* The server scopes each notification query to the authenticated account. */
   const user = (() => {
-    for (const st of ["sessionStorage", "localStorage"]) {
-      try { const u = JSON.parse(window[st].getItem("pawpaw_user") || "null"); if (u && u.name) return u; } catch (_) {}
-    }
-    return null;
+    try { return JSON.parse(sessionStorage.getItem("pawpaw_user") || "null"); } catch (_) { return null; }
   })();
-  const role = user ? String(user.role || "owner") : "";
-  const vetOf = () => { const w = String(user.name).toLowerCase().split(/[\s_.-]+/); return VETS.find((v) => w.some((x) => x.length > 2 && x !== "dr" && v.toLowerCase().includes(x))) || null; };
-  function ownerKey() {                                     // identity used for this browser's "already shown" list
-    if (!user) return "";
-    if (role === "staff" || role === "admin") return "staff";
-    if (role === "vet") return "vet:" + (vetOf() || "all").toLowerCase();
-    return String(user.name).trim().toLowerCase();
-  }
-  const KEYS = !user ? [] : (role === "staff" || role === "admin") ? ["pawpaw_notifications:staff"]
-    : role === "vet" ? (vetOf() ? [vetOf()] : VETS).map((v) => "pawpaw_notifications:vet:" + v.toLowerCase())
-    : ["pawpaw_notifications:" + String(user.name).trim().toLowerCase()];
+  const role = user ? String(user.role || "") : "";
+  const ownerKey = user ? String(user.id || user.userId || user.ownerId || role) : "";
   if (!user) return;                                         // not signed in
 
   let items = [];
   async function load() {
-    if (USE_BACKEND) {
-      try { const r = await fetch(API.list, { headers: { Accept: "application/json" } }); if (r.ok) return (await r.json()).map((n) => ({ ...n, _k: KEYS[0] })); } catch (_) {}
-    }
-    const out = [];
-    KEYS.forEach((k) => { try { const v = JSON.parse(localStorage.getItem(k) || "[]"); if (Array.isArray(v)) v.forEach((n) => out.push({ ...n, _k: k })); } catch (_) {} });
-    return out;
+    const response = await fetch(API.list, { headers: { Accept: "application/json" } });
+    if (!response.ok) throw new Error(`Could not load notifications (${response.status}).`);
+    return response.json();
   }
-  const save = () => KEYS.forEach((k) => { try { localStorage.setItem(k, JSON.stringify(items.filter((n) => n._k === k).map(({ _k, ...n }) => n))); } catch (_) {} });
 
   const IS_STAFF = role === "staff" || role === "admin";   // staff bell reads "pawpaw_notifications:staff" (owner book / cancel / reschedule)
   const IS_VET = role === "vet";                            // vet bell: new patient, check-in, reschedule, cancel
@@ -177,25 +157,32 @@
 
   async function markRead(id) {
     const n = items.find((x) => x.id === id); if (!n || n.readAt) return;
-    n.readAt = new Date().toISOString(); save();
-    if (USE_BACKEND) { try { await fetch(API.read(id), { method: "PATCH" }); } catch (_) {} }
+    const response = await fetch(API.read(id), { method: "PATCH" });
+    if (!response.ok) throw new Error(`Could not mark notification as read (${response.status}).`);
+    n.readAt = new Date().toISOString();
+    render();
   }
   async function markAll() {
-    const now = new Date().toISOString(); items.forEach((n) => { if (!n.readAt) n.readAt = now; }); save(); render();
-    if (USE_BACKEND) { try { await fetch(API.readAll, { method: "POST" }); } catch (_) {} }
+    const response = await fetch(API.readAll, { method: "POST" });
+    if (!response.ok) throw new Error(`Could not mark notifications as read (${response.status}).`);
+    const now = new Date().toISOString();
+    items.forEach((n) => { if (!n.readAt) n.readAt = now; });
+    render();
   }
   const setOpen = (open) => { if (open) tab = "all"; panel.hidden = !open; bell.setAttribute("aria-expanded", String(open)); if (open) render(); };
 
   bell.addEventListener("click", () => setOpen(panel.hidden));
-  allBtn.addEventListener("click", markAll);
+  allBtn.addEventListener("click", () => markAll().catch((error) => console.error(error)));
   panel.querySelector(".nb-tabs").addEventListener("click", (e) => { const t = e.target.closest("[data-tab]"); if (t) { tab = t.dataset.tab; render(); } });
-  list.addEventListener("click", (e) => { const a = e.target.closest("[data-id]"); if (a) markRead(a.dataset.id); });   // then follows the link
+  list.addEventListener("click", (e) => { const a = e.target.closest("[data-id]"); if (a) markRead(a.dataset.id).catch((error) => console.error(error)); });   // then follows the link
   document.addEventListener("click", (e) => { if (!panel.hidden && !panel.contains(e.target) && !bell.contains(e.target)) setOpen(false); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !panel.hidden) { setOpen(false); bell.focus(); } });
 
   /* refresh when the staff page (another tab) adds something, or when this tab is shown again */
-  const refresh = () => load().then((v) => { items = v; render(); popToasts(); });
-  window.addEventListener("storage", (e) => { if (KEYS.indexOf(e.key) >= 0) refresh(); });
+  const refresh = () => load().then((v) => { items = v; render(); popToasts(); }).catch((error) => {
+    console.error("Notification refresh failed:", error);
+    list.innerHTML = '<li class="nb-empty">Notifications could not be loaded.</li>';
+  });
   document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
   setInterval(refresh, 15000);
   refresh();

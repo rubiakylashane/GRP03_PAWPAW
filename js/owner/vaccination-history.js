@@ -3,24 +3,10 @@
      overdue  = next due date already passed
      soon     = next due within DUE_SOON_DAYS days
      ok       = everything else (including records with no next due date)
-   The vet / staff add the records. Set USE_BACKEND = true and edit API when the backend is ready. */
+   The vet / staff add the records through the clinic API. */
 (() => {
-  const USE_BACKEND = false;
-  const API = { vaccinations: "/api/vaccinations" }; // [{ id, vaccine, pet, dateAdministered, nextDue, administeredBy, notes }]
+  const API = { vaccinations: "/api/vaccinations" };
   const DUE_SOON_DAYS = 30;
-
-  /* Demo storage: this browser's localStorage, one list per signed-in user (empty until records are added). */
-  const BASE = "pawpaw_vaccinations";
-  function userKey() {
-    let name = "guest";
-    for (const store of ["sessionStorage", "localStorage"]) {
-      try {
-        const u = JSON.parse(window[store].getItem("pawpaw_user") || "null");
-        if (u && u.name) { name = String(u.name).trim().toLowerCase(); break; }
-      } catch (_) { /* ignore */ }
-    }
-    return BASE + ":" + name;
-  }
 
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
@@ -33,17 +19,12 @@
   };
 
   async function loadData() {
-    if (USE_BACKEND) {
-      try {
-        const res = await fetch(API.vaccinations, { headers: { Accept: "application/json" } });
-        if (!res.ok) throw new Error("Request failed");
-        return await res.json();
-      } catch (err) { console.warn("[vaccinations] backend failed:", err.message); }
+    const res = await fetch(API.vaccinations, { headers: { Accept: "application/json" } });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || `Could not load vaccinations (${res.status}).`);
     }
-    try {
-      const v = JSON.parse(localStorage.getItem(userKey()) || "null");
-      return Array.isArray(v) ? v : [];
-    } catch (_) { return []; }
+    return res.json();
   }
 
   let records = [];
@@ -101,5 +82,11 @@
   }
 
   sortEl.addEventListener("change", render);
-  loadData().then((d) => { records = d; render(); });
+  loadData().then((d) => { records = d; render(); }).catch((error) => {
+    console.error("Could not load vaccination history:", error);
+    for (const key of ["overdue", "soon", "ok"]) {
+      $("stat-" + key).textContent = "-";
+      $(key + "-rows").innerHTML = '<p class="vh-empty">Vaccination history could not be loaded. Please refresh and try again.</p>';
+    }
+  });
 })();

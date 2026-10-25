@@ -4,10 +4,26 @@
   const id = S.ownerId();
   const back = "owners-pets.html?owner=" + encodeURIComponent(id);
 
-  if (!id || !O.exists(id)) { $("owner-form").hidden = true; $("missing").hidden = false; return; }
+  if (!id) { $("owner-form").hidden = true; $("missing").hidden = false; return; }
   $("go-back").href = back; $("cancel").href = back;
 
-  const o = O.owner(id);
+  let o;
+  fetch("/api/owners/" + encodeURIComponent(id), { headers: { Accept: "application/json" } })
+    .then(async (response) => {
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || "Could not load the owner.");
+      o = result.owner;
+      if (!o) throw new Error("Owner not found.");
+      initialize();
+    })
+    .catch((error) => {
+      console.error("Could not load owner for editing:", error);
+      $("owner-form").hidden = true;
+      $("missing").textContent = error.message || "Could not load this owner.";
+      $("missing").hidden = false;
+    });
+
+  function initialize() {
   const f = { name: $("name"), email: $("email"), address: $("address"), phone: $("phone") };
   f.name.value = o.name; f.email.value = o.email; f.address.value = o.address; f.phone.value = o.phone;
 
@@ -38,7 +54,7 @@
 
   ["name", "email", "phone", "cur", "new", "conf"].forEach((k) => $(k).addEventListener("input", () => S.setError(k, "")));
 
-  $("owner-form").addEventListener("submit", (e) => {
+  $("owner-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const v = { name: f.name.value.trim().replace(/\s+/g, " "), email: f.email.value.trim(), address: f.address.value.trim(), phone: f.phone.value.replace(/[\s-]/g, "") };
     const cur = $("cur").value, nw = $("new").value, conf = $("conf").value;
@@ -56,13 +72,26 @@
     const bad = ["name", "email", "phone", "cur", "new", "conf"].find((k) => errors[k]);
     if (bad) { $(bad).focus(); return; }
 
-    const patch = { email: v.email, phone: v.phone, address: v.address, photo };
-    if (v.name !== o.name) Object.assign(patch, { name: v.name, firstName: "", middleName: "", lastName: "" });
-    else if (!O.owner(id).first) patch.name = v.name;
-    O.saveProfile(id, patch, true);
-    window.PawAdmin.log("updated owner " + window.PawAdmin.esc(v.name) + (cur || nw ? " (password changed)" : ""), "update", "owner");
-    // when the backend is ready: PUT /api/owners/:id with patch, and (if cur/nw given) POST /api/owners/:id/password
-    O.setFlash(cur || nw ? "Changes saved. Password updated." : "Changes saved.");
-    location.href = back;
+    const submit = $("owner-form").querySelector('[type="submit"]');
+    if (submit) submit.disabled = true;
+    try {
+      const response = await fetch("/api/owners/" + encodeURIComponent(id), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          name: v.name, email: v.email, phone: v.phone, address: v.address, photo,
+          currentPassword: cur || undefined, newPassword: nw || undefined
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || "Could not save the owner.");
+      O.setFlash(cur || nw ? "Changes saved. Password updated." : "Changes saved.");
+      location.href = back;
+    } catch (error) {
+      console.error("Could not save owner:", error);
+      S.setError("name", error.message || "Could not save the owner.");
+      if (submit) submit.disabled = false;
+    }
   });
+  }
 })();

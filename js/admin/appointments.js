@@ -18,7 +18,7 @@
   const ownerName = (a) => { try { return O.owner(a.owner).name; } catch (_) { return a.owner; } };
   const label = (a) => fmtDate(a.date).replace(/, \d{4}$/, "") + " · " + (a.petName || "Pet") + " · " + ownerName(a);
 
-  function load() { all = P.load(); }
+  async function load() { all = await P.load(); }
   function filtered() {
     const vet = $("f-vet").value, from = $("f-from").value, to = $("f-to").value;
     return all.filter((a) => (tab === "all" || a.status === tab) && (!vet || (vet === "__tba" ? (!a.vet || a.vet === TBA) : a.vet === vet)) && (!from || a.date >= from) && (!to || a.date <= to))
@@ -42,7 +42,7 @@
         <span role="cell" data-label="Services">${esc((a.services || []).map((s) => s.name).join(", ") || "-")}</span>
         <span role="cell" class="ap-total" data-label="Total">${peso(a.total)}</span>
         <span role="cell"><span class="ap-pill ap-${esc(a.status)}">${esc(LABEL[a.status] || a.status)}</span></span>
-        <span role="cell" class="ap-acts"><button type="button" class="u-act" data-act="edit" data-k="${esc(a._key)}|${esc(a.id)}">Edit</button>${open ? `<button type="button" class="u-act u-act-red" data-act="cancel" data-k="${esc(a._key)}|${esc(a.id)}">Cancel</button>` : ""}</span>
+        <span role="cell" class="ap-acts"><button type="button" class="u-act" data-act="edit" data-k="${esc(a.id)}">Edit</button>${open ? `<button type="button" class="u-act u-act-red" data-act="cancel" data-k="${esc(a.id)}">Cancel</button>` : ""}</span>
       </div>`;
     }).join("") : `<p class="u-empty">No appointments match.</p>`;
     $("ap-count").textContent = list.length ? "Showing " + (page * PAGE + 1) + "-" + (page * PAGE + shown.length) + " of " + list.length : "Showing 0 of 0";
@@ -51,15 +51,16 @@
   }
 
   /* filters */
-  $("f-vet").innerHTML = `<option value="">All veterinarians</option><option value="__tba">Unassigned</option>` + P.VETS.map((v) => `<option>${esc(v)}</option>`).join("");
   ["f-vet", "f-from", "f-to"].forEach((id) => $(id).addEventListener("change", () => { page = 0; render(); }));
   document.querySelector(".ap-tabs").addEventListener("click", (e) => { const t = e.target.closest("[data-s]"); if (t) { tab = t.dataset.s; page = 0; render(); } });
   $("ap-prev").addEventListener("click", () => { page--; render(); });
   $("ap-next").addEventListener("click", () => { page++; render(); });
 
-  const find = (k) => { const [key, id] = k.split("|"); return all.find((a) => a._key === key && String(a.id) === id); };
-  const done = (msg) => { load(); render(); S.toast(msg); };
-  const tell = (a, type, title, text) => P.notify(a.owner, type, title, text);   // owner's bell (the server does this when there is a backend)
+  const find = (id) => all.find((a) => String(a.id) === String(id));
+  async function done(msg) {
+    try { await load(); render(); S.toast(msg); }
+    catch (error) { console.error("Could not refresh appointments:", error); S.toast(error.message || "Could not refresh appointments."); }
+  }
 
   /* ----- edit (vet, date, time) ----- */
   const eDlg = $("edit-dialog");
@@ -81,18 +82,17 @@
   }
   ["e-vet", "e-date", "e-time"].forEach((id) => $(id).addEventListener("change", hint));
   $("e-cancel").addEventListener("click", () => eDlg.close());
-  $("e-save").addEventListener("click", () => {
+  $("e-save").addEventListener("click", async () => {
     const patch = { vet: $("e-vet").value, date: $("e-date").value, time: $("e-time").value };
     if (!patch.date) { $("e-hint").textContent = "Choose a date."; $("e-hint").className = "dlg-hint bad"; return; }
     if (patch.date < todayIso()) { $("e-hint").textContent = "Choose today or a later date."; $("e-hint").className = "dlg-hint bad"; return; }
     const was = { ...cur }, moved = patch.date !== was.date || patch.time !== was.time, vetChanged = patch.vet !== (was.vet || TBA);
     if (!moved && !vetChanged) { eDlg.close(); return; }
-    eDlg.close(); P.change(cur, patch, true);
+    eDlg.close();
     const bits = [];
     if (vetChanged) bits.push("reassigned to " + (patch.vet === TBA ? "no vet" : patch.vet));
-    if (moved) { bits.push("moved to " + fmtDate(patch.date) + " " + fmtTime(patch.time)); tell(cur, "appointment", "Appointment rescheduled", (cur.petName || "") + ", " + patch.date + " " + patch.time + "."); }
-    A.log("edited the appointment of " + esc(cur.petName) + " (" + esc(ownerName(cur)) + "): " + esc(bits.join(", ")), "update", "appointment");
-    done("Appointment updated.");
+    try { await P.change(cur, { ...patch, rescheduleReason: "Updated by administrator" }); await done("Appointment updated."); }
+    catch (error) { console.error("Appointment update failed:", error); S.toast(error.message || "Appointment update failed."); }
   });
   $("e-override").addEventListener("click", () => { eDlg.close(); openOverride(cur); });
 
@@ -104,7 +104,7 @@
     $("ov-reason").value = ""; $("ov-err").hidden = true; oDlg.showModal();
   }
   $("ov-cancel").addEventListener("click", () => oDlg.close());
-  $("ov-ok").addEventListener("click", () => {
+  $("ov-ok").addEventListener("click", async () => {
     const status = $("ov-status").value, reason = $("ov-reason").value.trim();
     const err = (m) => { $("ov-err").textContent = m; $("ov-err").hidden = false; };
     if (status === cur.status) return err("Choose a different status.");
@@ -112,23 +112,18 @@
     oDlg.close();
     const patch = { status, overrideReason: reason };
     if (status === "cancelled") patch.declineReason = reason;
-    P.change(cur, patch, true);
-    if (status === "cancelled") tell(cur, "appointment", "Appointment cancelled", (cur.petName || "") + ", " + cur.date + " " + cur.time + ". Reason: " + reason);
-    else if (status === "confirmed") tell(cur, "appointment", "Appointment approved", (cur.petName || "") + ", " + cur.date + " " + cur.time + ".");
-    A.log("overrode the status of " + esc(cur.petName) + " (" + esc(ownerName(cur)) + ") to " + esc(LABEL[status]) + ". Reason: " + esc(reason), "update", "appointment");
-    done("Status changed to " + LABEL[status] + ".");
+    try { await P.change(cur, { status, overrideReason: reason, ...(status === "cancelled" ? { cancellationReason: reason } : {}) }); await done("Status changed to " + LABEL[status] + "."); }
+    catch (error) { console.error("Appointment status update failed:", error); S.toast(error.message || "Appointment status update failed."); }
   });
 
   /* ----- cancel ----- */
   const cDlg = $("cx-dialog");
   function openCancel(a) { cur = a; $("cx-sub").textContent = label(a); $("cx-reason").value = ""; cDlg.showModal(); }
   $("cx-keep").addEventListener("click", () => cDlg.close());
-  $("cx-ok").addEventListener("click", () => {
+  $("cx-ok").addEventListener("click", async () => {
     const reason = $("cx-reason").value.trim(); cDlg.close();
-    P.change(cur, { status: "cancelled", declineReason: reason }, true);
-    tell(cur, "appointment", "Appointment cancelled", (cur.petName || "") + ", " + cur.date + " " + cur.time + "." + (reason ? " Reason: " + reason : ""));
-    A.log("cancelled the appointment of " + esc(cur.petName) + " (" + esc(ownerName(cur)) + ")" + (reason ? ". Reason: " + esc(reason) : ""), "update", "appointment");
-    done("Appointment cancelled.");
+    try { await P.change(cur, { status: "cancelled", cancellationReason: reason }); await done("Appointment cancelled."); }
+    catch (error) { console.error("Appointment cancellation failed:", error); S.toast(error.message || "Appointment cancellation failed."); }
   });
 
   document.addEventListener("click", (e) => {
@@ -140,7 +135,12 @@
   /* links from the Dashboard: appointments.html?status=pending  or  ?vet=unassigned */
   const q = new URLSearchParams(location.search);
   if (q.get("status") && document.querySelector('.ap-tab[data-s="' + q.get("status") + '"]')) tab = q.get("status");
-  if (q.get("vet") === "unassigned") $("f-vet").value = "__tba";
-
-  load(); render();
+  load().then(() => {
+    $("f-vet").innerHTML = `<option value="">All veterinarians</option><option value="__tba">Unassigned</option>` + P.VETS.map((v) => `<option>${esc(v)}</option>`).join("");
+    if (q.get("vet") === "unassigned") $("f-vet").value = "__tba";
+    render();
+  }).catch((error) => {
+    console.error("Could not load clinic appointments:", error);
+    $("ap-rows").innerHTML = '<p class="u-empty">Appointments could not be loaded. Please refresh and try again.</p>';
+  });
 })();

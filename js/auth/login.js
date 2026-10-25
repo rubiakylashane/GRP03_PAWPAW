@@ -1,19 +1,14 @@
-/* js/auth/login.js
-   Handles show/hide password, validation and redirect after login.
-   Set USE_BACKEND = true and edit API when the backend is ready.
-   While false, any username + password works (demo). */
+/* Handles show/hide password, validation and redirect after login. */
 (() => {
-  const USE_BACKEND = false;
-  const API = { login: "/api/auth/login" }; // POST { username, password } -> { token, role, name, mustChangePassword }
+  const API = { login: "/api/auth/login" };
 
   // Where each role lands after login (paths are relative to pages/auth/)
-   const HOME = {
-    owner: "../owner/dashboard.html",   
+  const HOME = {
+    owner: "../owner/dashboard.html",
     staff: "../staff/dashboard.html",
     vet: "../vet/dashboard.html",
     admin: "../admin/dashboard.html"
   };
-  const CHANGE_TEMP_PASSWORD = "change-temp-password.html";
 
   const $ = (id) => document.getElementById(id);
   const form = $("login-form");
@@ -36,7 +31,7 @@
   const error = document.createElement("p");
   error.setAttribute("role", "alert");
   error.hidden = true;
-  error.style.cssText = "color:#c62828;font-size:12px;margin:0 0 12px;";
+  error.className = "error";
   form.insertBefore(error, submit);
 
   function showError(msg) {
@@ -44,23 +39,44 @@
     error.hidden = !msg;
   }
 
+  if (new URLSearchParams(window.location.search).get("session") === "expired") {
+    showError("Your session expired. Please sign in again.");
+  }
+
   /* ----- Login request ----- */
   async function login(user, pass) {
-    if (USE_BACKEND) {
-      const res = await fetch(API.login, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: user, password: pass })
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.message || "Incorrect username or password.");
-      return data;
+    const res = await fetch(API.login, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: user, password: pass })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.message || data.error || "Unable to sign in. Please try again.");
     }
 
-    // DEMO: type "admin", "vet" or "staff" as username to test other roles
-    await new Promise((r) => setTimeout(r, 500));
-    const role = ["admin", "vet", "staff"].includes(user.toLowerCase()) ? user.toLowerCase() : "owner";
-    return { token: "demo-token", role, name: user, mustChangePassword: false };
+    const account = data.user || data;
+    const role = normalizeRole(account.role);
+    if (!role) {
+      throw new Error("This account has an unsupported role. Please contact the clinic.");
+    }
+
+    return {
+      id: account.userId || account.user_id || account.id,
+      ownerId: account.ownerId || account.owner_id,
+      username: account.username || user,
+      name: account.name || account.fullName || account.full_name || account.username || user,
+      role
+    };
+  }
+
+  function normalizeRole(value) {
+    const role = String(value || "").trim().toLowerCase().replace(/[_-]+/g, " ");
+    if (["owner", "pet owner"].includes(role)) return "owner";
+    if (["staff", "clinic staff"].includes(role)) return "staff";
+    if (["vet", "veterinarian"].includes(role)) return "vet";
+    if (["admin", "administrator"].includes(role)) return "admin";
+    return "";
   }
 
   form.addEventListener("submit", async (e) => {
@@ -86,17 +102,14 @@
       const data = await login(user, pass);
 
       try {
-        sessionStorage.setItem("pawpaw_user", JSON.stringify({ name: data.name || user, role: data.role }));
-        if (data.token) sessionStorage.setItem("token", data.token);
-      } catch (_) { /* storage blocked, ignore */ }
-
-      if (data.mustChangePassword) {
-        window.location.href = CHANGE_TEMP_PASSWORD;
-        return;
+        sessionStorage.setItem("pawpaw_user", JSON.stringify(data));
+      } catch (storageError) {
+        throw new Error("Your browser could not save the sign-in session. Enable site storage and try again.");
       }
-      window.location.href = HOME[data.role] || HOME.owner;
+
+      window.location.href = HOME[data.role];
     } catch (err) {
-      showError(err.message);
+      showError(err.message || "Unable to sign in. Please try again.");
       submit.disabled = false;
       submit.textContent = original;
     }

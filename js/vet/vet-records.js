@@ -10,12 +10,22 @@
 (() => {
   const V = window.PawVet, A = V.A, O = V.O, S = window.PawStaff, $ = (id) => document.getElementById(id), esc = O.esc;
   const PREVIEW = 5;
-  let all = A.load(), showAllNo = false, showAllDone = false, cur = null, blocks = [], rx = [], rxEdit = -1;
+  let all = [], records = [], showAllNo = false, showAllDone = false, cur = null, blocks = [], rx = [], rxEdit = -1;
 
   const key = (a) => a.owner + "|" + a.id;
+  const hasRecord = (a) => records.some((record) => String(record.appointmentId) === String(a.id));
   const done = () => all.filter((a) => V.visible(a) && a.status === "completed").sort((a, b) => V.stamp(b).localeCompare(V.stamp(a)));
-  const recOf = (a) => V.readJson("pawpaw_records:" + a.owner, { visits: [], prescriptions: [] }) || { visits: [], prescriptions: [] };
-  const visitOf = (a) => (recOf(a).visits || []).find((r) => r.apptId === a.id) || null;
+  const recOf = (a) => {
+    const record = records.find((item) => String(item.appointmentId) === String(a.id));
+    if (!record) return { visits: [], prescriptions: [] };
+    return {
+      visits: [{ ...record, apptId: String(record.appointmentId), vet: record.veterinarian }],
+      prescriptions: (record.prescriptions || []).map((item) => ({
+        ...item, apptId: String(record.appointmentId), medication: item.medication, dose: item.dose || ""
+      }))
+    };
+  };
+  const visitOf = (a) => recOf(a).visits[0] || null;
 
   /* ----- list ----- */
   const row = (a, btn) => `
@@ -27,7 +37,7 @@
       <span role="cell">${btn}</span>
     </div>`;
   function renderList() {
-    const d = done(), none = d.filter((a) => !V.hasRecord(a)), has = d.filter(V.hasRecord);
+    const d = done(), none = d.filter((a) => !hasRecord(a)), has = d.filter(hasRecord);
     const fill = (rows, el, allBtn, showAll, mk, empty) => {
       const list = showAll ? rows : rows.slice(0, PREVIEW);
       $(el).innerHTML = list.length ? list.map(mk).join("") : `<p class="o-empty">${empty}</p>`;
@@ -42,15 +52,16 @@
   const isVacc = (n) => /vaccin/i.test(n || "");
   const plusYear = (d) => { const x = new Date(d + "T00:00:00"); x.setFullYear(x.getFullYear() + 1); return V.iso(x); };
 
-  function loadState(a) {
+  async function loadState(a) {
     const rec = recOf(a), visit = visitOf(a);
     const date = visit ? visit.date : (a.date <= V.today() ? a.date : V.today());
     $("ve-date").value = date; $("ve-date").max = V.today();
     $("ve-diag").value = visit ? visit.diagnosis : ""; $("ve-treat").value = visit ? visit.treatment || "" : ""; $("ve-notes").value = visit ? visit.notes || "" : "";
     rx = (rec.prescriptions || []).filter((r) => r.apptId === a.id).map((r) => ({ medication: r.medication, dose: r.dose || "", quantity: r.quantity || "", instructions: r.instructions || "" }));
     if (visit) {
-      const vx = V.readJson("pawpaw_vaccinations:" + a.owner, []).filter((r) => r.apptId === a.id);
-      blocks = vx.map((r) => ({ type: "Vaccination", vaccine: r.vaccine, given: r.dateAdministered, due: r.nextDue || "" }))
+      const vx = await request(`/api/vaccinations/pet/${encodeURIComponent(a.petId)}`);
+      blocks = vx.filter((record) => String(record.appointmentId) === String(a.id))
+        .map((r) => ({ type: "Vaccination", vaccine: r.vaccine, given: r.dateAdministered, due: r.nextDue || "" }))
         .concat((visit.services || []).map((s) => ({ type: s.type, name: s.name || "", notes: s.notes || "" })));
     } else {
       blocks = (a.services || []).map((s) => isVacc(s.name)
@@ -59,8 +70,10 @@
     }
     rxEdit = -1; clearRx(); err("");
   }
-  function openEditor(a) {
-    cur = a; loadState(a);
+  async function openEditor(a) {
+    cur = a;
+    try { await loadState(a); }
+    catch (error) { console.error("Could not load visit details:", error); S.toast(error.message || "Could not load visit details."); return; }
     $("ve-bar").innerHTML = `<span>Pet: <strong>${esc(V.petName(a))}${petInfo(a)}</strong></span><span>Owner: <strong>${esc(V.ownerName(a))}</strong></span><span>Visit: <strong>${esc(V.fmtShort(a.date))} &middot; ${esc(V.services(a))}</strong></span><span>Status: <strong>${esc(V.label(a))}</strong></span>`;
     $("ve-svc").innerHTML = ["Vaccination"].concat(A.SERVICES.filter((s) => !isVacc(s))).map((s) => `<option>${esc(s)}</option>`).join("");
     drawBlocks(); drawRx();
@@ -106,7 +119,7 @@
     rxEdit = -1; clearRx(); err(""); drawRx();
   }
 
-  function save() {
+  async function save() {
     const a = cur, diag = $("ve-diag").value.trim(), date = $("ve-date").value;
     if (!diag) return err("Enter the diagnosis.");
     if (!date) return err("Pick the record date.");
@@ -117,22 +130,34 @@
       if (!b.given || b.given > V.today()) return err("Check the date administered of " + b.vaccine + ".");
       if (!b.due || b.due <= b.given) return err("The next due date of " + b.vaccine + " must be after the date administered.");
     }
-    const rk = "pawpaw_records:" + a.owner, rec = recOf(a), old = visitOf(a), id = old ? old.id : "r-" + Date.now().toString(36);
-    const base = { apptId: a.id, petId: a.petId || "", pet: V.petName(a) };
-    rec.visits = (rec.visits || []).filter((r) => r.apptId !== a.id);
-    rec.visits.push({ id, ...base, date, diagnosis: diag, treatment: $("ve-treat").value.trim(), notes: $("ve-notes").value.trim(), vet: a.vet,
-      services: blocks.filter((b) => b.type !== "Vaccination").map((b) => ({ type: b.type, name: b.name.trim(), notes: b.notes.trim() })) });
-    rec.prescriptions = (rec.prescriptions || []).filter((r) => r.apptId !== a.id);
-    rx.forEach((r, i) => rec.prescriptions.push({ id: id + "-rx" + i, ...base, date, medication: r.medication, dose: r.dose, instructions: r.instructions, quantity: r.quantity }));
-    const vk = "pawpaw_vaccinations:" + a.owner, vx = V.readJson(vk, []).filter((r) => r.apptId !== a.id);
-    blocks.filter((b) => b.type === "Vaccination").forEach((b, i) => vx.push({ id: "vx-" + Date.now().toString(36) + i, apptId: a.id, petId: a.petId || "", vaccine: b.vaccine.trim(), pet: V.petName(a), dateAdministered: b.given, nextDue: b.due, administeredBy: a.vet, notes: "" }));
-    try { localStorage.setItem(rk, JSON.stringify(rec)); localStorage.setItem(vk, JSON.stringify(vx)); } catch (_) { return err("Could not save. Storage is blocked."); }
-    window.PawOwners.audit(old ? "update" : "create", "medical_record", (old ? "Updated" : "Added") + " the medical record of " + V.petName(a) + ".");
-    if (rx.length) window.PawOwners.audit(old ? "update" : "create", "prescription", (old ? "Updated" : "Added") + " " + rx.length + " prescription" + (rx.length === 1 ? "" : "s") + " for " + V.petName(a) + ": " + rx.map((r) => r.medication).join(", ") + ".");
-    A.notify(a.owner, "record", old ? "Medical record updated" : "Medical record added", V.petName(a) + "'s medical record is ready. See Medical Records for the details.");
-    const given = blocks.filter((b) => b.type === "Vaccination");
-    if (given.length) A.notify(a.owner, "record", "Vaccination recorded", given.map((b) => b.vaccine.trim()).join(", ") + " given to " + V.petName(a) + ". See Vaccination History for the next due date.");
-    closeEditor(); S.toast("Record saved for " + V.petName(a) + ".");
+    const old = visitOf(a);
+    try {
+      await request(`/api/medical-records/appointments/${encodeURIComponent(a.id)}/complete`, {
+        method: "POST",
+        body: JSON.stringify({
+          diagnosis: diag,
+          recordDate: date,
+          treatment: $("ve-treat").value.trim(),
+          notes: $("ve-notes").value.trim(),
+          services: blocks.filter((block) => block.type !== "Vaccination").map((block) => ({
+            type: block.type, name: block.name.trim(), notes: block.notes.trim()
+          })),
+          prescriptions: rx.map((item) => ({
+            medication: item.medication, dose: item.dose, instructions: item.instructions, quantity: item.quantity || 1
+          })),
+          vaccinations: blocks.filter((block) => block.type === "Vaccination").map((block) => ({
+            name: block.vaccine.trim(), dateAdministered: block.given, nextDue: block.due
+          }))
+        })
+      });
+      records = await request("/api/medical-records/all");
+      const refreshed = await A.load();
+      all = refreshed;
+      closeEditor(); S.toast((old ? "Record updated for " : "Record saved for ") + V.petName(a) + ".");
+    } catch (error) {
+      console.error("Could not save the medical record:", error);
+      err(error.message || "Could not save the medical record.");
+    }
   }
 
   /* ----- events ----- */
@@ -153,7 +178,21 @@
   $("ve-save").addEventListener("click", save);
   $("ve-cancel").addEventListener("click", closeEditor);
 
-  renderList();
-  const want = new URLSearchParams(location.search).get("appt");
-  if (want) { const a = all.find((x) => key(x) === want && V.visible(x)); if (a) openEditor(a); }
+  async function request(url, options) {
+    const response = await fetch(url, {
+      headers: { Accept: "application/json", ...(options && options.body ? { "Content-Type": "application/json" } : {}) },
+      ...options
+    });
+    const body = response.status === 204 ? null : await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body && body.error || `Clinic request failed (${response.status}).`);
+    return body;
+  }
+  Promise.all([A.load(), request("/api/medical-records/all")]).then(([appointments, clinicalRecords]) => {
+    all = appointments; records = clinicalRecords; renderList();
+    const want = new URLSearchParams(location.search).get("appt");
+    if (want) { const appointment = all.find((item) => key(item) === want && V.visible(item)); if (appointment) openEditor(appointment); }
+  }).catch((error) => {
+    console.error("Could not load veterinarian records:", error);
+    $("nr-rows").innerHTML = '<p class="o-empty">Medical records could not be loaded. Please refresh and try again.</p>';
+  });
 })();

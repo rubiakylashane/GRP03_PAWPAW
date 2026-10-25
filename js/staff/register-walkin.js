@@ -9,7 +9,7 @@
   };
   Object.keys(f).forEach((k) => f[k].addEventListener("input", () => err(k, "")));
 
-  $("walkin-form").addEventListener("submit", (e) => {
+  $("walkin-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const v = {
       first: f.first.value.trim().replace(/\s+/g, " "), middle: f.middle.value.trim().replace(/\s+/g, " "),
@@ -26,9 +26,19 @@
     const bad = Object.keys(errors)[0];
     if (bad) { f[bad].focus(); return; }
 
-    // when the backend is ready: POST /api/owners with v, then use the id it returns
-    const id = O.createWalkin(v);
-    O.setFlash("Walk-in owner registered.");
-    location.href = "owner-details.html?id=" + encodeURIComponent(id);
+    try {
+      const response = await fetch("/api/owners/walk-in", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ firstName: v.first, middleName: v.middle, lastName: v.last, phone: v.phone, email: v.email })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || "Could not register the walk-in owner.");
+      O.setFlash("Walk-in owner registered.");
+      location.href = "owner-details.html?id=" + encodeURIComponent(result.owner.id);
+    } catch (error) {
+      console.error("Could not register walk-in owner:", error);
+      err("email", error.message || "Could not register the walk-in owner.");
+    }
   });
 })();

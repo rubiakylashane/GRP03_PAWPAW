@@ -5,13 +5,29 @@
   const toast = (m) => { try { if (S && S.toast) S.toast(m); } catch (_) { /* ignore */ } };
   const fail = (msg) => { const box = $("u-rows"); if (box) box.innerHTML = `<p class="u-empty">Could not load the users: ${String(msg).replace(/[<>&]/g, "")}. Open the browser console (F12) for details.</p>`; };
   if (!A) { fail("js/admin/admin-store.js did not load"); return; }
-  /* skip broken saved entries (a null or a record without a username) so one bad record cannot stop the whole page */
-  const load = () => { try { return A.list().filter((u) => u && typeof u.username === "string"); } catch (e) { console.error(e); loadFailed = e.message; return []; } };
-  let all = load(), filter = "all", current = null, loadFailed = "";
+  let all = [], filter = "all", current = null, loadFailed = "";
+  const request = async (url, options) => {
+    const response = await fetch(url, {
+      headers: { Accept: "application/json", ...(options && options.body ? { "Content-Type": "application/json" } : {}) },
+      ...options
+    });
+    const result = response.status === 204 ? null : await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result && result.error || `Clinic request failed (${response.status}).`);
+    return result;
+  };
+  function signedInUsername() {
+    for (const store of ["sessionStorage", "localStorage"]) {
+      try {
+        const user = JSON.parse(window[store].getItem("pawpaw_user") || "null");
+        if (user && user.username) return String(user.username).toLowerCase();
+      } catch (_) { /* ignore */ }
+    }
+    return "";
+  }
 
   const btn = (act, cls, label, id) => `<button type="button" class="u-act ${cls}" data-act="${act}" data-id="${A.esc(id)}">${label}</button>`;
   function actions(u) {
-    const me = A.me().toLowerCase(), self = u.username.toLowerCase() === me;
+    const self = u.username.toLowerCase() === signedInUsername();
     const reset = btn("reset", "", "Reset password", u.id);
     const toggle = u.status === "active" ? btn("deactivate", "u-act-red", "Deactivate", u.id) : btn("activate", "u-act-green", "Activate", u.id);
     if (u.role === "admin") return reset;                                   // admins: only reset password
@@ -47,16 +63,41 @@
   });
 
   $("role-cancel").addEventListener("click", () => roleDlg.close());
-  $("role-save").addEventListener("click", () => { const r = $("role-select").value; roleDlg.close(); if (r !== current.role) { A.setRole(current, r); render(); toast("Role changed to " + A.ROLES[r] + "."); } });
+  $("role-save").addEventListener("click", async () => {
+    const role = $("role-select").value;
+    if (role === current.role) { roleDlg.close(); return; }
+    try {
+      await request(`/api/admin/users/${encodeURIComponent(current.id)}`, { method: "PATCH", body: JSON.stringify({ role }) });
+      current.role = role; roleDlg.close(); render(); toast("Role changed to " + A.ROLES[role] + ".");
+    } catch (error) { console.error("Could not change account role:", error); $("role-sub").textContent = error.message; }
+  });
   $("pw-cancel").addEventListener("click", () => pwDlg.close());
-  $("pw-save").addEventListener("click", () => {
-    const v = $("pw-new").value;
-    if (v.length < 8) { $("pw-err").textContent = "Use at least 8 characters."; $("pw-err").hidden = false; return; }
-    pwDlg.close(); A.resetPassword(current); toast("Password reset. " + current.username + " must change it at the next login.");   // the password itself is sent to the backend, never saved here
+  $("pw-save").addEventListener("click", async () => {
+    const temporaryPassword = $("pw-new").value;
+    if (temporaryPassword.length < 8) { $("pw-err").textContent = "Use at least 8 characters."; $("pw-err").hidden = false; return; }
+    try {
+      await request(`/api/admin/users/${encodeURIComponent(current.id)}/reset-password`, {
+        method: "POST", body: JSON.stringify({ temporaryPassword })
+      });
+      pwDlg.close(); toast("Password reset for " + current.username + ".");
+    } catch (error) { console.error("Could not reset account password:", error); $("pw-err").textContent = error.message; $("pw-err").hidden = false; }
   });
   $("st-cancel").addEventListener("click", () => stDlg.close());
-  $("st-ok").addEventListener("click", () => { const to = $("st-ok").dataset.to; stDlg.close(); A.setStatus(current, to); render(); toast(current.username + (to === "active" ? " activated." : " deactivated.")); });
+  $("st-ok").addEventListener("click", async () => {
+    const status = $("st-ok").dataset.to;
+    try {
+      await request(`/api/admin/users/${encodeURIComponent(current.id)}`, { method: "PATCH", body: JSON.stringify({ status }) });
+      current.status = status; stDlg.close(); render(); toast(current.username + (status === "active" ? " activated." : " deactivated."));
+    } catch (error) { console.error("Could not update account status:", error); $("st-sub").textContent = error.message; }
+  });
 
-  render();
-  toast(A.takeFlash());
+  request("/api/admin/users").then((users) => {
+    all = users.filter((user) => user && typeof user.username === "string");
+    render();
+    toast(A.takeFlash());
+  }).catch((error) => {
+    console.error("Could not load user accounts:", error);
+    loadFailed = error.message;
+    render();
+  });
 })();

@@ -1,34 +1,14 @@
-/* js/staff/vaccine-reminders.js - staff Vaccination Reminder list
-   Reads the vaccination records saved per owner ("pawpaw_vaccinations:<owner>", each with a nextDue date).
-   Replace load() with fetch("/api/staff/vaccination-reminders") when the backend is ready. */
+/* js/staff/vaccine-reminders.js - staff Vaccination Reminder list backed by clinic records. */
 (() => {
   const O = window.PawOwners, S = window.PawStaff, $ = (id) => document.getElementById(id), esc = O.esc;
-  /* Backend: set USE_BACKEND = true. "Send Reminder" then calls
-       POST /api/vaccination-reminders/:id/notify   -> the server sends the SMS / email to the owner
-     and replies { sentAt: "ISO date-time" }. In demo mode it only records the time in localStorage. */
-  const USE_BACKEND = false;
-  const API_NOTIFY = (id) => "/api/vaccination-reminders/" + encodeURIComponent(id) + "/notify";
   const SOON = 30;                                  // days: orange when due within this many days
-  const KEY = "pawpaw_vaccinations:";
 
-  function load() {
-    const out = [];
-    try {
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (!k || k.indexOf(KEY) !== 0) continue;
-        const owner = k.slice(KEY.length);
-        (JSON.parse(localStorage.getItem(k) || "[]") || []).forEach((r, i) => { if (r && r.nextDue) out.push({ ...r, id: r.id || owner + "-" + i, owner }); });
-      }
-    } catch (_) { /* storage blocked */ }
-    return out;
-  }
-  const all = load();
+  let all = [];
 
   const midnight = (iso) => new Date(iso + "T00:00:00");
   const now = new Date(); now.setHours(0, 0, 0, 0);
   const daysTo = (iso) => Math.round((midnight(iso) - now) / 86400000);
-  const ownerOf = (r) => { try { return O.owner(r.owner); } catch (_) { return { short: r.owner, phone: "" }; } };
+  const ownerOf = (r) => ({ short: r.owner, name: r.owner, phone: r.phone || "" });
   const fmtDate = (iso) => midnight(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   const plural = (n) => n + (n === 1 ? " day" : " days");
 
@@ -49,7 +29,7 @@
   function row(r) {
     const o = ownerOf(r), st = status(r);
     const phone = o.phone || "";
-    const q = "owner=" + encodeURIComponent(r.owner) + "&petid=" + encodeURIComponent(r.petId || "") + "&pet=" + encodeURIComponent(r.pet || "") + "&vaccine=" + encodeURIComponent(r.vaccine || "");
+    const q = "owner=" + encodeURIComponent(r.ownerId) + "&petid=" + encodeURIComponent(r.petId || "") + "&pet=" + encodeURIComponent(r.pet || "") + "&vaccine=" + encodeURIComponent(r.vaccine || "");
     return `
       <div class="orow vrow" role="row">
         <span role="cell">${esc(r.vaccine || "-")}</span>
@@ -77,25 +57,17 @@
     btn.disabled = true;
     let sentAt = new Date().toISOString();
     try {
-      if (USE_BACKEND) {
-        const res = await fetch(API_NOTIFY(r.id), { method: "POST", headers: { Accept: "application/json" } });
-        if (!res.ok) throw new Error("Request failed");
-        sentAt = (await res.json()).sentAt || sentAt;
-      } else {
-        const key = KEY + r.owner, list = JSON.parse(localStorage.getItem(key) || "[]");
-        const i = list.findIndex((x, n) => (x.id || r.owner + "-" + n) === r.id);
-        if (i >= 0) { list[i].lastRemindedAt = sentAt; localStorage.setItem(key, JSON.stringify(list)); }
-      }
+      const response = await fetch("/api/vaccinations/reminders/" + encodeURIComponent(r.id) + "/notify", {
+        method: "POST", headers: { Accept: "application/json" }
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || "Could not send the reminder.");
+      sentAt = result.lastRemindedAt || sentAt;
       r.lastRemindedAt = sentAt; render();
-      try {
-        const nk = "pawpaw_notifications:" + r.owner, nl = JSON.parse(localStorage.getItem(nk) || "[]");
-        nl.push({ id: "n-" + Date.now().toString(36), type: "reminder", title: "Vaccine reminder: " + (r.pet || ""),
-          text: (r.vaccine || "Vaccine") + " is due on " + fmtDate(r.nextDue) + ". Book an appointment to keep your pet protected.", createdAt: sentAt, readAt: null });
-        localStorage.setItem(nk, JSON.stringify(nl.slice(-50)));
-      } catch (_) { /* ignore */ }
       S.toast("Reminder sent to " + (ownerOf(r).short || r.owner) + ".");
     } catch (err) {
-      btn.disabled = false; S.toast("Could not send the reminder. Try again.");
+      console.error("Could not send vaccination reminder:", err);
+      btn.disabled = false; S.toast(err.message || "Could not send the reminder. Try again.");
     }
   }
   document.addEventListener("click", (e) => {
@@ -104,5 +76,14 @@
   });
   $("search").addEventListener("input", render);
   $("sort").addEventListener("change", render);
-  render();
+  fetch("/api/vaccinations/reminders", { headers: { Accept: "application/json" } })
+    .then(async (response) => {
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || "Could not load vaccination reminders.");
+      all = result; render();
+    })
+    .catch((error) => {
+      console.error("Could not load vaccination reminders:", error);
+      $("vx-rows").innerHTML = '<p class="o-empty">Vaccination reminders could not be loaded. Please refresh and try again.</p>';
+    });
 })();

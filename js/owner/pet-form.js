@@ -2,7 +2,7 @@
    Add a new pet / Edit pet.
    The page decides which one with <body data-mode="add"> or "edit".
 */
-(() => {
+(async () => {
   const P = window.PawPets || {
     get: () => null,
     add: () => {},
@@ -136,17 +136,20 @@
   const todayIso = toIso(new Date());
 
   /*
-    Birthday input format: MM/DD/YYYY
-    Example: 10182020 -> 10/18/2020
+    Birthday input format: MM/DD/YYYY, or N/A/Unknown when not known.
   */
   if (f.dob) {
     f.dob.type = "text";
-    f.dob.placeholder = "MM/DD/YYYY";
+    f.dob.placeholder = "MM/DD/YYYY, or N/A";
     f.dob.maxLength = 10;
-    f.dob.inputMode = "numeric";
+    f.dob.inputMode = "text";
     f.dob.autocomplete = "bday";
 
     f.dob.addEventListener("input", () => {
+      if (/^[a-z/]/i.test(f.dob.value.trim())) {
+        setError("dob", "");
+        return;
+      }
       const digits = f.dob.value
         .replace(/\D/g, "")
         .slice(0, 8);
@@ -344,8 +347,14 @@
   /* ----- Edit mode: load existing pet ----- */
   if (mode === "edit") {
     editingId = new URLSearchParams(location.search).get("id");
-
-    const pet = editingId && P.get(editingId);
+    let pet;
+    try {
+      pet = editingId && await P.get(editingId);
+    } catch (error) {
+      console.error("Could not load pet for editing:", error);
+      setError("name", "Pet details could not be loaded. Please refresh and try again.");
+      return;
+    }
 
     if (!pet) {
       location.replace("my-pets.html");
@@ -374,6 +383,8 @@
       } else {
         f.dob.value = pet.dob;
       }
+    } else if (f.dob) {
+      f.dob.value = "N/A";
     }
 
     if (f.allergies) {
@@ -388,7 +399,7 @@
   }
 
   /* ----- Submit form ----- */
-  form.addEventListener("submit", (event) => {
+  form.addEventListener("submit", async (event) => {
     event.preventDefault();
 
     const name = f.name ? f.name.value.trim() : "";
@@ -400,7 +411,7 @@
       species: f.species ? f.species.value : "",
       breed: f.breed ? f.breed.value : "",
       sex: f.sex ? f.sex.value : "",
-      dob: parsedDob || "",
+      dob: /^n\/?a$/i.test(rawDob) || /^unknown$/i.test(rawDob) ? null : parsedDob,
       allergies: f.allergies ? f.allergies.value.trim() : "",
       notes: f.notes ? f.notes.value.trim() : "",
       photo: photoData
@@ -426,13 +437,11 @@
       errors.sex = "Choose a sex.";
     }
 
-    if (!rawDob) {
-      errors.dob = "Enter the date of birth.";
-    } else if (!values.dob) {
+    if (rawDob && !values.dob && !/^n\/?a$/i.test(rawDob) && !/^unknown$/i.test(rawDob)) {
       errors.dob = "Enter a valid date in MM/DD/YYYY format.";
-    } else if (values.dob > todayIso) {
+    } else if (values.dob && values.dob > todayIso) {
       errors.dob = "Date of birth can't be in the future.";
-    } else if (values.dob < "1990-01-01") {
+    } else if (values.dob && values.dob < "1990-01-01") {
       errors.dob = "Please check the year.";
     }
 
@@ -447,14 +456,21 @@
       return;
     }
 
-    if (mode === "edit") {
-      P.update(editingId, values);
-      P.setFlash("Changes saved.");
-    } else {
-      P.add(values);
-      P.setFlash("Pet added.");
+    const submit = form.querySelector('[type="submit"]');
+    if (submit) submit.disabled = true;
+    try {
+      if (mode === "edit") {
+        await P.update(editingId, values);
+        P.setFlash("Changes saved.");
+      } else {
+        await P.add(values);
+        P.setFlash("Pet added.");
+      }
+      location.href = document.body.dataset.return || "my-pets.html";
+    } catch (error) {
+      console.error("Could not save pet:", error);
+      setError("name", "Your pet could not be saved. Please check your connection and try again.");
+      if (submit) submit.disabled = false;
     }
-
-    location.href = "my-pets.html";
   });
 })();

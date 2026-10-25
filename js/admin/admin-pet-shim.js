@@ -13,12 +13,38 @@
   document.getElementById("go-back").href = back;
   document.getElementById("cancel").href = back;
 
-  if (!owner || !O.exists(owner)) { location.replace("owners-pets.html"); return; }
+  async function request(url, options) {
+    const response = await fetch(url, options);
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || "Could not save the pet.");
+    return result;
+  }
 
-    window.PawPets = {
-    get: (id) => O.getPet(owner, id),
-    add: (pet) => O.addPet(owner, pet),          // owners-store.js writes the audit line
-    update: (id, patch) => O.updatePet(owner, id, patch),
+  window.PawPets = {
+    get: async (id) => {
+      const pets = await request("/api/pets/owner/" + encodeURIComponent(owner), { headers: { Accept: "application/json" } });
+      return pets.find((pet) => String(pet.id) === String(id)) || null;
+    },
+    add: async (pet) => (await request("/api/pets", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({
+        owner_id: owner, name: pet.name, species: pet.species, breed: pet.breed,
+        gender: pet.sex, date_of_birth: pet.dob, allergies: pet.allergies,
+        notes: pet.notes, photo: pet.photo
+      })
+    })).pet,
+    update: async (id, pet) => (await request("/api/pets/" + encodeURIComponent(id), {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({
+        name: pet.name, species: pet.species, breed: pet.breed,
+        gender: pet.sex, date_of_birth: pet.dob, allergies: pet.allergies,
+        notes: pet.notes, photo: pet.photo
+      })
+    })).pet,
     setFlash: (m) => O.setFlash(m)
   };
+
+  if (!owner) location.replace("owners-pets.html");
 })();

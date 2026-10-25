@@ -1,15 +1,12 @@
 /* js/owner/book-appointment.js
    Book Appointment: pick a pet, vet, date, time and services; the summary updates live.
    Needs pets-store.js and appts-store.js loaded first. */
-(() => {
+(async () => {
   const { esc, load: loadPets } = window.PawPets;
   const Appts = window.PawAppts;
   const $ = (id) => document.getElementById(id);
 
-  /* ================= EDIT THESE ================= */
-  // Veterinarians shown in the dropdown (leave "To be assigned" when none is picked)
-  const VETS = (() => { try { const v = JSON.parse(localStorage.getItem("pawpaw_vets") || "null"); if (Array.isArray(v) && v.length) return v.map((x) => x.name); } catch (_) { /* default */ } return ["Dr. Anajoy N. Abila", "Dr. Sean Kurvie G. Buerano", "Dr. Roxanne N. Regulacion", "Dr. Jenmarc M. Ronquillo", "Dr. Kyla Shane T. Rubia"]; })();   // the admin Veterinarians page saves the list in "pawpaw_vets"
-
+  /* ================= CLINIC SETTINGS ================= */
   // Clinic hours: first slot, closing time (no slot starts at closing time), minutes per slot
   const HOURS = { open: "09:00", close: "17:00", step: 30 };
   const MIN_LEAD_MINUTES = 60;   // can't book a slot that starts sooner than this from now
@@ -17,7 +14,7 @@
 
   // Services and prices come from services-data.js (the same list the Services page shows).
   // A service with "options" opens a list, each option has a 1x/2x/3x selector.
-  const SERVICES = window.PawServices || [];
+  let SERVICES;
   const DOSES = [1, 2, 3];
   /* ============================================== */
 
@@ -29,7 +26,25 @@
     pet: $("pet"), vet: $("vet"), date: $("date"), time: $("time"), reason: $("reason"),
     picker: $("date-picker"), services: $("services")
   };
-  const pets = loadPets();
+  let pets, veterinarians;
+  try {
+    [pets, SERVICES, veterinarians] = await Promise.all([
+      loadPets(),
+      window.PawServicesReady,
+      fetch("/api/veterinarians", { headers: { Accept: "application/json" } }).then(async (response) => {
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || "Could not load veterinarians.");
+        return result;
+      })
+    ]);
+  } catch (error) {
+    console.error("Could not load booking data:", error);
+    f.pet.disabled = true;
+    f.pet.options[0].textContent = "Pets unavailable";
+    $("no-pets").hidden = false;
+    $("no-pets").textContent = error.message || "Could not load booking data. Please refresh and try again.";
+    return;
+  }
 
   function setError(key, msg) {
     const el = $("err-" + key);
@@ -41,13 +56,13 @@
   if (pets.length) {
     pets.forEach((p) => f.pet.add(new Option(p.name + " (" + p.species + ")", p.id)));
     const wanted = new URLSearchParams(location.search).get("pet");
-    if (wanted && pets.some((p) => p.id === wanted)) f.pet.value = wanted;
+    if (wanted && pets.some((p) => String(p.id) === wanted)) f.pet.value = wanted;
   } else {
     f.pet.disabled = true;
     f.pet.options[0].textContent = "No pets yet";
     $("no-pets").hidden = false;
   }
-  VETS.forEach((v) => f.vet.add(new Option(v, v)));
+  veterinarians.forEach((vet) => f.vet.add(new Option(vet.name, vet.name)));
 
   /* ---------- Date: type MM/DD/YYYY or use the calendar ---------- */
   const todayIso = toIso(new Date());
@@ -188,10 +203,10 @@
       if (s.options) {
         s.options.forEach((o) => {
           const qty = +row.querySelector(`select[data-opt="${o.id}"]`).value || 0;
-          if (qty > 0) lines.push({ id: s.id + ":" + o.id, name: s.name + " (" + o.name + ")", qty, unit: o.price, price: o.price * qty });
+          if (qty > 0) lines.push({ id: s.id + ":" + o.id, serviceId: o.serviceId, name: s.name + " (" + o.name + ")", qty, unit: o.price, price: o.price * qty });
         });
       } else {
-        lines.push({ id: s.id, name: s.name, qty: 1, unit: s.price, price: s.price });
+        lines.push({ id: s.id, serviceId: s.id, name: s.name, qty: 1, unit: s.price, price: s.price });
       }
     });
     return lines;
@@ -199,7 +214,7 @@
 
   /* ---------- Summary ---------- */
   function renderSummary() {
-    const pet = pets.find((p) => p.id === f.pet.value);
+    const pet = pets.find((p) => String(p.id) === f.pet.value);
     $("sum-pet").textContent = pet ? pet.name : "—";
     $("sum-vet").textContent = f.vet.value || "To be assigned";
 
@@ -230,8 +245,8 @@
   }
   renderSummary();
 
-  /* ---------- Submit ---------- */
-  $("appt-form").addEventListener("submit", (e) => {
+/* ---------- Submit ---------- */
+  $("appt-form").addEventListener("submit", async (e) => { // <-- 1. Make this event listener async
     e.preventDefault();
     const iso = parseDate(f.date.value);
     const lines = selectedLines();
@@ -250,22 +265,49 @@
     const first = ["pet", "date", "time", "services"].find((k) => errors[k]);
     if (first) { (f[first] || f.services).scrollIntoView({ block: "center", behavior: "smooth" }); if (f[first] && first !== "services") f[first].focus(); return; }
 
-    const pet = pets.find((p) => p.id === f.pet.value);
+    const pet = pets.find((p) => String(p.id) === f.pet.value);
+    if (!pet) {
+      setError("pet", "Choose a pet before requesting an appointment.");
+      f.pet.focus();
+      return;
+    }
     const total = lines.reduce((t, l) => t + l.price, 0);
-    const saved = Appts.add({
-      petId: pet.id, petName: pet.name, vet: f.vet.value || "To be assigned",
-      date: iso, time: f.time.value, reason: f.reason.value.trim(), services: lines, total
-    });
+    const submitButton = $('appt-form').querySelector('[type="submit"]');
 
-    // confirmation panel
-    $("done-text").textContent =
-      pet.name + " · " + longDate(saved.date) + ", " + label12(toMin(saved.time)) + " · Estimated " + peso(total);
-    // keep the form and summary; show the confirmation under the summary
-    $("done").hidden = false;
-    document.querySelectorAll(".ap-sum-actions").forEach((el) => { el.hidden = true; });
-    $("appt-form").querySelectorAll("input, select, textarea, button").forEach((el) => { el.disabled = true; });
-    $("done").scrollIntoView({ block: "nearest", behavior: "smooth" });
+    try {
+      if (submitButton) submitButton.disabled = true;
+      const response = await fetch('/api/appointments', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({
+          pet_id: pet.id,
+          veterinarian_name: f.vet.value || null,
+          appointment_date: iso,
+          appointment_time: f.time.value,
+          reason: f.reason.value.trim(),
+          services: lines.map((line) => ({ service_id: line.serviceId, quantity: line.qty }))
+        })
+      });
+
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(result.message || result.error || 'Failed to book appointment.');
+      }
+
+      // confirmation panel UI logic
+      $("done-text").textContent =
+        pet.name + " · " + longDate(iso) + ", " + label12(toMin(f.time.value)) + " · Estimated " + peso(total);
+
+      $("done").hidden = false;
+      document.querySelectorAll(".ap-sum-actions").forEach((el) => { el.hidden = true; });
+      $("appt-form").querySelectorAll("input, select, textarea, button").forEach((el) => { el.disabled = true; });
+      $("done").scrollIntoView({ block: "nearest", behavior: "smooth" });
+
+    } catch (err) {
+      console.error("Booking error:", err);
+      alert(err.message || "Something went wrong while booking your appointment. Please try again.");
+      if (submitButton) submitButton.disabled = false;
+    }
   });
-
-  $("book-another").addEventListener("click", () => { location.href = "book-appointment.html"; });
 })();

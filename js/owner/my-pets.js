@@ -32,8 +32,8 @@
       </article>`;
   }
 
-  function render() {
-    const pets = load();
+  async function render() {
+    const pets = await load();
     grid.innerHTML = pets.length
       ? pets.map(card).join("")
       : `<div class="pets-empty">
@@ -55,8 +55,8 @@
     document.title = "My Pets | Pawpaw Clinic";
   }
 
-  function showDetails(id) {
-    const p = get(id);
+  async function showDetails(id) {
+    const p = await get(id);
     grid.hidden = true;
     head.add.hidden = true;
     head.back.hidden = false;
@@ -77,16 +77,28 @@
     window.scrollTo(0, 0);
   }
 
-  function route() {
+  async function route() {
     const m = /^#view=(.+)$/.exec(location.hash);
-    if (m) showDetails(decodeURIComponent(m[1])); else showList();
+    if (m) {
+      await showDetails(decodeURIComponent(m[1]));
+    } else {
+      showList();
+      await render();
+    }
+  }
+  function handleRoute() {
+    route().catch((error) => {
+      console.error("Could not load pet data:", error);
+      showList();
+      grid.innerHTML = '<div class="pets-empty"><h2>Pets could not be loaded</h2><p>Please refresh the page and try again.</p></div>';
+    });
   }
   head.back.addEventListener("click", (e) => {
     e.preventDefault();
     history.pushState("", document.title, location.pathname + location.search); // clears #view=...
-    route();
+    handleRoute();
   });
-  window.addEventListener("hashchange", route);
+  window.addEventListener("hashchange", handleRoute);
 
   /* ----- Message from add / edit ----- */
   function showToast(msg) {
@@ -95,8 +107,7 @@
     setTimeout(() => toast.classList.remove("show"), 2800);
   }
 
-  render();
-  route();
+  handleRoute();
   const flash = takeFlash();
   if (flash) showToast(flash);
 })();

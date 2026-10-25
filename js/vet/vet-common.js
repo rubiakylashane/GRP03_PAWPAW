@@ -32,9 +32,9 @@ window.PawVet = (() => {
   const services = (a) => (a.services || []).map((s) => s.name).join(", ") || a.service || "-";
   const stamp = (a) => (a.date || "") + " " + (a.time || "");
   const recQuery = (a) => "appt=" + encodeURIComponent(a.owner + "|" + a.id);   // opens the record editor of this appointment
-  const patientQuery = (a) => "owner=" + encodeURIComponent(a.owner) + "&petid=" + encodeURIComponent(a.petId || "") + "&pet=" + encodeURIComponent(petName(a));
+  const patientQuery = (a) => "owner=" + encodeURIComponent(a.ownerId || "") + "&petid=" + encodeURIComponent(a.petId || "") + "&pet=" + encodeURIComponent(petName(a));
   const recordHref = (a) => "medical-records.html?" + recQuery(a);
-  const hasRecord = (a) => ((readJson("pawpaw_records:" + a.owner, { visits: [] }) || {}).visits || []).some((r) => r.apptId === a.id);
+  const hasRecord = (a) => !!a.hasRecord;
   const readJson = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k) || "null"); return v == null ? d : v; } catch (_) { return d; } };
 
   return { A, O, mine, display, greeting, visible, today, iso, label, fmtDate, fmtShort, fmtMD, fmtTime, ownerName, petName, services, stamp, recQuery, recordHref, hasRecord, patientQuery, readJson };

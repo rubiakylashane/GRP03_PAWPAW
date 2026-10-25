@@ -30,14 +30,19 @@
     if ($("greeting-name")) $("greeting-name").textContent = saved.name;
   }
 
-  /* ----- Profile picture in the sidebar (saved on Edit Profile) ----- */
-  try {
-    const avatar = $("user-avatar");
-    if (avatar && saved) {
-      const prof = JSON.parse(localStorage.getItem("pawpaw_profile:" + String(saved.name).trim().toLowerCase()) || "null");
-      if (prof && prof.photo) avatar.style.cssText += `;background-image:url('${prof.photo}');background-size:cover;background-position:center`;
-    }
-  } catch (_) { /* ignore */ }
+  /* ----- Profile picture in the sidebar ----- */
+  fetch("/api/me", { headers: { Accept: "application/json" } })
+    .then(async (response) => {
+      if (!response.ok) throw new Error(`Profile request failed (${response.status}).`);
+      return response.json();
+    })
+    .then((data) => {
+      const avatar = $("user-avatar");
+      if (avatar && data.profile && data.profile.photo) {
+        avatar.style.cssText += `;background-image:url('${data.profile.photo}');background-size:cover;background-position:center`;
+      }
+    })
+    .catch((error) => console.error("Could not load profile picture:", error));
 
   /* ----- Log out ----- */
   const logout = $("logout");

@@ -1,26 +1,10 @@
 /* js/owner/medical-records.js
-   Medical Records (read only for the owner): visit records and prescriptions of the signed-in user's pets.
-   The vet / staff add the records. Set USE_BACKEND = true and edit API when the backend is ready. */
+   Medical Records (read only for the owner): visit records and prescriptions of the signed-in user's pets. */
 (() => {
-  const USE_BACKEND = false;
   const API = {
-    visits: "/api/medical-records",      // [{ id, pet, date, diagnosis, treatment, notes }]
-    prescriptions: "/api/prescriptions"  // [{ id, pet, date, medication, dose, instructions, quantity }]
+    visits: "/api/medical-records",
+    prescriptions: "/api/prescriptions"
   };
-
-  /* Demo storage: this browser's localStorage, one list per signed-in user.
-     Shape: { visits: [...], prescriptions: [...] }  (empty until records are added) */
-  const BASE = "pawpaw_records";
-  function userKey() {
-    let name = "guest";
-    for (const store of ["sessionStorage", "localStorage"]) {
-      try {
-        const u = JSON.parse(window[store].getItem("pawpaw_user") || "null");
-        if (u && u.name) { name = String(u.name).trim().toLowerCase(); break; }
-      } catch (_) { /* ignore */ }
-    }
-    return BASE + ":" + name;
-  }
 
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
@@ -32,20 +16,15 @@
 
   async function get(url) {
     const res = await fetch(url, { headers: { Accept: "application/json" } });
-    if (!res.ok) throw new Error("Request failed: " + url);
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || `Request failed (${res.status}): ${url}`);
+    }
     return res.json();
   }
   async function loadData() {
-    if (USE_BACKEND) {
-      try {
-        const [visits, prescriptions] = await Promise.all([get(API.visits), get(API.prescriptions)]);
-        return { visits, prescriptions };
-      } catch (err) { console.warn("[medical records] backend failed:", err.message); }
-    }
-    try {
-      const v = JSON.parse(localStorage.getItem(userKey()) || "null");
-      return { visits: (v && v.visits) || [], prescriptions: (v && v.prescriptions) || [] };
-    } catch (_) { return { visits: [], prescriptions: [] }; }
+    const [visits, prescriptions] = await Promise.all([get(API.visits), get(API.prescriptions)]);
+    return { visits, prescriptions };
   }
 
   let data = { visits: [], prescriptions: [] };
@@ -89,5 +68,9 @@
   }
 
   sortEl.addEventListener("change", render);
-  loadData().then((d) => { data = d; render(); });
+  loadData().then((d) => { data = d; render(); }).catch((error) => {
+    console.error("Could not load medical records:", error);
+    $("visit-rows").innerHTML = '<p class="mr-empty">Medical records could not be loaded. Please refresh and try again.</p>';
+    $("rx-rows").innerHTML = '<p class="mr-empty">Prescriptions could not be loaded.</p>';
+  });
 })();

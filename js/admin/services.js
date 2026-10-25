@@ -7,8 +7,9 @@
   const esc = A.esc;
   let pending = null;
 
+  let services = [];
   function render() {
-    const list = A.services();
+    const list = services;
     $("sv-rows").innerHTML = list.length ? list.map((s) => `
       <div class="sv-row" role="row">
         <span role="cell" class="sv-name">${esc(s.name)}</span>
@@ -26,14 +27,33 @@
   }
   document.addEventListener("click", (e) => {
     const b = e.target.closest("[data-del]"); if (!b) return;
-    const s = A.services().find((x) => x.id === b.dataset.del); if (!s) return;
-    const n = A.serviceUses(s);
-    if (n) ask("Cannot delete", s.name + " is already used in " + n + (n === 1 ? " appointment" : " appointments") + ", so it stays on record. Edit it instead.", true);
-    else ask("Delete service", "Delete " + s.name + "? Owners and staff will no longer see it. This cannot be undone.", false, () => { A.deleteService(s.id); render(); S.toast(s.name + " deleted."); });
+    const s = services.find((x) => String(x.id) === b.dataset.del); if (!s) return;
+    ask("Delete service", "Delete " + s.name + "? Owners and staff will no longer see it. This cannot be undone.", false, async () => {
+      try {
+        const response = await fetch(`/api/services/${encodeURIComponent(s.id)}`, { method: "DELETE", headers: { Accept: "application/json" } });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || "Could not delete the service.");
+        services = services.filter((service) => String(service.id) !== String(s.id));
+        render(); S.toast(s.name + " deleted.");
+      } catch (error) {
+        console.error("Could not delete clinic service:", error);
+        S.toast(error.message || "Could not delete the service.");
+      }
+    });
   });
   $("del-cancel").addEventListener("click", () => dlg.close());
   $("del-ok").addEventListener("click", () => { dlg.close(); if (pending) pending(); });
 
   S.toast(A.takeFlash());
-  render();
+  fetch("/api/services", { headers: { Accept: "application/json" } })
+    .then(async (response) => {
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || "Could not load clinic services.");
+      services = result;
+      render();
+    })
+    .catch((error) => {
+      console.error("Could not load clinic services:", error);
+      $("sv-rows").innerHTML = '<p class="sv-empty">Services could not be loaded. Please refresh and try again.</p>';
+    });
 })();

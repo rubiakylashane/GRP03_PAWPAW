@@ -4,12 +4,12 @@
 (() => {
   const A = window.PawStaffAppts, O = window.PawOwners, S = window.PawStaff, $ = (id) => document.getElementById(id);
   const esc = O.esc, PAGE = 6, TBA = A.TBA;
-  let all = A.load(), tab = "all", dateF = "", shown = PAGE;
+  let all = [], owners = [], tab = "all", dateF = "", shown = PAGE, loadError = "";
 
   const pad = (n) => String(n).padStart(2, "0");
   const iso = (d) => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
   const today = () => iso(new Date());
-  const uid = (a) => a._key + "|" + a.id;
+  const uid = (a) => String(a.id);
   const find = (u) => all.find((a) => uid(a) === u);
 
   const ownerName = (a) => { try { return O.owner(a.owner).short; } catch (_) { return a.owner || "Owner"; } };
@@ -81,7 +81,9 @@
         (!q || [petName(a), ownerName(a), vetName(a), services(a), A.STATUS[a.status] || a.status, a.date].join(" ").toLowerCase().includes(q)))
       .sort(sorters[$("sort").value] || sorters.soon);
     const part = list.slice(0, shown);
-    $("appt-rows").innerHTML = part.length
+    $("appt-rows").innerHTML = loadError
+      ? `<p class="o-empty">${esc(loadError)}</p>`
+      : part.length
       ? part.map(row).join("")
       : `<p class="o-empty">${all.length ? "No appointments match your filters." : "No appointment requests yet."}</p>`;
     $("count").textContent = list.length ? `Showing 1-${part.length} of ${list.length}` : "";
@@ -128,35 +130,47 @@
   function openDecline(a) { cur = a; $("decline-sub").textContent = who(a) + ", " + when(a); $("decline-reason").value = ""; D.decline.showModal(); }
 
   /* 10: add appointment */
-  function openAdd() {
-    const owners = O.list().filter((o) => o.id);
+  async function openAdd() {
+    try {
+      owners = await A.owners();
+    } catch (error) {
+      console.error("Could not load owners for appointment booking:", error);
+      S.toast(error.message || "Could not load owners.");
+      return;
+    }
     if (!owners.length) { S.toast("Register an owner first."); return; }
-    $("add-owner").innerHTML = owners.map((o) => `<option value="${esc(o.id)}">${esc(o.short || o.name)}</option>`).join("");
+    $("add-owner").innerHTML = owners.map((o) => `<option value="${esc(o.id)}">${esc(o.name)}</option>`).join("");
     $("add-service").innerHTML = A.SERVICES.map((s) => `<option>${esc(s)}</option>`).join("");
     $("add-date").min = today(); $("add-date").value = today();
     $("add-time").innerHTML = timeOptions("09:00"); $("add-vet").innerHTML = vetOptions(A.VETS[0], true);
-    fillPets(); checkAdd(); D.add.showModal();
+    await fillPets(); checkAdd(); D.add.showModal();
   }
-  function fillPets() {
-    const pets = O.petsOf($("add-owner").value);
-    $("add-pet").innerHTML = pets.length ? pets.map((p) => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join("") : `<option value="">No pets yet</option>`;
+  async function fillPets() {
+    try {
+      const pets = await A.pets($("add-owner").value);
+      $("add-pet").innerHTML = pets.length ? pets.map((p) => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join("") : `<option value="">No pets yet</option>`;
+    } catch (error) {
+      console.error("Could not load owner pets:", error);
+      $("add-pet").innerHTML = '<option value="">Pets could not be loaded</option>';
+      S.toast(error.message || "Could not load owner pets.");
+    }
   }
   const checkAdd = () => hint($("add-hint"), A.conflict(all, $("add-vet").value, $("add-date").value, $("add-time").value));
 
   /* tell the owner (notification bell) what the clinic just did */
-  function tell(a, before, patch) {
-    const what = petName(a) + ", " + (a.date ? fmtShort(a.date) : "") + " " + fmtTime(a.time);
-    const n = (title, text) => A.notify(a.owner, "appointment", title, text);
-    if (patch.date || patch.time) n("Appointment rescheduled", what + (patch.rescheduleReason ? ". Reason: " + patch.rescheduleReason : "") + ".");
-    else if (patch.status === "confirmed" && before === "pending") n("Appointment approved", what + (a.vet && a.vet !== TBA ? " with " + a.vet : "") + ".");
-    else if (patch.status === "cancelled") n("Request declined", petName(a) + ", " + (a.date ? fmtShort(a.date) : "") + "." + (patch.declineReason ? " Reason: " + patch.declineReason : ""));
-    else if (patch.status === "completed") n("Visit completed", petName(a) + " has finished the visit.");
-    else if (patch.status === "no_show") n("Marked as no-show", petName(a) + " did not arrive for the " + fmtShort(a.date) + " appointment.");
+  async function set(a, patch, msg) {
+    try {
+      await A.change(a, patch);
+      render();
+      S.toast(msg);
+    } catch (error) {
+      console.error("Could not update appointment:", error);
+      S.toast(error.message || "The appointment could not be updated.");
+    }
   }
-  function set(a, patch, msg) { const before = a.status; A.change(a, patch); tell(a, before, patch); render(); S.toast(msg); }
 
   /* ---------- events ---------- */
-  document.addEventListener("click", (e) => {
+  document.addEventListener("click", async (e) => {
     const t = e.target.closest("[data-tab]");
     if (t) { tab = t.dataset.tab; shown = PAGE; render(); return; }
     if (e.target.closest("[data-close]")) { e.target.closest("dialog").close(); return; }
@@ -214,15 +228,25 @@
 
   $("add-owner").addEventListener("change", fillPets);
   ["add-vet", "add-date", "add-time"].forEach((id) => $(id).addEventListener("change", checkAdd));
-  $("add-ok").addEventListener("click", () => {
+  $("add-ok").addEventListener("click", async () => {
     const key = $("add-owner").value, petId = $("add-pet").value, date = $("add-date").value;
     if (!petId) { S.toast("This owner has no pet yet."); return; }
     if (!date) { S.toast("Pick a date."); return; }
-    const pet = O.getPet(key, petId), svc = $("add-service").value;
-    const a = A.add(key, { petId, petName: pet ? pet.name : "", vet: $("add-vet").value, date, time: $("add-time").value, services: [{ name: svc, price: 0 }] });
-    A.notify(a.owner, "appointment", "Appointment booked", petName(a) + ", " + fmtShort(a.date) + " " + fmtTime(a.time) + ", " + services(a) + ".");
-    all.push(a); D.add.close(); render(); S.toast("Appointment added for " + petName(a) + ".");
+    const pet = (await A.pets(key)).find((item) => String(item.id) === String(petId)), svc = $("add-service").value;
+    if (!pet) { S.toast("The selected pet is no longer available."); return; }
+    try {
+      const appointment = await A.add(key, { petId, vet: $("add-vet").value, date, time: $("add-time").value, services: [{ name: svc }] });
+      all.push(appointment);
+      D.add.close(); render(); S.toast("Appointment added for " + pet.name + ".");
+    } catch (error) {
+      console.error("Could not create appointment:", error);
+      S.toast(error.message || "The appointment could not be created.");
+    }
   });
 
-  render();
+  A.load().then((rows) => { all = rows; render(); }).catch((error) => {
+    loadError = "Appointments could not be loaded. Please refresh and try again.";
+    console.error("Could not load appointments:", error);
+    render();
+  });
 })();

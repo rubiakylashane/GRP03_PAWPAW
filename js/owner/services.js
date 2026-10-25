@@ -3,7 +3,6 @@
    Clicking a card opens Book Appointment with that service already ticked. */
 (() => {
   const list = document.getElementById("svc-list");
-  const services = window.PawServices || [];
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const peso = (n) => "₱" + Number(n).toLocaleString("en-US");
@@ -18,10 +17,15 @@
       </div>
     </a>`;
 
-  let html = "";
-  for (let i = 0; i < services.length; i += 2) {
-    const row = services.slice(i, i + 2).map(card).join("");
-    html += `<div class="svc-row${(i / 2) % 2 === 1 ? " is-shifted" : ""}">${row}</div>`;
-  }
-  list.innerHTML = html || `<p class="svc-empty">No services listed yet.</p>`;
+  window.PawServicesReady.then((services) => {
+    let html = "";
+    for (let i = 0; i < services.length; i += 2) {
+      const row = services.slice(i, i + 2).map(card).join("");
+      html += `<div class="svc-row${(i / 2) % 2 === 1 ? " is-shifted" : ""}">${row}</div>`;
+    }
+    list.innerHTML = html || `<p class="svc-empty">No services listed yet.</p>`;
+  }).catch((error) => {
+    console.error("Could not load clinic services:", error);
+    list.innerHTML = `<p class="svc-empty">Services could not be loaded. Please refresh and try again.</p>`;
+  });
 })();

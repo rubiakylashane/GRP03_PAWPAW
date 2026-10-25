@@ -23,14 +23,12 @@
   const services = (a) => (a.services || []).map((s) => s.name).join(", ") || a.service || "-";
   const stamp = (a) => (a.date || "") + " " + (a.time || "");
 
-  let all = A.load(), tab = "clinic";
+  let all = [], tab = "clinic";
 
   /* ----- which vet is signed in ----- */
   let userName = "";
   for (const st of ["sessionStorage", "localStorage"]) { try { const u = JSON.parse(window[st].getItem("pawpaw_user") || "null"); if (u && u.name) { userName = String(u.name).toLowerCase(); break; } } catch (_) {} }
-  const mine = A.VETS.find((v) => userName.split(/[\s_.-]+/).some((w) => w.length > 2 && v.toLowerCase().includes(w)));
-  $("vet-pick").innerHTML = `<option value="${ALL}">All veterinarians</option>` + A.VETS.map((v) => `<option${v === mine ? " selected" : ""}>${esc(v)}</option>`).join("");
-  if (!mine) $("vet-pick").value = A.VETS[0];
+  let mine = null;
 
   /* ----- list ----- */
   const SHOWN = ["confirmed", "checked_in", "with_vet", "completed"];
@@ -65,7 +63,9 @@
   let cur = null;
   const find = (u) => all.find((a) => a.owner + "|" + a.id === u);
   const given = (a) => (a.date && a.date <= today() ? a.date : today());
-  const vaccinesOf = (a) => (a.services || []).map((x) => x.name || "").filter((n) => /vaccin/i.test(n)).map((n) => { const m = n.match(/\(([^)]+)\)/); return m ? m[1].trim() : "Vaccination"; });
+  const vaccinesOf = (a) => (a.services || []).map((x) => x.name || "")
+    .filter((name) => /vaccin|rabies|dhpp|dhppl|4-in-1|kennel cough/i.test(name))
+    .map((name) => { const match = name.match(/\(([^)]+)\)/); return match ? match[1].trim() : name; });
   function suggestDue(vaccine, from) {
     const v = vaccine.toLowerCase(); let m = INTERVAL_MONTHS.default;
     Object.keys(INTERVAL_MONTHS).forEach((k) => { if (v.indexOf(k) >= 0) m = INTERVAL_MONTHS[k]; });
@@ -85,38 +85,69 @@
   }
 
   const readJson = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k) || "null"); return v == null ? d : v; } catch (_) { return d; } };
-  function complete() {
+  async function complete() {
     const a = cur, diag = $("cv-diag").value.trim(), g = given(a), dues = [...$("cv-vacc").querySelectorAll("input")];
     if (!diag) return err("Enter the diagnosis.");
     if (dues.some((i) => !i.value)) return err("Pick the next due date for each vaccine.");
-    const rk = "pawpaw_records:" + a.owner, rec = readJson(rk, { visits: [], prescriptions: [] });
-    rec.visits = (rec.visits || []).filter((r) => r.apptId !== a.id); rec.prescriptions = rec.prescriptions || [];
-    const id = "r-" + Date.now().toString(36);
-    rec.visits.push({ id, apptId: a.id, petId: a.petId || "", pet: petName(a), date: g, diagnosis: diag, treatment: $("cv-treat").value.trim(), notes: $("cv-notes").value.trim(), vet: a.vet });
     const med = $("cv-med").value.trim();
-    if (med) rec.prescriptions.push({ id: id + "-rx", apptId: a.id, petId: a.petId || "", pet: petName(a), date: g, medication: med, dose: $("cv-dose").value.trim(), instructions: $("cv-inst").value.trim(), quantity: $("cv-qty").value.trim() });
-    try { localStorage.setItem(rk, JSON.stringify(rec)); } catch (_) {}
-    if (dues.length) {
-      const vk = "pawpaw_vaccinations:" + a.owner, vx = readJson(vk, []).filter((r) => r.apptId !== a.id);
-      dues.forEach((i) => vx.push({ id: "vx-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), apptId: a.id, petId: a.petId || "", vaccine: i.dataset.vname, pet: petName(a), dateAdministered: g, nextDue: i.value, administeredBy: a.vet, notes: "" }));
-      try { localStorage.setItem(vk, JSON.stringify(vx)); } catch (_) {}
+    const payload = {
+      diagnosis: diag,
+      recordDate: g,
+      treatment: $("cv-treat").value.trim(),
+      notes: $("cv-notes").value.trim(),
+      prescriptions: med ? [{
+        medication: med,
+        dose: $("cv-dose").value.trim(),
+        instructions: $("cv-inst").value.trim(),
+        quantity: $("cv-qty").value.trim() || 1
+      }] : [],
+      vaccinations: dues.map((input) => ({
+        name: input.dataset.vname,
+        dateAdministered: g,
+        nextDue: input.value
+      }))
+    };
+    try {
+      const response = await fetch(`/api/medical-records/appointments/${encodeURIComponent(a.id)}/complete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || "Could not save the completed visit.");
+      a.status = "completed";
+      dlg.close(); render(); S.toast(petName(a) + " completed. Records saved.");
+    } catch (error) {
+      console.error("Visit completion failed:", error);
+      err(error.message || "Could not save the completed visit.");
     }
-    A.change(a, { status: "completed" });
-    A.notify(a.owner, "appointment", "Visit completed", petName(a) + " has finished the visit. See Medical Records for the details.");
-    dlg.close(); render(); S.toast(petName(a) + " completed. Records saved.");
   }
 
   /* ----- events ----- */
-  document.addEventListener("click", (e) => {
+  document.addEventListener("click", async (e) => {
     const t = e.target.closest("[data-tab]"); if (t) { tab = t.dataset.tab; render(); return; }
     if (e.target.closest("[data-close]")) { e.target.closest("dialog").close(); return; }
     const b = e.target.closest("[data-act]"); if (!b) return;
     const a = find(b.dataset.id); if (!a) return;
-    if (b.dataset.act === "start") { A.change(a, { status: "with_vet" }); tab = "clinic"; render(); S.toast("Visit started for " + petName(a) + "."); }
+    if (b.dataset.act === "start") {
+      try { await A.change(a, { status: "with_vet" }); tab = "clinic"; render(); S.toast("Visit started for " + petName(a) + "."); }
+      catch (error) { console.error("Could not start visit:", error); S.toast(error.message || "Could not start the visit."); }
+    }
     else openComplete(a);
   });
   $("cv-ok").addEventListener("click", complete);
   $("search").addEventListener("input", render);
   $("vet-pick").addEventListener("change", render);
-  render();
+  A.load().then((appointments) => {
+    all = appointments;
+    mine = A.VETS.find((vet) => userName.split(/[\s_.-]+/).some((word) => word.length > 2 && vet.toLowerCase().includes(word))) ||
+      (all.length ? all[0].vet : null);
+    $("vet-pick").innerHTML = `<option value="${ALL}">My assigned patients</option>` +
+      (mine ? `<option selected>${esc(mine)}</option>` : "");
+    $("vet-pick").value = mine || ALL;
+    render();
+  }).catch((error) => {
+    console.error("Could not load veterinarian appointments:", error);
+    $("pt-rows").innerHTML = '<p class="o-empty">Appointments could not be loaded. Please refresh and try again.</p>';
+  });
 })();

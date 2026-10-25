@@ -101,3 +101,40 @@
     ask(t);
   }, true);
 })();
+
+/* ---- Owner sidebar: the profile picture and the name open "My Profile" ----
+   Only runs on pages loaded with data-role that includes "owner". No change needed in the HTML:
+   it finds .sidebar-user > .avatar and its name (#sidebar-name) and makes them a link to profile.html. */
+(() => {
+  const me = document.currentScript;
+  const roles = String((me && me.dataset.role) || "").split(",").map((s) => s.trim());
+  if (roles.indexOf("owner") < 0) return;
+
+  function wire() {
+    const box = document.querySelector(".sidebar-user");
+    if (!box) return;
+    if (!document.getElementById("pp-own-link-style")) {
+      const st = document.createElement("style");
+      st.id = "pp-own-link-style";
+      st.textContent =
+        ".sidebar-user .pp-prof-link{cursor:pointer}" +
+        ".sidebar-user .avatar.pp-prof-link:hover{box-shadow:0 0 0 2px rgba(255,255,255,.55)}" +
+        ".sidebar-user strong.pp-prof-link:hover{text-decoration:underline}" +
+        ".sidebar-user .pp-prof-link:focus-visible{outline:2px solid #e29d1a;outline-offset:2px;border-radius:6px}";
+      document.head.appendChild(st);
+    }
+    const go = () => { location.href = "profile.html"; };      // same folder: pages/owner/
+    const items = [box.querySelector(".avatar"), box.querySelector("#sidebar-name, .user-meta strong")];
+    items.forEach((el) => {
+      if (!el || el.classList.contains("pp-prof-link")) return;
+      el.classList.add("pp-prof-link");
+      el.setAttribute("role", "link");
+      el.setAttribute("tabindex", "0");
+      el.setAttribute("title", "My Profile");
+      el.addEventListener("click", go);
+      el.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } });
+    });
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", wire);
+  else wire();
+})();

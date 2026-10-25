@@ -61,3 +61,12 @@
 
 /* Inactive owner / pet tag */
 .adm .o-tag { display: inline-block; margin-left: 6px; padding: 1px 8px; font-size: 10.5px; font-weight: 700; color: #555; background: #e4e4e4; border-radius: 999px; vertical-align: middle; }
+
+/* ---------- Admin Edit owner: Phone Number sits under Address; the picture is centered next to the fields ---------- */
+.adm #owner-form .oe-phone { grid-column: 1; grid-row: 4; }
+.adm #owner-form .oe-picture { grid-column: 2; grid-row: 1 / 5; align-self: center; justify-self: center; width: 100%; display: flex; flex-direction: column; align-items: center; text-align: center; }
+.adm #owner-form .oe-picture .of-label { text-align: center; align-self: center; }
+.adm #owner-form .oe-picture .of-photo-box { margin: 0 auto; }
+@media (max-width: 800px) {
+  .adm #owner-form .oe-picture { align-self: auto; }
+}

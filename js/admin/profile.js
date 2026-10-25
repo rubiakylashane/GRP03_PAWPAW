@@ -4,8 +4,9 @@
 (() => {
   const A = window.PawAdmin, S = window.PawStaff, $ = (id) => document.getElementById(id);
   const me = A.myProfile();
-  const f = { name: $("name"), email: $("email"), phone: $("phone") };
-  f.name.value = me.name; f.email.value = me.email || ""; f.phone.value = me.phone || ""; $("username").value = me.username;
+  const f = { name: $("name"), email: $("email"), phone: $("phone"), username: $("username") };
+  f.name.value = me.name; f.email.value = me.email || ""; f.phone.value = me.phone || ""; f.username.value = me.username;
+  if (!me.accountId) f.username.readOnly = true;   // no saved account to rename (demo sign-in only)
 
   /* picture */
   let photo = me.photo || "";
@@ -32,12 +33,12 @@
     input.type = input.type === "password" ? "text" : "password";
   }));
 
-  const KEYS = ["name", "email", "phone", "cur", "new", "conf"];
+  const KEYS = ["name", "email", "username", "phone", "cur", "new", "conf"];
   KEYS.forEach((k) => $(k).addEventListener("input", () => S.setError(k, "")));
 
   $("profile-form").addEventListener("submit", (e) => {
     e.preventDefault();
-    const v = { name: f.name.value.trim().replace(/\s+/g, " "), email: f.email.value.trim(), phone: f.phone.value.replace(/[\s-]/g, "") };
+    const v = { name: f.name.value.trim().replace(/\s+/g, " "), email: f.email.value.trim(), phone: f.phone.value.replace(/[\s-]/g, ""), username: f.username.value.trim().toLowerCase() };
     const cur = $("cur").value, nw = $("new").value, conf = $("conf").value;
     const errors = {};
 
@@ -46,6 +47,11 @@
     if (!v.email) errors.email = "Enter your email address.";
     else if (!A.validEmail(v.email)) errors.email = "Enter a valid email address.";
     else if (A.emailTaken(v.email, me.accountId)) errors.email = "This email is already used by another account.";
+    if (me.accountId) {                 // the username is what you type to log in
+      if (!v.username) errors.username = "Enter a username.";
+      else if (!/^[a-z][a-z0-9._]{2,19}$/.test(v.username)) errors.username = "Use 3-20 letters, numbers, dots or underscores, starting with a letter.";
+      else if (A.usernameTaken(v.username, me.accountId)) errors.username = "This username is already taken.";
+    }
     if (!v.phone) errors.phone = "Enter your phone number.";
     else if (!A.validPhone(v.phone)) errors.phone = "Use a mobile number like 09XXXXXXXXX.";
     if (cur || nw || conf) {            // only checked when you are changing the password
@@ -57,7 +63,7 @@
     const bad = KEYS.find((k) => errors[k]);
     if (bad) { $(bad).focus(); return; }
 
-    A.saveMyProfile({ name: v.name, email: v.email, phone: v.phone, photo }, !!(cur || nw));
+    A.saveMyProfile({ name: v.name, email: v.email, phone: v.phone, photo, username: me.accountId ? v.username : "" }, !!(cur || nw));
     // when the backend is ready: PUT /api/me, and POST /api/me/password if cur / nw were given (the password is never saved here)
     A.setFlash(cur || nw ? "Profile saved. Password updated." : "Profile saved.");
     location.reload();

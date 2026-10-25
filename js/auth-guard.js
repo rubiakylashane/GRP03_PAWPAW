@@ -170,6 +170,11 @@
       ".pp-act[hidden],.pp-act-sm[hidden]{display:none!important}" +          /* keep the hidden attribute working */
       ".pp-act-gap{gap:24px!important}" +
       ".pp-act-center{justify-content:center!important;gap:14px!important}" +
+      ".pp-act-center .pp-act{flex:0 1 150px!important;min-width:0!important;padding:0 12px!important;white-space:nowrap}" +   /* 3 buttons in a dialog shrink to fit instead of overflowing */
+      "select:not([multiple]):not([size]){-webkit-appearance:none!important;-moz-appearance:none!important;appearance:none!important;" +   /* drop-downs: the arrow sits a little in from the edge */
+        "background-image:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23333' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\")!important;" +
+        "background-repeat:no-repeat!important;background-position:right 16px center!important;background-size:12px 8px!important;padding-right:42px!important;text-overflow:ellipsis}" +
+      "select:disabled{opacity:.7}" +
       ".pp-act-bar{display:flex!important;flex-wrap:wrap;justify-content:center!important;align-items:center!important;gap:24px!important;grid-template-columns:none!important}" +
       "@media (max-width:600px){.pp-act{flex:1 1 0!important;min-width:0!important;padding:0 14px!important}.pp-act-bar{gap:12px!important}}";
     document.head.appendChild(st);

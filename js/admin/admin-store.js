@@ -92,23 +92,29 @@ window.PawAdmin = (() => {
   const profKey = () => (myRole() === "admin" ? "pawpaw_admin_profile:" : "pawpaw_" + myRole() + "_profile:") + me().toLowerCase();
   function myAccount() {
     const m = me().toLowerCase(), r = myRole();
-    return accounts().find((u) => u.role === r && (String(u.username).toLowerCase() === m || String(u.name || "").toLowerCase() === m)) || null;
+    return accounts().find((u) => u.role === r && (String(u.username).toLowerCase() === m || String(u.name || "").toLowerCase() === m || String(u.email || "").toLowerCase() === m)) || null;
   }
   function myProfile() {
     const a = myAccount(), s = read(profKey(), {}) || {};
     return { username: a ? a.username : me(), accountId: a ? a.id : null, name: s.name || (a && a.name) || cap(me()),
       email: "email" in s ? s.email : (a ? a.email : ""), phone: "phone" in s ? s.phone : (a ? a.phone : ""), photo: s.photo || "" };
   }
-  function saveMyProfile({ name, email, phone, photo }, passwordChanged) {
+  function saveMyProfile({ name, email, phone, photo, username }, passwordChanged) {
     const vet = myRole() === "vet";
     if (vet) name = withDr(name);
     write(profKey(), { name, email, phone, photo: photo || "" });
     const a = myAccount();
+    let renamed = false;
     if (a) {
-      const all = accounts(), i = all.findIndex((x) => x.id === a.id); if (i >= 0) { all[i] = { ...all[i], name, email, phone }; write(USERS, all); }
+      const all = accounts(), i = all.findIndex((x) => x.id === a.id);
+      if (i >= 0) {
+        const un = username ? String(username).trim().toLowerCase() : "";
+        renamed = !!un && un !== String(all[i].username).toLowerCase();
+        all[i] = { ...all[i], name, email, phone, ...(renamed ? { username: un } : {}) }; write(USERS, all);
+      }
       if (vet) { const list = vets(), j = list.findIndex((v) => v.userId === a.id); if (j >= 0) { const old = list[j].name; list[j] = { ...list[j], name, email, phone }; write(VETS, list); renameVetEverywhere(old, name); } }
     }
-    log("updated their own profile" + (passwordChanged ? " (password changed)" : ""), "update", "user");
+    log("updated their own profile" + (renamed ? " (username changed)" : "") + (passwordChanged ? " (password changed)" : ""), "update", "user");
   }
 
   /* username: first initial + last name ("Maria Santos" -> msantos), unique */
@@ -119,6 +125,7 @@ window.PawAdmin = (() => {
     while (taken.has(u)) u = base + n++;
     return u;
   }
+  const usernameTaken = (un, exceptId) => list().some((u) => u.id !== exceptId && String(u.username || "").toLowerCase() === String(un).toLowerCase());
   const emailTaken = (email, exceptId) => list().some((u) => u.id !== exceptId && u.email && u.email.toLowerCase() === email.toLowerCase());
 
   function add({ name, phone, email, role }) {
@@ -340,5 +347,5 @@ window.PawAdmin = (() => {
   const takeFlash = () => { try { const m = sessionStorage.getItem(FLASH) || ""; sessionStorage.removeItem(FLASH); return m; } catch (_) { return ""; } };
   const fmtDate = (s) => { if (!s) return "-"; const d = new Date(s + "T00:00:00"); return isNaN(d) ? "-" : d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); };
 
-  return { services, addService, updateService, deleteService, setServiceStatus, serviceUses, serviceNameTaken, peso, log, ownerHistory, describe, deleteOwner, deletePet, ownerStatus, setOwnerStatus, setPetStatus, VETS, SPECS, vets, history, addVet, updateVet, setVetStatus, removeVet, withDr, phoneShow, normLicense, licenseTaken, vetEmailTaken, freeVetAccounts, validName: (s) => /^[A-Za-zÀ-ÿ.'\- ]{2,60}$/.test(s), ROLES, list, add, updateUser, myAccount, myProfile, saveMyProfile, setRole, setStatus, resetPassword, validPhone, validEmail, emailTaken, setFlash, takeFlash, fmtDate, esc, me };
+  return { services, addService, updateService, deleteService, setServiceStatus, serviceUses, serviceNameTaken, peso, log, ownerHistory, describe, deleteOwner, deletePet, ownerStatus, setOwnerStatus, setPetStatus, VETS, SPECS, vets, history, addVet, updateVet, setVetStatus, removeVet, withDr, phoneShow, normLicense, licenseTaken, vetEmailTaken, freeVetAccounts, validName: (s) => /^[A-Za-zÀ-ÿ.'\- ]{2,60}$/.test(s), ROLES, list, add, updateUser, myAccount, myProfile, saveMyProfile, setRole, setStatus, resetPassword, validPhone, validEmail, emailTaken, usernameTaken, setFlash, takeFlash, fmtDate, esc, me };
 })();

@@ -70,3 +70,29 @@
 @media (max-width: 800px) {
   .adm #owner-form .oe-picture { align-self: auto; }
 }
+
+/* ---------- Admin Edit owner: same text sizes and spacing as the admin My Profile page ---------- */
+.adm #owner-form .own-edit-card { padding: 22px 28px 22px; margin-bottom: 16px; }
+.adm #owner-form .oe-grid { row-gap: 14px; }
+.adm #owner-form .of-field > label, .adm #owner-form .of-label { margin-bottom: 6px; font-size: 12px; }
+.adm #owner-form .of-field input[type="text"], .adm #owner-form .of-field input[type="email"] { height: 42px; }
+.adm #owner-form .of-field textarea { height: 124px; }
+.adm #owner-form .of-field > .of-photo-box { width: min(240px, 100%); }
+.adm #owner-form .own-pass { padding-top: 18px; padding-bottom: 20px; }
+.adm #owner-form .own-pass h2 { margin-bottom: 8px; font-size: 16px; }
+.adm #owner-form .oe-pass-grid .of-field > label { font-size: 12px; }
+.adm #owner-form .of-pass input { height: 38px !important; }
+.adm #owner-form .of-actions-wide { margin: 18px 0 0; }
+
+/* ---------- font sizes: Edit owner, Edit pet and My Profile all use the same text sizes ---------- */
+.adm #owner-form .of-field > label, .adm #owner-form .of-label,
+.adm #pet-form .pf-field > label, .adm #pet-form .pf-label { font-size: 12px; font-weight: 700; letter-spacing: -0.02em; }
+.adm #owner-form .of-field input, .adm #owner-form .of-field textarea,
+.adm #pet-form .pf-field input, .adm #pet-form .pf-field select, .adm #pet-form .pf-field textarea { font-size: 13px; }
+.adm #owner-form .of-error, .adm #pet-form .pf-error { font-size: 12px; }
+
+/* Edit pet: the "Picture" label sits right above the picture, both centered in the right column */
+.adm #pet-form .pf-picture { align-self: center; display: flex; flex-direction: column; align-items: center; text-align: center; }
+.adm #pet-form .pf-picture .pf-label { text-align: center; align-self: center; }
+.adm #pet-form .pf-picture .pf-photo-box { margin: 0 auto; }
+@media (max-width: 800px) { .adm #pet-form .pf-picture { align-self: auto; } }

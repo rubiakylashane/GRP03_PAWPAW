@@ -166,7 +166,10 @@ window.PawAdmin = (() => {
     log("updated the details of " + esc(ROLES[u.role].toLowerCase()) + " account " + esc(u.username), "update", "user");
   }
   const setRole = (u, role) => patch(u, { role }, "changed the role of " + esc(u.username) + " to " + esc(ROLES[role].toLowerCase()));
-  const setStatus = (u, status) => patch(u, { status }, (status === "active" ? "activated " : "deactivated ") + "account " + esc(u.username));
+  const setStatus = (u, status) => {
+    patch(u, { status }, (status === "active" ? "activated " : "deactivated ") + "account " + esc(u.username));
+    if (u.role === "vet") { const list = vets(), j = list.findIndex((v) => v.userId === u.id); if (j >= 0) { list[j] = { ...list[j], status }; write(VETS, list); } }   // keep the Veterinarians page in step
+  };
   const resetPassword = (u) => { if (!u.owner) { const all = accounts(), i = all.findIndex((x) => x.id === u.id); if (i >= 0) { all[i].mustChange = true; write(USERS, all); } } log("reset the password of " + esc(u.username), "update", "user"); };
 
   /* ---------- veterinarian profiles (the Veterinarians page) ----------
@@ -223,6 +226,13 @@ window.PawAdmin = (() => {
     list[i] = { ...list[i], ...f }; write(VETS, list); Object.assign(v, list[i]); renameVetEverywhere(oldName, v.name);
     if (v.userId) { const all = accounts(), j = all.findIndex((u) => u.id === v.userId); if (j >= 0) { all[j] = { ...all[j], name: v.name, email: v.email, phone: v.phone }; write(USERS, all); } }
     log("updated veterinarian " + esc(v.name), "update", "veterinarian");
+  }
+  /* deactivate / activate a veterinarian: nothing is deleted, the login account follows, history stays */
+  function setVetStatus(v, status) {
+    const list = vets(), i = list.findIndex((x) => x.id === v.id); if (i < 0) return;
+    list[i] = { ...list[i], status }; write(VETS, list); v.status = status;
+    if (v.userId) { const all = accounts(), j = all.findIndex((u) => u.id === v.userId); if (j >= 0 && all[j].status !== status) { all[j] = { ...all[j], status }; write(USERS, all); } }
+    log((status === "active" ? "activated" : "deactivated") + " veterinarian " + esc(v.name), "update", "veterinarian");
   }
   function removeVet(v) {
     write(VETS, vets().filter((x) => x.id !== v.id));
@@ -330,5 +340,5 @@ window.PawAdmin = (() => {
   const takeFlash = () => { try { const m = sessionStorage.getItem(FLASH) || ""; sessionStorage.removeItem(FLASH); return m; } catch (_) { return ""; } };
   const fmtDate = (s) => { if (!s) return "-"; const d = new Date(s + "T00:00:00"); return isNaN(d) ? "-" : d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); };
 
-  return { services, addService, updateService, deleteService, setServiceStatus, serviceUses, serviceNameTaken, peso, log, ownerHistory, describe, deleteOwner, deletePet, ownerStatus, setOwnerStatus, setPetStatus, VETS, SPECS, vets, history, addVet, updateVet, removeVet, withDr, phoneShow, normLicense, licenseTaken, vetEmailTaken, freeVetAccounts, validName: (s) => /^[A-Za-zÀ-ÿ.'\- ]{2,60}$/.test(s), ROLES, list, add, updateUser, myAccount, myProfile, saveMyProfile, setRole, setStatus, resetPassword, validPhone, validEmail, emailTaken, setFlash, takeFlash, fmtDate, esc, me };
+  return { services, addService, updateService, deleteService, setServiceStatus, serviceUses, serviceNameTaken, peso, log, ownerHistory, describe, deleteOwner, deletePet, ownerStatus, setOwnerStatus, setPetStatus, VETS, SPECS, vets, history, addVet, updateVet, setVetStatus, removeVet, withDr, phoneShow, normLicense, licenseTaken, vetEmailTaken, freeVetAccounts, validName: (s) => /^[A-Za-zÀ-ÿ.'\- ]{2,60}$/.test(s), ROLES, list, add, updateUser, myAccount, myProfile, saveMyProfile, setRole, setStatus, resetPassword, validPhone, validEmail, emailTaken, setFlash, takeFlash, fmtDate, esc, me };
 })();

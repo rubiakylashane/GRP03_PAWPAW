@@ -8,7 +8,7 @@
 window.PawStaffAppts = (() => {
   const KEY = "pawpaw_appointments:";
   /* the doctors: the admin Veterinarians page saves them in "pawpaw_vets"; until then these are used */
-  const VETS = (() => { try { const v = JSON.parse(localStorage.getItem("pawpaw_vets") || "null"); if (Array.isArray(v) && v.length) return v.map((x) => x.name); } catch (_) { /* default */ } return ["Dr. Anajoy N. Abila", "Dr. Sean Kurvie G. Buerano", "Dr. Roxanne N. Regulacion", "Dr. Jenmarc M. Ronquillo", "Dr. Kyla Shane T. Rubia"]; })();
+  const VETS = (() => { try { const v = JSON.parse(localStorage.getItem("pawpaw_vets") || "null"); if (Array.isArray(v) && v.length) return v.filter((x) => x.status !== "inactive").map((x) => x.name); } catch (_) { /* default */ } return ["Dr. Anajoy N. Abila", "Dr. Sean Kurvie G. Buerano", "Dr. Roxanne N. Regulacion", "Dr. Jenmarc M. Ronquillo", "Dr. Kyla Shane T. Rubia"]; })();
   /* same names as the owner Services page: the admin Services page saves them in "pawpaw_services"; until then these are used */
   const SERVICES = (() => { try { const v = JSON.parse(localStorage.getItem("pawpaw_services") || "null"); if (Array.isArray(v) && v.length) return v.filter((x) => x.status !== "inactive").map((x) => x.name); } catch (_) { /* default */ } return ["General Consultation", "Vaccination", "Deworming", "Grooming", "Dental Cleaning", "Laboratory Test"]; })();
   const STATUS = { pending: "Pending", confirmed: "Confirmed", checked_in: "Checked in", with_vet: "With vet", completed: "Completed", cancelled: "Cancelled", no_show: "No-show" };

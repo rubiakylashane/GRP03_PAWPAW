@@ -13,14 +13,14 @@
 .adm .ap-filters select, .adm .ap-filters input { width: 100%; height: 36px; padding: 0 10px; font: inherit; font-size: 13px; color: #111; background: #fff; border: 1px solid #bbb; border-radius: 6px; }
 .adm .ap-filters select:focus-visible, .adm .ap-filters input:focus-visible { outline: 3px solid rgba(15, 107, 92, .4); outline-offset: 1px; }
 
-.adm .ap-row { display: grid; align-items: center; column-gap: 14px; padding: 9px 0; min-height: 46px; font-size: 12.5px; border-bottom: 1px solid #e3e3e3; grid-template-columns: 105px minmax(0, 1.4fr) minmax(0, 1.1fr) minmax(0, 1.5fr) 70px 100px 112px; }
+.adm .ap-row { display: grid; align-items: center; column-gap: 14px; padding: 9px 0; min-height: 46px; font-size: 12.5px; border-bottom: 1px solid #e3e3e3; grid-template-columns: 105px minmax(0, 1.4fr) minmax(0, 1.1fr) minmax(0, 1.5fr) 70px 100px 150px; }
 .adm .ap-row:last-child { border-bottom: 0; }
 .adm .ap-headrow { min-height: 0; padding: 8px 0; font-size: 10.5px; font-weight: 600; letter-spacing: .02em; text-transform: uppercase; color: #333; border-bottom: 1px solid #aaa; }
 .adm .ap-when b { display: block; font-weight: 700; }
 .adm .ap-when i { display: block; margin-top: 1px; font-style: normal; font-size: 11px; color: #555; }
 .adm .ap-tba { font-weight: 700; color: #b45f06; }
 .adm .ap-total { font-weight: 700; }
-.adm .ap-acts { display: flex; gap: 8px; }
+.adm .ap-acts { display: flex; flex-wrap: wrap; gap: 8px; }
 .adm .ap-pill { display: inline-block; padding: 3px 12px; font-size: 11px; font-weight: 700; border-radius: 999px; white-space: nowrap; }
 .adm .ap-pending { color: #7a5200; background: #f9e7b0; }
 .adm .ap-confirmed { color: #2a3a9a; background: #dde3fa; }

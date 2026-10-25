@@ -84,12 +84,12 @@
     <header class="head-row">
       <div class="page-head">
         <h1>Veterinarians</h1>
-        <p class="sub">Add, edit, and remove veterinarian profiles.</p>
+        <p class="sub">Add, edit, and deactivate veterinarian profiles.</p>
       </div>
       <a href="register-vet.html" class="a-btn a-btn-main">Add Veterinarian</a>
     </header>
 
-    <p class="v-warn" role="note"><strong>Delete is blocked for any veterinarian who already has appointments, records, prescriptions, or vaccinations, so history is never lost.</strong><br />Deactivate their account in Users and Staff instead.</p>
+    <p class="v-warn" role="note"><strong>Veterinarians are deactivated, not deleted.</strong><br />Their appointments, records, and vaccinations stay in the clinic history. Use Activate to bring them back.</p>
 
     <section class="v-card" aria-label="Veterinarians">
       <div class="v-row v-head" role="row">
@@ -139,13 +139,13 @@
       </form>
     </dialog>
 
-    <!-- Delete -->
-    <dialog id="del-dialog" class="dlg" aria-labelledby="del-title">
-      <h2 id="del-title">Delete veterinarian</h2>
-      <p class="dlg-sub" id="del-sub"></p>
+    <!-- Activate / deactivate -->
+    <dialog id="st-dialog" class="dlg" aria-labelledby="st-title">
+      <h2 id="st-title">Deactivate veterinarian</h2>
+      <p class="dlg-sub" id="st-sub"></p>
       <div class="dlg-actions">
-        <button type="button" class="btn btn-outline" id="del-cancel">Cancel</button>
-        <button type="button" class="btn btn-danger" id="del-ok">Delete</button>
+        <button type="button" class="btn btn-outline" id="st-cancel">Cancel</button>
+        <button type="button" class="btn btn-danger" id="st-ok">Deactivate</button>
       </div>
     </dialog>
   </main>

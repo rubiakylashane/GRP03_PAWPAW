@@ -4,8 +4,8 @@
 .adm .o-label { display: block; margin-bottom: 6px; font-size: 12px; font-weight: 600; }
 .adm .o-search { width: min(520px, 100%); height: 38px; margin-bottom: 14px; padding: 0 16px; font: inherit; font-size: 13px; color: #111; background: #fff; border: 1px solid #bbb; border-radius: 999px; }
 .adm .o-search:focus-visible { outline: 3px solid rgba(15, 107, 92, .4); outline-offset: 1px; }
-.adm .o-row { display: grid; align-items: center; column-gap: 14px; padding: 9px 8px; min-height: 44px; font-size: 13px; border-bottom: 1px solid #e3e3e3; grid-template-columns: minmax(0, 2.6fr) 70px minmax(0, 1fr) 150px; }
-.adm .o-prow { grid-template-columns: minmax(0, 1.2fr) minmax(0, .9fr) minmax(0, 1.1fr) minmax(0, .9fr) minmax(0, 1.1fr) 150px; padding-left: 0; padding-right: 0; }
+.adm .o-row { display: grid; align-items: center; column-gap: 14px; padding: 9px 8px; min-height: 44px; font-size: 13px; border-bottom: 1px solid #e3e3e3; grid-template-columns: minmax(0, 2.6fr) 70px minmax(0, 1fr) 172px; }
+.adm .o-prow { grid-template-columns: minmax(0, 1.2fr) minmax(0, .9fr) minmax(0, 1.1fr) minmax(0, .9fr) minmax(0, 1.1fr) 172px; padding-left: 0; padding-right: 0; }
 /* owners and pets side by side on wide screens (stacked below 1281px) */
 .adm .o-split { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; margin: 0 26px 16px; }
 .adm .o-split .o-card { margin: 0; }
@@ -14,8 +14,8 @@
   .adm .o-split .o-card { padding-left: 16px; padding-right: 16px; }
   .adm .o-split .o-search { width: 100%; }
   /* narrower cards: owner (name, email, phone) | pets | registered | actions */
-  .adm .o-split .o-row:not(.o-prow) { column-gap: 10px; padding-left: 4px; padding-right: 4px; grid-template-columns: minmax(0, 1fr) 36px 88px 132px; }
-  .adm .o-split .o-prow { column-gap: 10px; grid-template-columns: minmax(0, 1fr) minmax(0, .8fr) minmax(0, 1fr) minmax(0, .7fr) minmax(0, .9fr) 132px; }
+  .adm .o-split .o-row:not(.o-prow) { column-gap: 10px; padding-left: 4px; padding-right: 4px; grid-template-columns: minmax(0, 1fr) 36px 88px 160px; }
+  .adm .o-split .o-prow { column-gap: 10px; grid-template-columns: minmax(0, 1fr) minmax(0, .8fr) minmax(0, 1fr) minmax(0, .7fr) minmax(0, .9fr) 160px; }
   .adm .o-split .o-acts { gap: 6px; }
 }
 @media (max-width: 900px) { .adm .o-split { margin-left: 0; margin-right: 0; } }
@@ -27,7 +27,7 @@
 .adm .o-orow.sel { background: #e3f1ec; }
 .adm .o-main { display: block; font-weight: 700; }
 .adm .o-sub { display: block; margin-top: 1px; font-size: 11.5px; color: #555; overflow-wrap: anywhere; }
-.adm .o-acts { display: flex; gap: 8px; }
+.adm .o-acts { display: flex; flex-wrap: wrap; gap: 8px; }
 .adm .o-acts .u-act { display: inline-flex; align-items: center; text-decoration: none; }
 .adm .o-pets-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
 .adm .o-pets-head h2 { margin: 0; font-size: 16px; font-weight: 700; }

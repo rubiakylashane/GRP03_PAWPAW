@@ -2,13 +2,13 @@
 .adm .sv-warn { margin: 0 26px 14px; padding: 12px 16px; font-size: 12px; line-height: 1.5; color: #7a4a00; background: #fdf1d9; border-radius: 10px; }
 .adm .sv-card { margin: 0 26px 18px; padding: 14px 20px 18px; color: #111; background: #fff; border: 1px solid var(--line); border-radius: 14px; }
 
-.adm .sv-row { display: grid; align-items: center; column-gap: 18px; padding: 12px 0; min-height: 50px; font-size: 13px; border-bottom: 1px solid #e3e3e3; grid-template-columns: minmax(0, 1.2fr) minmax(0, 2.4fr) 110px 150px; }
+.adm .sv-row { display: grid; align-items: center; column-gap: 18px; padding: 12px 0; min-height: 50px; font-size: 13px; border-bottom: 1px solid #e3e3e3; grid-template-columns: minmax(0, 1.2fr) minmax(0, 2.4fr) 110px 172px; }
 .adm .sv-row:last-child { border-bottom: 0; }
 .adm .sv-head { min-height: 0; padding: 8px 0; font-size: 11px; font-weight: 600; letter-spacing: .02em; text-transform: uppercase; color: #333; border-bottom: 1px solid #aaa; }
 .adm .sv-name { font-weight: 700; overflow-wrap: anywhere; }
 .adm .sv-desc { overflow-wrap: anywhere; }
 .adm .sv-price { font-weight: 700; }
-.adm .sv-acts { display: flex; gap: 8px; }
+.adm .sv-acts { display: flex; flex-wrap: wrap; gap: 8px; }
 .adm .sv-empty { padding: 22px 0 6px; font-size: 14px; color: #555; }
 
 /* add / edit form */

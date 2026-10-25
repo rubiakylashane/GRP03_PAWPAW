@@ -138,3 +138,82 @@
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", wire);
   else wire();
 })();
+
+/* ---- One look for every button (all roles) ----
+   Page CSS gave buttons many different sizes. This marks them and gives each KIND one size:
+     pp-act     normal buttons: Cancel / Save / Save Changes / Confirm, header buttons (Go Back, Add User ...),
+                dialog buttons, form buttons ...................... 44px high, 150px wide at least
+     pp-act-sm  small buttons inside table rows and lists (Edit, Reset password, Deactivate, View and Edit ...)
+                ................................................... 34px high
+   Not touched: tabs / filter chips, sidebar links, icon buttons (menu, close, eye, calendar), text links.
+   Colors stay as each page defines them. Works for dialogs that JS builds later too.
+   To change a size everywhere, edit the numbers in the "pp-act-style" block below. */
+(() => {
+  const WORDS = /^\s*(cancel|save|save changes|confirm|update|reset|deactivate|activate|delete|log out)\s*$/i;
+  const BTN = /^(btn|obtn|abtn|pbtn|a-btn|u-btn|sv-btn|o-btn|ve-save|ve-cancel|u-act|ma-btn)$/;            // button class names used in the pages
+  const SMALL_TOKEN = /(^|-)sm$|^u-act$|^ma-btn$/;                                          // obtn-sm, btn-sm, u-act, ma-btn
+  const NEVER = /tab|chip|pill|nav|menu|date|close|toggle|eye|upload|link|avatar|brand|logo|carousel|dot|arrow|prev|next|cal/i;
+  const NEVER_SEL = "[data-close-x], .close, .dlg-x, [aria-label='Close'], .sidebar, nav, .sidebar-user, .pp-lo-card .x";
+  const ROWS = "tr, li, [role=row], [class*='row'], .req-actions, .a-actions, .v-actions, .ap-acts";   // buttons in a row of a list
+  const FORMLIKE = "form, dialog, [role=dialog], .dlg, .pp-lo";
+
+  function addStyle() {
+    if (document.getElementById("pp-act-style")) return;
+    const st = document.createElement("style");
+    st.id = "pp-act-style";
+    const base = "box-sizing:border-box!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;" +
+      "width:auto!important;flex:0 0 auto!important;margin-top:0!important;margin-bottom:0!important;line-height:1!important;" +
+      "border-radius:8px!important;white-space:nowrap;text-decoration:none!important;cursor:pointer;";
+    st.textContent =
+      ".pp-act{" + base + "height:44px!important;min-height:44px!important;min-width:150px!important;padding:0 24px!important;font-size:14px!important;font-weight:700!important}" +
+      ".pp-act-sm{" + base + "height:34px!important;min-height:34px!important;min-width:0!important;padding:0 14px!important;font-size:13px!important;font-weight:600!important}" +
+      ".pp-act[hidden],.pp-act-sm[hidden]{display:none!important}" +          /* keep the hidden attribute working */
+      ".pp-act-gap{gap:24px!important}" +
+      ".pp-act-center{justify-content:center!important;gap:14px!important}" +
+      ".pp-act-bar{display:flex!important;flex-wrap:wrap;justify-content:center!important;align-items:center!important;gap:24px!important;grid-template-columns:none!important}" +
+      "@media (max-width:600px){.pp-act{flex:1 1 0!important;min-width:0!important;padding:0 14px!important}.pp-act-bar{gap:12px!important}}";
+    document.head.appendChild(st);
+  }
+
+  function kind(el) {
+    if (el.closest(".pp-lo")) return "std";
+    if (el.matches(NEVER_SEL) || el.closest("nav, .sidebar, .sidebar-user")) return null;
+    const cls = [...el.classList].filter((c) => !/^pp-act/.test(c));
+    if (cls.some((c) => NEVER.test(c) && !BTN.test(c))) return null;            // tabs, chips, icon buttons, text links
+    const isBtn = cls.some((c) => BTN.test(c));
+    const text = (el.textContent || el.value || "").trim();
+    if (!isBtn && !WORDS.test(text) && !el.closest(".dlg-actions, .of-actions, [class*='-actions'] ")) return null;
+    if (!isBtn && el.tagName === "A") return null;                              // a plain link is not a button
+    if (!text && !el.value) return null;                                        // icon-only
+    if (cls.some((c) => SMALL_TOKEN.test(c))) return "sm";
+    if (el.closest(FORMLIKE) || el.closest("header, .head-row, .page-head, .page-actions, .toolbar")) return "std";   // page header buttons are normal size
+    if (el.closest(ROWS)) return "sm";
+    return "std";
+  }
+
+  function mark(root) {
+    (root.querySelectorAll ? root : document).querySelectorAll("button, a[class], input[type=submit]").forEach((el) => {
+      if (el.classList.contains("pp-act") || el.classList.contains("pp-act-sm")) return;
+      const k = kind(el);
+      if (!k) return;
+      el.classList.add(k === "sm" ? "pp-act-sm" : "pp-act");
+      if (k === "std") {
+        const par = el.parentElement;                  // a grid with fixed columns would stretch the buttons
+        if (par && par !== document.body) {
+          const d = getComputedStyle(par).display;
+          if (/grid/.test(d)) par.classList.add("pp-act-bar");
+          else if (/flex/.test(d)) par.classList.add(par.closest("dialog, [role=dialog], .pp-lo") ? "pp-act-center" : "pp-act-gap");   // dialogs: buttons in the middle; forms: same space between them
+        }
+      }
+    });
+  }
+
+  function start() {
+    addStyle();
+    mark(document);
+    new MutationObserver((list) => {
+      for (const m of list) m.addedNodes.forEach((n) => { if (n.nodeType === 1) mark(n.matches && n.matches("button, a") ? n.parentNode || document : n); });
+    }).observe(document.body, { childList: true, subtree: true });
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start();
+})();

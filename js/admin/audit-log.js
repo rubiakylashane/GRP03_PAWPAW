@@ -41,7 +41,8 @@
   const dayOf = (t) => { const d = new Date(t); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); };   // local date, to match the date pickers
   const fmtDate = (t) => new Date(t).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   const fmtTime = (t) => new Date(t).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-  const recLabel = (r) => String(r || "").replace(/\s+/g, "_");
+  const recLabel = (r) => String(r || "").replace(/\s+/g, "_");                                       // raw value (filters, CSV)
+  const recNice = (r) => { const t = String(r || "").replace(/_/g, " "); return t.charAt(0).toUpperCase() + t.slice(1); };   // shown on screen: "Medical record"
 
   /* filters
      "All users" lists every account (owners, staff, vets, admins from PawAdmin.list()) even if they have no entry yet,
@@ -55,7 +56,7 @@
   $("f-user").innerHTML = '<option value="">All users</option>' + opts.map((o) => `<option value="${o.i}">${esc(o.label)}</option>`).join("");
   $("f-action").innerHTML = '<option value="">All actions</option>' + Object.keys(ACTIONS).map((a) => `<option value="${a}">${a.charAt(0).toUpperCase() + a.slice(1)}</option>`).join("");
   const recs = [...new Set([...RECORDS, ...all.map((e) => e.record)])];
-  $("f-record").innerHTML = '<option value="">All records</option>' + recs.map((r) => `<option value="${esc(r)}">${esc(recLabel(r))}</option>`).join("");
+  $("f-record").innerHTML = '<option value="">All records</option>' + recs.map((r) => `<option value="${esc(r)}">${esc(recNice(r))}</option>`).join("");
 
   function filtered() {
     const u = $("f-user").value, a = $("f-action").value, r = $("f-record").value, from = $("f-from").value, to = $("f-to").value;
@@ -71,9 +72,9 @@
     $("au-rows").innerHTML = shown.length ? shown.map((e) => `
       <div class="au-row" role="row">
         <span class="au-when"><b>${esc(fmtDate(e.t))}</b><i>${esc(fmtTime(e.t))}</i></span>
-        <span class="au-who"><b>${esc(e.user)}</b>${e.role ? `<i>${esc(ROLE[e.role] || e.role)}</i>` : ""}</span>
+        <span class="au-who"><b>${esc(e.user)}</b>${e.role && String(e.user).toLowerCase() !== String(ROLE[e.role] || e.role).toLowerCase() ? `<i>${esc(ROLE[e.role] || e.role)}</i>` : ""}</span>
         <span><span class="au-pill au-${e.action}">${ACTIONS[e.action]}</span></span>
-        <span class="au-rec">${esc(recLabel(e.record))}</span>
+        <span><span class="au-rec">${esc(recNice(e.record))}</span></span>
         <span class="au-det">${esc(e.details)}</span>
       </div>`).join("")
       : `<p class="au-empty">${all.length ? "No entries match these filters." : "No activity has been recorded yet. Changes made in the clinic will show up here."}</p>`;

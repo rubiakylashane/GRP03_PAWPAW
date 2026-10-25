@@ -356,7 +356,7 @@
 
     if (f.species) {
       f.species.value = pet.species || "";
-      f.species.disabled = true;
+      f.species.disabled = !document.body.dataset.speciesEditable;   // admin can correct the species; owners cannot
     }
 
     fillBreeds(pet.species, pet.breed);

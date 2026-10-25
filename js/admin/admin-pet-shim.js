@@ -10,6 +10,7 @@
 
   document.body.dataset.mode = petId ? "edit" : "add";
   document.body.dataset.return = back;
+  document.body.dataset.speciesEditable = "1";   // admin may correct the species (owners cannot)
   document.getElementById("go-back").href = back;
   document.getElementById("cancel").href = back;
 

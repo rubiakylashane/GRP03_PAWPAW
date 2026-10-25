@@ -1,10 +1,11 @@
 /* js/auth/login.js
    Handles show/hide password, validation and redirect after login.
    Set USE_BACKEND = true and edit API when the backend is ready.
-   While false, any username + password works (demo). */
+   While false, any password works (demo). Sign in with a USERNAME or an EMAIL. */
 (() => {
   const USE_BACKEND = false;
   const API = { login: "/api/auth/login" }; // POST { username, password } -> { token, role, name, mustChangePassword }
+  // "username" may be the username OR the email: the server looks up the account by either one.
 
   // Where each role lands after login (paths are relative to pages/auth/)
    const HOME = {
@@ -20,6 +21,8 @@
   const username = $("username");
   const password = $("password");
   const submit = form.querySelector(".submit");
+
+  if (username && !username.placeholder) username.placeholder = "Username or email";
 
   /* ----- Show / hide password ----- */
   const toggle = $("toggle-password");
@@ -44,6 +47,32 @@
     error.hidden = !msg;
   }
 
+  /* ----- DEMO ONLY: find the account by username OR email -----
+     The accounts live in this browser (admin-store.js: staff / vet / admin accounts + the owners who registered).
+     admin-store.js is loaded on demand so this also works on a fresh browser. The backend does this lookup itself. */
+  function loadAdminStore() {
+    if (window.PawAdmin) return Promise.resolve(window.PawAdmin);
+    return new Promise((resolve) => {
+      const s = document.createElement("script");
+      s.src = "../../js/admin/admin-store.js";
+      s.charset = "utf-8";
+      s.onload = () => resolve(window.PawAdmin || null);
+      s.onerror = () => resolve(null);
+      document.head.appendChild(s);
+    });
+  }
+  async function findAccount(id) {
+    const A = await loadAdminStore();
+    if (!A || typeof A.list !== "function") return null;
+    const key = id.toLowerCase();
+    try {
+      return A.list().find((u) =>
+        String(u.username || "").toLowerCase() === key ||
+        (u.email && String(u.email).toLowerCase() === key)
+      ) || null;
+    } catch (_) { return null; }
+  }
+
   /* ----- Login request ----- */
   async function login(user, pass) {
     if (USE_BACKEND) {
@@ -53,12 +82,19 @@
         body: JSON.stringify({ username: user, password: pass })
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.message || "Incorrect username or password.");
+      if (!res.ok) throw new Error(data.message || "Incorrect username/email or password.");
       return data;
     }
 
-    // DEMO: type "admin", "vet" or "staff" as username to test other roles
+    // DEMO: a username or email of a saved account signs in as that account.
+    //       Typing "admin", "vet" or "staff" still opens that role; anything else is an owner.
     await new Promise((r) => setTimeout(r, 500));
+    const acc = await findAccount(user);
+    if (acc) {
+      const role = acc.role === "owner" ? "owner" : acc.role;
+      // an owner is known by the username (their data is saved under it); staff / vet / admin by their full name
+      return { token: "demo-token", role, name: acc.owner ? acc.username : (acc.name || acc.username), mustChangePassword: false };
+    }
     const role = ["admin", "vet", "staff"].includes(user.toLowerCase()) ? user.toLowerCase() : "owner";
     return { token: "demo-token", role, name: user, mustChangePassword: false };
   }
@@ -74,7 +110,7 @@
     if (!user || !pass) {
       if (!user) username.classList.add("invalid");
       if (!pass) password.classList.add("invalid");
-      return showError("Enter your name or username and password.");
+      return showError("Enter your username or email and password.");
     }
     showError("");
 

@@ -28,3 +28,9 @@
   .adm #profile-form .oe-grid { grid-template-columns: 1fr; }
   .adm #profile-form .oe-grid > * { grid-column: 1 !important; grid-row: auto !important; }
 }
+
+/* "Picture" label sits right above the picture, both centered in the right column */
+.adm #profile-form .oe-picture { align-self: center; display: flex; flex-direction: column; align-items: center; text-align: center; }
+.adm #profile-form .oe-picture .of-label { text-align: center; align-self: center; }
+.adm #profile-form .oe-picture .of-photo-box { margin: 0 auto; }
+@media (max-width: 800px) { .adm #profile-form .oe-picture { align-self: auto; } }

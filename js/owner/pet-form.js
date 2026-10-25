@@ -348,7 +348,7 @@
     const pet = editingId && P.get(editingId);
 
     if (!pet) {
-      location.replace("my-pets.html");
+      location.replace(document.body.dataset.return || "my-pets.html");
       return;
     }
 
@@ -455,6 +455,6 @@
       P.setFlash("Pet added.");
     }
 
-    location.href = "my-pets.html";
+    location.href = document.body.dataset.return || "my-pets.html";
   });
 })();

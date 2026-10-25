@@ -96,3 +96,6 @@
 .adm #pet-form .pf-picture .pf-label { text-align: center; align-self: center; }
 .adm #pet-form .pf-picture .pf-photo-box { margin: 0 auto; }
 @media (max-width: 800px) { .adm #pet-form .pf-picture { align-self: auto; } }
+
+/* Edit pet: Cancel / Confirm sit under the white card (same as Edit owner and My Profile) */
+.adm .pf-actions-out { margin: 18px 0 0; }

@@ -153,12 +153,13 @@
         </div>
 
       </div>
-
-      <div class="pf-actions">
-        <a href="owners-pets.html" id="cancel" class="obtn obtn-cancel">Cancel</a>
-        <button type="submit" class="obtn obtn-green">Confirm</button>
-      </div>
     </form>
+
+    <!-- the buttons sit under the white card; the Confirm button still submits the form above -->
+    <div class="of-actions of-actions-wide pf-actions-out">
+      <a href="owners-pets.html" id="cancel" class="obtn obtn-cancel">Cancel</a>
+      <button type="submit" form="pet-form" class="obtn obtn-amber">Confirm</button>
+    </div>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 

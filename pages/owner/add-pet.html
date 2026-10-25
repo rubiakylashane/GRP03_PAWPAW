@@ -138,7 +138,7 @@
           <label for="dob">Date of Birth</label>
           <div class="pf-date">
             <input id="dob" name="dob" type="text" inputmode="numeric" placeholder="MM/DD/YYYY" maxlength="10" autocomplete="off" required />
-            <button type="button" class="pf-date-btn" id="dob-btn" aria-label="Pick a date from the calendar"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></button>
+            <button type="button" class="pf-date-btn" id="dob-btn" aria-label="Pick a date from the calendar"><svg width="26" height="26" style="width:26px;height:26px;max-width:26px;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></button>
             <input id="dob-picker" class="pf-date-native" type="date" tabindex="-1" aria-hidden="true" />
           </div>
           <p class="pf-error" id="err-dob" role="alert" hidden></p>
@@ -151,17 +151,17 @@
 
       </div>
 
-      <div class="pf-actions">
-        <a href="my-pets.html" class="pbtn pbtn-outline">Cancel</a>
-        <button type="submit" class="pbtn pbtn-primary">Confirm</button>
-      </div>
     </form>
+
+    <div class="pf-actions pf-actions-out">
+      <a href="my-pets.html" class="pbtn pbtn-outline">Cancel</a>
+      <button type="submit" form="pet-form" class="pbtn pbtn-amber">Confirm</button>
+    </div>
   </main>
 
   <script src="../../js/owner/app-shell.js"></script>
   <script src="../../js/owner/calendar.js"></script>
   <script src="../../js/owner/pets-store.js"></script>
   <script src="../../js/owner/pet-form.js"></script>
-  
 </body>
 </html>

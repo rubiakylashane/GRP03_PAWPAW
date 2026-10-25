@@ -36,3 +36,19 @@
 .sdash .rec-scope { margin: 0 0 14px; font-size: 12px; color: #fff; }
 .sdash .rec-scope button { margin-left: 10px; padding: 4px 14px; border: 1px solid #fff; border-radius: 999px; background: transparent; color: #fff; font: inherit; font-size: 12px; cursor: pointer; }
 .sdash .rec-scope button:hover { background: rgba(255, 255, 255, .15); }
+
+/* table headers: bold */
+.sdash .rrow.orow-head span { font-weight: 700; }
+ 
+/* spacing: pantay ang gap ng columns */
+.sdash .rrow { column-gap: 20px; }
+.sdash .rrow-visit { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.sdash .rrow-rx { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+
+.sdash .rrow.orow-head span { font-weight: 700; }
+ 
+.sdash .rrow { column-gap: 12px; padding: 18px 0; min-height: 88px; }
+.sdash .rrow.orow-head { padding: 12px 0 16px; min-height: 0; }
+.sdash .rrow-visit { grid-template-columns: 1.4fr 1.3fr 1.4fr 1.4fr 1.5fr; }
+.sdash .rrow-rx { grid-template-columns: 1.3fr 1.3fr 1.3fr 1fr 1.6fr .9fr; }
+ 

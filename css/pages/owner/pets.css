@@ -420,3 +420,27 @@
   .pets-head { flex-direction: column; }
   .pets-grid { grid-template-columns: 1fr; }
 }
+/* ===== IDAGDAG ITO SA DULO NG css/pages/pets.css (copy-paste lang) =====
+   Bagong design ng Add Pet / Edit Pet (owner): buttons nasa labas ng card, amber ang Confirm / Save Changes,
+   at nakagitna ang "Picture" sa ibabaw ng picture. */
+
+.pbtn-amber { color: #111; background: var(--yellow, #f0b94a); }
+.pbtn-amber:hover { background: var(--yellow, #f0b94a); filter: brightness(1.06); text-decoration: none; }
+
+/* buttons sa ilalim ng card (hindi na nasa loob) */
+.pf-actions-out { margin-top: 24px; }
+
+/* "Picture" label nasa ibabaw mismo ng picture, nakagitna */
+.pf-picture { display: flex; flex-direction: column; align-items: center; }
+.pf-picture .pf-label { text-align: center; align-self: center; }
+.pf-picture .pf-photo-box { margin: 0 auto; }
+
+/* ===== Add Pet / Edit Pet (owner): parehong laki ng font at spacing ng admin at staff form ===== */
+#pet-form .pf-field > label, #pet-form .pf-label { margin-bottom: 5px; font-size: 12px; font-weight: 700; letter-spacing: -0.02em; }
+#pet-form .pf-field input, #pet-form .pf-field select, #pet-form .pf-field textarea { font-size: 15px; }
+#pet-form .pf-error { font-size: 12px; }
+#pet-form.pf-card { padding: 20px 28px 22px; border-radius: 22px; }
+#pet-form .pf-grid { row-gap: 15px; }
+#pet-form .pf-field input[type="text"], #pet-form .pf-field select, #pet-form .pf-date input { height: 38px; }
+#pet-form .pf-field textarea { height: 80px; }
+#pet-form .pf-field > .pf-photo-box { width: 160px; }

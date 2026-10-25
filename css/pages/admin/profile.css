@@ -11,7 +11,7 @@
 .adm #profile-form .oe-grid { row-gap: 14px; }
 .adm #profile-form .of-field > label, .adm #profile-form .of-label { margin-bottom: 6px; font-size: 12px; }
 .adm #profile-form .of-field input[type="text"], .adm #profile-form .of-field input[type="email"] { height: 42px; }
-.adm #profile-form .of-field > .of-photo-box { width: min(240px, 100%); }
+.adm #profile-form .of-field > .of-photo-box { width: min(280px, 100%); }
 .adm #profile-form .own-pass { padding-top: 18px; padding-bottom: 20px; }
 .adm #profile-form .own-pass h2 { margin-bottom: 8px; font-size: 16px; }
 .adm #profile-form .of-pass input { height: 38px !important; }

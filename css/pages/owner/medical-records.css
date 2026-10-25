@@ -73,3 +73,8 @@
   .mr-row, .mr-visits .mr-row, .mr-rx .mr-row { grid-template-columns: 1fr; }
   .mr-card { padding: 14px 14px 18px; }
 }
+
+.mr-th { font-weight: 700; padding: 12px 0 16px; }
+.mr-row { gap: 12px; }
+#visit-rows .mr-row, #rx-rows .mr-row { padding: 18px 0; min-height: 88px; }
+ 

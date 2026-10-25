@@ -103,9 +103,16 @@ window.PawAdmin = (() => {
     const vet = myRole() === "vet";
     if (vet) name = withDr(name);
     write(profKey(), { name, email, phone, photo: photo || "" });
-    const a = myAccount();
+    let a = myAccount();
     let renamed = false;
-    if (a) {
+    const un0 = username ? String(username).trim().toLowerCase() : "";
+    if (!a && un0 && un0 !== me().toLowerCase() && (myRole() === "staff" || myRole() === "vet" || myRole() === "admin")) {
+      // demo sign-in ("staff" / "vet" / "admin") with no saved account: choosing a username saves one, so you can log in with it next time
+      const all = accounts();
+      a = { id: "u-" + Date.now().toString(36), username: un0, name, email, phone, role: myRole(), status: "active", createdAt: iso(), mustChange: false };
+      all.push(a); write(USERS, all); renamed = true;
+    }
+    if (a && !renamed) {
       const all = accounts(), i = all.findIndex((x) => x.id === a.id);
       if (i >= 0) {
         const un = username ? String(username).trim().toLowerCase() : "";
@@ -113,6 +120,14 @@ window.PawAdmin = (() => {
         all[i] = { ...all[i], name, email, phone, ...(renamed ? { username: un } : {}) }; write(USERS, all);
       }
       if (vet) { const list = vets(), j = list.findIndex((v) => v.userId === a.id); if (j >= 0) { const old = list[j].name; list[j] = { ...list[j], name, email, phone }; write(VETS, list); renameVetEverywhere(old, name); } }
+    }
+    if (a && name && name !== me()) {   // keep the signed-in identity in step with the saved name so My Profile still finds the account
+      const oldKey = profKey();
+      for (const st of ["sessionStorage", "localStorage"]) {
+        try { const u = JSON.parse(window[st].getItem("pawpaw_user") || "null"); if (u && u.name) { u.name = name; window[st].setItem("pawpaw_user", JSON.stringify(u)); } } catch (_) { /* ignore */ }
+      }
+      write(profKey(), { name, email, phone, photo: photo || "" });
+      if (oldKey !== profKey()) { try { localStorage.removeItem(oldKey); } catch (_) { /* ignore */ } }
     }
     log("updated their own profile" + (renamed ? " (username changed)" : "") + (passwordChanged ? " (password changed)" : ""), "update", "user");
   }

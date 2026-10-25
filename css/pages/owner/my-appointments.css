@@ -557,3 +557,8 @@
 
 /* empty time select looks like a placeholder */
 .rs-form select:invalid { color: #777; }
+
+.ma-head { font-weight: 700; padding: 12px 0 16px; }
+.ma-row { gap: 12px; }
+#rows .ma-row { padding: 18px 0; min-height: 88px; }
+ 

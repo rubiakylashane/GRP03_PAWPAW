@@ -77,7 +77,7 @@
 .adm #owner-form .of-field > label, .adm #owner-form .of-label { margin-bottom: 6px; font-size: 12px; }
 .adm #owner-form .of-field input[type="text"], .adm #owner-form .of-field input[type="email"] { height: 42px; }
 .adm #owner-form .of-field textarea { height: 124px; }
-.adm #owner-form .of-field > .of-photo-box { width: min(240px, 100%); }
+.adm #owner-form .of-field > .of-photo-box { width: min(280px, 100%); }
 .adm #owner-form .own-pass { padding-top: 18px; padding-bottom: 20px; }
 .adm #owner-form .own-pass h2 { margin-bottom: 8px; font-size: 16px; }
 .adm #owner-form .oe-pass-grid .of-field > label { font-size: 12px; }
@@ -88,7 +88,7 @@
 .adm #owner-form .of-field > label, .adm #owner-form .of-label,
 .adm #pet-form .pf-field > label, .adm #pet-form .pf-label { font-size: 12px; font-weight: 700; letter-spacing: -0.02em; }
 .adm #owner-form .of-field input, .adm #owner-form .of-field textarea,
-.adm #pet-form .pf-field input, .adm #pet-form .pf-field select, .adm #pet-form .pf-field textarea { font-size: 13px; }
+.adm #pet-form .pf-field input, .adm #pet-form .pf-field select, .adm #pet-form .pf-field textarea { font-size: 15px; }
 .adm #owner-form .of-error, .adm #pet-form .pf-error { font-size: 12px; }
 
 /* Edit pet: the "Picture" label sits right above the picture, both centered in the right column */

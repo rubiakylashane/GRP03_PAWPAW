@@ -11,6 +11,7 @@
   <!-- dashboard.css = staff sidebar / page shell, owners.css = Owners and Pets pages -->
   <link rel="stylesheet" href="../../css/pages/staff/dashboard.css" />
   <link rel="stylesheet" href="../../css/pages/staff/owners.css" />
+  <link rel="stylesheet" href="../../css/pages/staff/form-look.css" />
 </head>
 <body class="sdash">
 
@@ -139,11 +140,13 @@
 
       </div>
 
-      <div class="pf-actions">
-        <a href="owner-details.html" id="cancel" class="obtn obtn-cancel">Cancel</a>
-        <button type="submit" class="obtn obtn-green">Confirm</button>
-      </div>
     </form>
+
+    <!-- the buttons sit under the white card; the Confirm button still submits the form above -->
+    <div class="of-actions of-actions-wide pf-actions-out">
+      <a href="owner-details.html" id="cancel" class="obtn obtn-cancel">Cancel</a>
+      <button type="submit" form="pet-form" class="obtn obtn-amber">Confirm</button>
+    </div>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
   </main>
@@ -153,6 +156,5 @@
   <script src="../../js/staff/owner-pet-shim.js"></script>
   <script src="../../js/owner/calendar.js"></script>
   <script src="../../js/owner/pet-form.js"></script>
-
 </body>
 </html>

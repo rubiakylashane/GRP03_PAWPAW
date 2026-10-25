@@ -176,6 +176,8 @@
         "background-repeat:no-repeat!important;background-position:right 16px center!important;background-size:12px 8px!important;padding-right:42px!important;text-overflow:ellipsis}" +
       "select:disabled{opacity:.7}" +
       ".pp-act-bar{display:flex!important;flex-wrap:wrap;justify-content:center!important;align-items:center!important;gap:24px!important;grid-template-columns:none!important}" +
+      ".pet-actions.pp-act-bar{display:grid!important;grid-template-columns:1fr 1fr!important;gap:14px!important}" +   /* My Pets cards: View Details and Edit side by side, same size */
+      ".pet-actions .pp-act{width:100%!important;min-width:0!important;padding:0 10px!important;white-space:nowrap}" +
       "@media (max-width:600px){.pp-act{flex:1 1 0!important;min-width:0!important;padding:0 14px!important}.pp-act-bar{gap:12px!important}}";
     document.head.appendChild(st);
   }

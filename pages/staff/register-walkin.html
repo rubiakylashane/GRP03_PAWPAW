@@ -11,6 +11,7 @@
   <!-- dashboard.css = staff sidebar / page shell, owners.css = Owners and Pets pages -->
   <link rel="stylesheet" href="../../css/pages/staff/dashboard.css" />
   <link rel="stylesheet" href="../../css/pages/staff/owners.css" />
+  <link rel="stylesheet" href="../../css/pages/staff/form-look.css" />
 </head>
 <body class="sdash">
 
@@ -101,11 +102,13 @@
         <input id="email" name="email" type="email" placeholder="Ex. XXXXXXXX@XXX.com" autocomplete="off" maxlength="80" />
         <p class="of-error" id="err-email" role="alert" hidden></p>
       </div>
-      <div class="of-actions of-actions-narrow">
-        <a href="owners-pets.html" class="obtn obtn-cancel">Cancel</a>
-        <button type="submit" class="obtn obtn-green">Save</button>
-      </div>
     </form>
+
+    <!-- the buttons sit under the white card; Save still submits the form above -->
+    <div class="of-actions of-actions-wide pf-actions-out">
+      <a href="owners-pets.html" class="obtn obtn-cancel">Cancel</a>
+      <button type="submit" form="walkin-form" class="obtn obtn-amber">Save</button>
+    </div>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
   </main>

@@ -143,3 +143,33 @@
   .sdash .ve-actions { gap: 12px; }
   .sdash .ve-cancel, .sdash .ve-save { min-width: 0; flex: 1; }
 }
+
+.sdash .vrow-ap.orow-head span,
+.sdash .vrow-vx.orow-head span,
+.sdash .vrow-rec.orow-head span { font-weight: 700; }
+ 
+@media (min-width: 1101px) {
+  /* mas mataas na rows, pantay ang gap */
+  .sdash .orow.vrow-ap, .sdash .orow.vrow-vx, .sdash .orow.vrow-rec { column-gap: 12px; padding: 18px 0; min-height: 88px; }
+  .sdash .orow.vrow-ap.orow-head, .sdash .orow.vrow-vx.orow-head, .sdash .orow.vrow-rec.orow-head { padding: 12px 0 16px; min-height: 0; }
+ 
+  /* My Appointments: Status at Actions nakagitna */
+  .sdash .vrow-ap { grid-template-columns: 1.15fr 1.3fr 1.2fr 1.2fr 1.1fr 1.9fr; }
+  .sdash .vrow-ap > :nth-child(n+5) { text-align: center; justify-self: center; }
+  .sdash .vrow-ap .a-actions { justify-content: center; }
+ 
+  /* Vaccinations: Administered at Next Due nakagitna */
+  .sdash .vrow-vx { grid-template-columns: 1.2fr 1.4fr 1.2fr 1.2fr; }
+  .sdash .vrow-vx > :nth-child(n+3) { text-align: center; justify-self: center; }
+ 
+  /* Medical Records: Status at Action nakagitna */
+  .sdash .vrow-rec > :nth-child(n+4) { text-align: center; justify-self: center; }
+}
+@media (min-width: 1101px) and (max-width: 1280px) {
+  .sdash .vrow-rec { grid-template-columns: 1.3fr 1.3fr 1.2fr 1.1fr 1.4fr; }
+}
+@media (min-width: 1281px) {
+  /* dalawang card magkatabi: walang Status column, kaya Action lang ang nakagitna */
+  .sdash #rec-list .vrow-rec > :nth-child(5) { text-align: center; justify-self: center; }
+}
+ 

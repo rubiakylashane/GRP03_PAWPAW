@@ -96,8 +96,9 @@
           </div>
           <div class="of-field oe-user">
             <label for="username">Username</label>
-            <input id="username" type="text" readonly tabindex="-1" />
-            <p class="pf-hint">Your username and role (Veterinarian) can only be changed by an admin in Users and Staff. Specialization and license number are edited in Veterinarians.</p>
+            <input id="username" type="text" maxlength="20" autocomplete="off" />
+            <p class="of-error" id="err-username" role="alert" hidden></p>
+            <p class="pf-hint">This is what you type to log in (3-20 letters, numbers, dots or underscores). Your role (Veterinarian) can only be changed by an admin in Users and Staff.</p>
           </div>
           <div class="of-field oe-picture">
             <span class="of-label">Picture</span>

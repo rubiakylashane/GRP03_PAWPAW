@@ -488,3 +488,7 @@
 @media (max-width: 420px) {
   .pcal { width: min(300px, calc(100vw - 32px)); }
 }
+
+/* Owners and Pets list: bold ang column names (Owner, Phone, Pets, Registered, Actions) */
+.sdash .otable[aria-label="Owners and their pets"] .orow-head span { font-weight: 700; }
+ 

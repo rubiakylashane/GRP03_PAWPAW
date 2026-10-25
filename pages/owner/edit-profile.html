@@ -11,7 +11,6 @@
   <link rel="stylesheet" href="../../css/base.css" />
   <link rel="stylesheet" href="../../css/layout.css" />
   <link rel="stylesheet" href="../../css/components.css" />
-  <link rel="stylesheet" href="../../css/pages/pets.css" />
   <link rel="stylesheet" href="../../css/pages/owner/profile.css" />
 </head>
 <body class="app">
@@ -81,7 +80,7 @@
 
   <!-- Main -->
   <main class="main">
-    <header class="pets-head">
+    <header class="pets-head pr-head">
       <h1>Edit Profile</h1>
     </header>
 
@@ -127,7 +126,7 @@
           <div class="pr-field">
             <label for="current">Current password</label>
             <div class="pr-pw">
-              <input id="current" name="current" type="password" autocomplete="current-password" />
+              <input id="current" name="current" type="password" autocomplete="new-password" />
               <button type="button" class="pr-eye" data-for="current" aria-label="Show password" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 12S5.5 5 12 5s10.5 7 10.5 7-4 7-10.5 7S1.5 12 1.5 12Z"/><circle cx="12" cy="12" r="3"/></svg></button>
             </div>
             <p class="pr-error" id="err-current" role="alert" hidden></p>
@@ -153,7 +152,7 @@
 
       <div class="pr-actions">
         <a href="profile.html" class="pbtn pbtn-outline pr-cancel">Cancel</a>
-        <button type="submit" class="pbtn pbtn-primary">Save Changes</button>
+        <button type="submit" class="pbtn pbtn-amber">Save Changes</button>
       </div>
     </form>
   </main>
@@ -162,6 +161,5 @@
   <script src="../../js/owner/pets-store.js"></script>
   <script src="../../js/owner/profile-store.js"></script>
   <script src="../../js/owner/edit-profile.js"></script>
-    
 </body>
 </html>

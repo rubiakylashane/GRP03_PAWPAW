@@ -301,3 +301,32 @@
   .pr-edit { width: 100%; }
   .pr-pets-head h2 { font-size: 20px; }
 }
+
+/* ===== Bagong design ng Edit Profile (pareho ng admin at staff) ===== */
+.pbtn-amber { color: #111; background: var(--yellow, #f0b94a); }
+.pbtn-amber:hover { background: var(--yellow, #f0b94a); filter: brightness(1.06); text-decoration: none; }
+
+/* Phone nasa ilalim ng Address; nakagitna ang picture sa kanan */
+.pr-name    { grid-column: 1; grid-row: 1; }
+.pr-email   { grid-column: 1; grid-row: 2; }
+.pr-address { grid-column: 1; grid-row: 3; }
+.pr-phone   { grid-column: 1; grid-row: 4; align-self: start; }
+.pr-picture { grid-column: 2; grid-row: 1 / 5; align-self: center; display: flex; flex-direction: column; align-items: center; text-align: center; }
+
+/* "Picture" nasa ibabaw mismo ng picture, nakagitna */
+.pr-picture .pr-label { text-align: center; align-self: center; }
+.pr-picture .pr-photo-box { margin: 0 auto; }
+
+/* mas malaking picture */
+.pr-field > .pr-photo-box { width: min(280px, 100%); }
+
+/* parehong laki ng font */
+.pr-field > label, .pr-label { font-size: 12px; font-weight: 700; }
+.pr-field input[type="text"], .pr-field input[type="email"], .pr-field input[type="tel"],
+.pr-field input[type="password"], .pr-field textarea { font-size: 15px; }
+.pr-error { font-size: 12px; }
+
+@media (max-width: 760px) {
+  .pr-phone { grid-column: 1; grid-row: auto; }
+  .pr-picture { align-self: auto; }
+}

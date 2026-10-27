@@ -52,3 +52,7 @@
 /* Inactive service */
 .adm .sv-off .sv-name, .adm .sv-off .sv-desc, .adm .sv-off .sv-price { color: #777; }
 .adm .sv-tag { display: inline-block; margin-left: 6px; padding: 1px 8px; font-size: 10.5px; font-weight: 700; color: #555; background: #e4e4e4; border-radius: 999px; vertical-align: middle; }
+
+/* Admin Services: the Add service / Save button uses the admin amber */
+body.sdash.adm .sv-btn-ok { color: #1b1300; background: #e29d1a; border: 1px solid #c98712; }
+body.sdash.adm .sv-btn-ok:hover { background: #e29d1a; filter: brightness(1.07); }

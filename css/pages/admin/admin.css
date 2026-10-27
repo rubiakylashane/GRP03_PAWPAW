@@ -187,3 +187,8 @@ body.sdash.adm { --admin-dark: #0d2a25; --sidebar-bg: #0d2a25; }
 .adm .user-meta .user-link:hover strong { text-decoration: underline; }
 .adm .user-link:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .adm a.user-link:hover .avatar { filter: brightness(.94); }
+
+@media (min-height: 861px) {
+  .adm .nav { padding-top: 24px; }
+}
+ 

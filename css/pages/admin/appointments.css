@@ -53,3 +53,8 @@
   .adm .ap-when { flex-basis: 100%; }
   .adm .ap-acts { flex-basis: 100%; }
 }
+
+/* Admin Appointments: the selected tab and Previous / Next use the admin amber */
+body.sdash.adm .ap-tab.on { color: #1b1300; font-weight: 700; background: #e29d1a; border: 1px solid #c98712; }
+body.sdash.adm .ap-page, body.sdash.adm .ap-page-next { color: #1b1300; background: #e29d1a; border: 1px solid #c98712; }
+body.sdash.adm .ap-page:not(:disabled):hover { filter: brightness(1.07); }

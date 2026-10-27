@@ -95,3 +95,5 @@
 /* "Rescheduled" tag: may space sa ilalim ng status */
 .sdash .spill + .resch-tag { display: table; margin: 6px auto 0; padding: 3px 10px; }
  
+/* Appointments rows: the action buttons wrap to a second line instead of pushing No-show off the screen */
+.sdash .a-actions { flex-wrap: wrap; row-gap: 8px; }

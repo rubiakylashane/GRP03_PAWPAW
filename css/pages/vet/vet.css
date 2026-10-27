@@ -172,4 +172,9 @@
   /* dalawang card magkatabi: walang Status column, kaya Action lang ang nakagitna */
   .sdash #rec-list .vrow-rec > :nth-child(5) { text-align: center; justify-self: center; }
 }
+
+/* Vet My Appointments: "Mark as completed?" is wider and its 3 buttons are centered and fit their text */
+.sdash #done-dialog { width: min(640px, 94vw); }
+.sdash #done-dialog .dlg-actions { justify-content: center; flex-wrap: wrap; gap: 12px; }
+.sdash #done-dialog .dlg-actions .btn { flex: 0 0 auto !important; width: auto !important; min-width: 0 !important; padding: 0 20px !important; white-space: nowrap; }
  

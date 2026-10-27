@@ -119,18 +119,19 @@
         <p class="u-hint">Veterinarians are added on the Veterinarians page.</p>
         <p class="u-error" id="err-role" role="alert" hidden></p>
       </div>
-      <div class="u-actions">
-        <a href="users-staff.html" class="u-btn u-btn-cancel">Cancel</a>
-        <button type="submit" class="u-btn u-btn-ok">Confirm</button>
-      </div>
     </form>
+
+    <!-- Buttons sit outside the white card; Confirm still submits the form -->
+    <div class="u-actions u-actions-out">
+      <a href="users-staff.html" class="u-btn u-btn-cancel">Cancel</a>
+      <button type="submit" form="user-form" class="u-btn u-btn-ok">Confirm</button>
+    </div>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
   </main>
 
   <script src="../../js/staff/staff-shell.js"></script>
   <script src="../../js/admin/admin-store.js"></script>
-  <script src="../../js/core/api.js"></script>
   <script src="../../js/admin/register-user.js"></script>
 </body>
 </html>

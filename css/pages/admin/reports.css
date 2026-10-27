@@ -64,3 +64,7 @@
   .adm .rp-range input { width: 100%; }
   .adm .rp-range > div { flex: 1 1 140px; }
 }
+
+/* Admin Reports: Export CSV and the selected period tab use the admin amber */
+body.sdash.adm .rp-tab.on { color: #1b1300; font-weight: 700; background: #e29d1a; border: 1px solid #c98712; }
+body.sdash.adm .a-btn-main { color: #1b1300; background: #e29d1a; border-color: #c98712; }

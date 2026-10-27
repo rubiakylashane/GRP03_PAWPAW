@@ -99,3 +99,7 @@
 
 /* Edit pet: Cancel / Confirm sit under the white card (same as Edit owner and My Profile) */
 .adm .pf-actions-out { margin: 18px 0 0; }
+
+/* Admin Edit owner / Add-Edit pet: Go Back and Save Changes / Confirm are amber again (they were green on green) */
+body.sdash.adm .abtn, body.sdash.adm .abtn-light, body.sdash.adm .obtn-amber { color: #1b1300; background: #e29d1a; border: 1px solid #c98712; }
+body.sdash.adm .abtn:hover, body.sdash.adm .abtn-light:hover, body.sdash.adm .obtn-amber:hover { background: #e29d1a; filter: brightness(1.07); }

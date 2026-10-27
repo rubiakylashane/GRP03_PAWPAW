@@ -42,7 +42,7 @@
   const clash = (a) => A.ACTIVE.indexOf(a.status) >= 0 ? A.conflict(all, a.vet, a.date, a.time, a.id) : null;
 
   /* ---------- tabs ---------- */
-  const TABS = [["all", "All"], ["pending", "Pending"], ["today", "Today"], ["confirmed", "Confirmed"], ["checked_in", "Checked in"], ["completed", "Completed"], ["cancelled", "Cancelled"]];
+  const TABS = [["all", "All"], ["pending", "Pending"], ["today", "Today"], ["confirmed", "Confirmed"], ["checked_in", "Checked in"], ["completed", "Completed"], ["no_show", "No-show"], ["cancelled", "Cancelled"]];
   const inTab = (a, t) => t === "all" || (t === "today" ? a.date === today() : a.status === t);
   /* the dashboard cards open this page with ?tab=...: a real tab, or "scheduled" (today's confirmed / checked-in / with-vet visits, shown under the Today tab) */
   let sub = "";
@@ -164,8 +164,34 @@
     else if (patch.status === "confirmed" && before === "pending") n("Appointment approved", what + (a.vet && a.vet !== TBA ? " with " + a.vet : "") + ".");
     else if (patch.status === "cancelled") n("Request declined", petName(a) + ", " + (a.date ? fmtShort(a.date) : "") + "." + (patch.declineReason ? " Reason: " + patch.declineReason : ""));
     else if (patch.status === "completed") n("Visit completed", petName(a) + " has finished the visit.");
+    else if (patch.status === "checked_in") n("Checked in", petName(a) + " has checked in for the " + fmtShort(a.date) + " " + fmtTime(a.time) + " appointment.");
     else if (patch.status === "no_show") n("Marked as no-show", petName(a) + " did not arrive for the " + fmtShort(a.date) + " appointment.");
   }
+  /* ask the staff first: "has the pet really checked in?" / "is it really a no-show?" */
+  const CONFIRM = {
+    checkin: { title: (a) => "Has " + petName(a) + " really checked in?", note: "Confirm only if the owner and the pet are already at the clinic.",
+      no: "Not yet", yes: "Yes, checked in", cls: "btn-primary", patch: { status: "checked_in" }, msg: (a) => petName(a) + " checked in." },
+    noshow: { title: (a) => "Did " + petName(a) + " really not show up?", note: "Confirm only if the owner did not arrive for this appointment.",
+      no: "Go back", yes: "Yes, no-show", cls: "btn-danger", patch: { status: "no_show" }, msg: (a) => petName(a) + " marked as no-show." }
+  };
+  const cfm = document.createElement("dialog");
+  cfm.className = "dlg"; cfm.setAttribute("aria-labelledby", "cfm-title");
+  cfm.innerHTML = `<h2 id="cfm-title"></h2><p class="dlg-sub" id="cfm-who"></p><p class="dlg-sub" id="cfm-note"></p>
+    <div class="dlg-actions" style="justify-content:center">
+    <button type="button" class="btn btn-outline" data-close id="cfm-no"></button><button type="button" class="btn" id="cfm-yes"></button></div>`;
+  document.body.appendChild(cfm);
+  let cfmA = null, cfmK = null;
+  function askConfirm(a, kind) {
+    cfmA = a; cfmK = CONFIRM[kind];
+    $("cfm-title").textContent = cfmK.title(a);
+    $("cfm-who").textContent = who(a) + ", " + when(a);
+    $("cfm-note").textContent = cfmK.note;
+    $("cfm-no").textContent = cfmK.no;
+    $("cfm-yes").textContent = cfmK.yes; $("cfm-yes").className = "btn " + cfmK.cls;
+    cfm.showModal();
+  }
+  $("cfm-yes").addEventListener("click", () => { cfm.close(); set(cfmA, cfmK.patch, cfmK.msg(cfmA)); });
+
   async function set(a, patch, msg) {
     const before = a.status;
     try { await A.change(a, patch); }
@@ -187,8 +213,8 @@
       const a = find(b.dataset.id); if (!a) return;
       ({
         approve: () => openApprove(a), decline: () => openDecline(a), assign: () => openAssign(a), resched: () => openResched(a),
-        checkin: () => set(a, { status: "checked_in" }, petName(a) + " checked in."),
-        noshow: () => set(a, { status: "no_show" }, petName(a) + " marked as no-show.")
+        checkin: () => askConfirm(a, "checkin"),
+        noshow: () => askConfirm(a, "noshow")
       })[b.dataset.act]();
       return;
     }

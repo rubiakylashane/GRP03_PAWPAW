@@ -213,7 +213,7 @@
       if (s.options) {
         s.options.forEach((o) => {
           const qty = +row.querySelector(`select[data-opt="${o.id}"]`).value || 0;
-          if (qty > 0) lines.push({ id: s.id, name: s.name, quantity: qty, qty, unit: o.price, price: o.price * qty });
+          if (qty > 0) lines.push({ id: Number(o.id), name: o.name, quantity: qty, qty, unit: o.price, price: o.price * qty });
         });
       } else {
           lines.push({ id: s.id, name: s.name, quantity: 1, qty: 1, unit: s.price, price: s.price });

@@ -85,10 +85,35 @@
   }
 
   const readJson = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k) || "null"); return v == null ? d : v; } catch (_) { return d; } };
-  function complete() {
+  async function complete() {
     const a = cur, diag = $("cv-diag").value.trim(), g = given(a), dues = [...$("cv-vacc").querySelectorAll("input")];
     if (!diag) return err("Enter the diagnosis.");
     if (dues.some((i) => !i.value)) return err("Pick the next due date for each vaccine.");
+    if (window.PawApi.isBackendSession()) {
+      const medication = $("cv-med").value.trim();
+      try {
+        await window.PawApi.request("/api/vet/appointments/" + encodeURIComponent(a.id) + "/complete", {
+          method: "POST",
+          body: {
+            diagnosis: diag,
+            treatment: $("cv-treat").value.trim(),
+            notes: $("cv-notes").value.trim(),
+            prescription: medication ? {
+              medication,
+              dose: $("cv-dose").value.trim(),
+              instructions: $("cv-inst").value.trim(),
+              quantity: $("cv-qty").value
+            } : null,
+            vaccines: dues.map((input) => ({ name: input.dataset.vname, nextDue: input.value }))
+          }
+        });
+      } catch (error) {
+        return err(error.message || "Could not complete the visit.");
+      }
+      a.status = "completed";
+      dlg.close(); render(); S.toast(petName(a) + " completed. Records saved.");
+      return;
+    }
     const rk = "pawpaw_records:" + a.owner, rec = readJson(rk, { visits: [], prescriptions: [] });
     rec.visits = (rec.visits || []).filter((r) => r.apptId !== a.id); rec.prescriptions = rec.prescriptions || [];
     const id = "r-" + Date.now().toString(36);
@@ -115,7 +140,7 @@
     if (b.dataset.act === "start") { A.change(a, { status: "with_vet" }); tab = "clinic"; render(); S.toast("Visit started for " + petName(a) + "."); }
     else openComplete(a);
   });
-  $("cv-ok").addEventListener("click", complete);
+  $("cv-ok").addEventListener("click", () => { complete(); });
   $("search").addEventListener("input", render);
   $("vet-pick").addEventListener("change", render);
   render();

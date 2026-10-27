@@ -4,13 +4,35 @@
    The bell is added by this script (top right), no HTML or CSS changes needed.
 
    Demo data: localStorage "pawpaw_notifications:<owner>" = [{ id, type, title, text, createdAt, readAt }]
-   (the staff pages write to it). Backend: set USE_BACKEND = true and match API below:
+   (the staff pages write to it). Backend API:
      GET   /api/notifications            -> [{ id, type, title, text, createdAt, readAt }]
      PATCH /api/notifications/:id/read
      POST  /api/notifications/read-all */
 (() => {
-  const USE_BACKEND = false;
+  const USE_BACKEND = true;
   const API = { list: "/api/notifications", read: (id) => "/api/notifications/" + encodeURIComponent(id) + "/read", readAll: "/api/notifications/read-all" };
+  const backendToken = () => {
+    for (const store of [sessionStorage, localStorage]) {
+      for (const key of ["token", "pawpaw_token"]) {
+        const value = store.getItem(key);
+        if (value) return value;
+      }
+    }
+    return "";
+  };
+  const backendSession = () => window.PawApi
+    ? window.PawApi.isBackendSession()
+    : Boolean(backendToken() && backendToken() !== "demo-token");
+  async function backendRequest(url, options = {}) {
+    if (window.PawApi) return window.PawApi.request(url, options);
+    const headers = new Headers(options.headers || {});
+    const token = backendToken();
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+    const response = await fetch(url, { ...options, headers });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || data.message || `Request failed (${response.status}).`);
+    return data;
+  }
 
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   /* who is signed in: owner (own list), staff / admin (shared "staff" list), vet (list of that vet).
@@ -37,8 +59,8 @@
 
   let items = [];
   async function load() {
-    if (USE_BACKEND) {
-      try { const r = await fetch(API.list, { headers: { Accept: "application/json" } }); if (r.ok) return (await r.json()).map((n) => ({ ...n, _k: KEYS[0] })); } catch (_) {}
+    if (USE_BACKEND && backendSession()) {
+      return backendRequest(API.list);
     }
     const out = [];
     KEYS.forEach((k) => { try { const v = JSON.parse(localStorage.getItem(k) || "[]"); if (Array.isArray(v)) v.forEach((n) => out.push({ ...n, _k: k })); } catch (_) {} });
@@ -83,8 +105,8 @@
   /* ---------- styles ---------- */
   const css = document.createElement("style");
   css.textContent = `
-  .nb-bell{position:fixed;top:16px;right:24px;z-index:60;width:46px;height:46px;border-radius:50%;background:#fff;color:#0f6b5c;display:grid;place-items:center;cursor:pointer;border:3px solid #e29d1a;box-shadow:0 2px 10px rgba(0,0,0,.3)}
-  .nb-bell:hover{background:#f1f6f3}.nb-bell:focus-visible{outline:3px solid #e2a21c;outline-offset:2px}
+  .nb-bell{position:fixed;top:16px;right:24px;z-index:60;width:46px;height:46px;border-radius:50%;background:#fff;color:#0f6b5c;display:grid;place-items:center;cursor:pointer;border:3px solid #f2d64f;box-shadow:0 2px 10px rgba(0,0,0,.3)}
+  .nb-bell:hover{background:#f1f6f3}.nb-bell:focus-visible{outline:3px solid #f2d64f;outline-offset:2px}
   .nb-badge{position:absolute;top:-4px;right:-4px;min-width:20px;height:20px;padding:0 5px;border-radius:999px;background:#d9534f;color:#fff;font:700 12px/20px Inter,sans-serif;text-align:center;box-sizing:border-box}
   .nb-panel{position:fixed;top:72px;right:24px;z-index:61;width:min(380px,calc(100vw - 32px));max-height:min(520px,calc(100vh - 100px));display:flex;flex-direction:column;background:#fff;color:#222;border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.28);font-family:Inter,sans-serif;overflow:hidden}
   .nb-panel[hidden]{display:none}
@@ -106,7 +128,7 @@
   .nb-tab.on{background:#0f6b5c;color:#fff}
   .nb-group{padding:14px 20px 6px;font:700 12px Inter,sans-serif;letter-spacing:.04em;text-transform:uppercase;color:#6a6a6a;background:#fff;position:sticky;top:0}
   .nb-toasts{position:fixed;right:24px;bottom:24px;z-index:70;display:grid;gap:12px;width:min(360px,calc(100vw - 32px));font-family:Inter,sans-serif}
-  .nb-toast{display:flex;gap:14px;align-items:flex-start;padding:16px 18px;border-radius:14px;background:#fff;color:#222;border-left:6px solid #e29d1a;box-shadow:0 10px 30px rgba(0,0,0,.35);text-decoration:none;animation:nbin .25s ease-out}
+  .nb-toast{display:flex;gap:14px;align-items:flex-start;padding:16px 18px;border-radius:14px;background:#fff;color:#222;border-left:6px solid #f2d64f;box-shadow:0 10px 30px rgba(0,0,0,.35);text-decoration:none;animation:nbin .25s ease-out}
   .nb-toast .nb-ico{background:#fdf0d2;color:#b97a00}
   .nb-toast strong{display:block;font-size:14.5px;line-height:1.3;color:#111}
   .nb-toast span.t{display:block;margin-top:3px;font-size:13px;line-height:1.45;color:#444}
@@ -176,24 +198,36 @@
 
   async function markRead(id) {
     const n = items.find((x) => x.id === id); if (!n || n.readAt) return;
+    if (USE_BACKEND && backendSession()) {
+      const saved = await backendRequest(API.read(id), { method: "PATCH" });
+      n.readAt = saved.readAt;
+      render();
+      return;
+    }
     n.readAt = new Date().toISOString(); save();
-    if (USE_BACKEND) { try { await fetch(API.read(id), { method: "PATCH" }); } catch (_) {} }
   }
   async function markAll() {
+    if (USE_BACKEND && backendSession()) {
+      await backendRequest(API.readAll, { method: "POST" });
+      const now = new Date().toISOString(); items.forEach((n) => { if (!n.readAt) n.readAt = now; }); render();
+      return;
+    }
     const now = new Date().toISOString(); items.forEach((n) => { if (!n.readAt) n.readAt = now; }); save(); render();
-    if (USE_BACKEND) { try { await fetch(API.readAll, { method: "POST" }); } catch (_) {} }
   }
   const setOpen = (open) => { if (open) tab = "all"; panel.hidden = !open; bell.setAttribute("aria-expanded", String(open)); if (open) render(); };
 
   bell.addEventListener("click", () => setOpen(panel.hidden));
-  allBtn.addEventListener("click", markAll);
+  allBtn.addEventListener("click", () => { markAll().catch((error) => console.error("[notifications] could not mark all read:", error)); });
   panel.querySelector(".nb-tabs").addEventListener("click", (e) => { const t = e.target.closest("[data-tab]"); if (t) { tab = t.dataset.tab; render(); } });
-  list.addEventListener("click", (e) => { const a = e.target.closest("[data-id]"); if (a) markRead(a.dataset.id); });   // then follows the link
+  list.addEventListener("click", (e) => { const a = e.target.closest("[data-id]"); if (a) markRead(a.dataset.id).catch((error) => console.error("[notifications] could not mark read:", error)); });
   document.addEventListener("click", (e) => { if (!panel.hidden && !panel.contains(e.target) && !bell.contains(e.target)) setOpen(false); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !panel.hidden) { setOpen(false); bell.focus(); } });
 
   /* refresh when the staff page (another tab) adds something, or when this tab is shown again */
-  const refresh = () => load().then((v) => { items = v; render(); popToasts(); });
+  const refresh = () => load().then((v) => { items = v; render(); popToasts(); }).catch((error) => {
+    console.error("[notifications] backend failed:", error);
+    list.textContent = error.message || "Could not load notifications.";
+  });
   window.addEventListener("storage", (e) => { if (KEYS.indexOf(e.key) >= 0) refresh(); });
   document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
   setInterval(refresh, 15000);

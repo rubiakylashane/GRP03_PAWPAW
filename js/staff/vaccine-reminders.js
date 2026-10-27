@@ -1,17 +1,18 @@
 /* js/staff/vaccine-reminders.js - staff Vaccination Reminder list
    Reads the vaccination records saved per owner ("pawpaw_vaccinations:<owner>", each with a nextDue date).
-   Replace load() with fetch("/api/staff/vaccination-reminders") when the backend is ready. */
+   Reminder records and delivery are managed by the clinic API. */
 (() => {
   const O = window.PawOwners, S = window.PawStaff, $ = (id) => document.getElementById(id), esc = O.esc;
-  /* Backend: set USE_BACKEND = true. "Send Reminder" then calls
-       POST /api/vaccination-reminders/:id/notify   -> the server sends the SMS / email to the owner
-     and replies { sentAt: "ISO date-time" }. In demo mode it only records the time in localStorage. */
-  const USE_BACKEND = false;
+  const USE_BACKEND = true;
   const API_NOTIFY = (id) => "/api/vaccination-reminders/" + encodeURIComponent(id) + "/notify";
   const SOON = 30;                                  // days: orange when due within this many days
   const KEY = "pawpaw_vaccinations:";
+  let loadError = "";
 
-  function load() {
+  async function load() {
+    if (USE_BACKEND && window.PawApi.isBackendSession()) {
+      return window.PawApi.request("/api/staff/vaccination-reminders");
+    }
     const out = [];
     try {
       for (let i = 0; i < localStorage.length; i++) {
@@ -23,12 +24,12 @@
     } catch (_) { /* storage blocked */ }
     return out;
   }
-  const all = load();
+  let all = [];
 
   const midnight = (iso) => new Date(iso + "T00:00:00");
   const now = new Date(); now.setHours(0, 0, 0, 0);
   const daysTo = (iso) => Math.round((midnight(iso) - now) / 86400000);
-  const ownerOf = (r) => { try { return O.owner(r.owner); } catch (_) { return { short: r.owner, phone: "" }; } };
+  const ownerOf = (r) => { try { return { ...O.owner(r.owner), short: O.owner(r.owner).short || r.ownerName, phone: O.owner(r.owner).phone || r.phone }; } catch (_) { return { short: r.ownerName || r.owner, phone: r.phone || "" }; } };
   const fmtDate = (iso) => midnight(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   const plural = (n) => n + (n === 1 ? " day" : " days");
 
@@ -65,6 +66,10 @@
   }
 
   function render() {
+    if (loadError) {
+      $("vx-rows").textContent = loadError;
+      return;
+    }
     const q = $("search").value.trim().toLowerCase();
     const list = all
       .filter((r) => !q || [r.vaccine, r.pet, ownerOf(r).short, ownerOf(r).phone, status(r).text].join(" ").toLowerCase().includes(q))
@@ -77,17 +82,15 @@
     btn.disabled = true;
     let sentAt = new Date().toISOString();
     try {
-      if (USE_BACKEND) {
-        const res = await fetch(API_NOTIFY(r.id), { method: "POST", headers: { Accept: "application/json" } });
-        if (!res.ok) throw new Error("Request failed");
-        sentAt = (await res.json()).sentAt || sentAt;
+      if (USE_BACKEND && window.PawApi.isBackendSession()) {
+        sentAt = (await window.PawApi.request(API_NOTIFY(r.id), { method: "POST" })).sentAt || sentAt;
       } else {
         const key = KEY + r.owner, list = JSON.parse(localStorage.getItem(key) || "[]");
         const i = list.findIndex((x, n) => (x.id || r.owner + "-" + n) === r.id);
         if (i >= 0) { list[i].lastRemindedAt = sentAt; localStorage.setItem(key, JSON.stringify(list)); }
       }
       r.lastRemindedAt = sentAt; render();
-      try {
+      if (!USE_BACKEND || !window.PawApi.isBackendSession()) try {
         const nk = "pawpaw_notifications:" + r.owner, nl = JSON.parse(localStorage.getItem(nk) || "[]");
         nl.push({ id: "n-" + Date.now().toString(36), type: "reminder", title: "Vaccine reminder: " + (r.pet || ""),
           text: (r.vaccine || "Vaccine") + " is due on " + fmtDate(r.nextDue) + ". Book an appointment to keep your pet protected.", createdAt: sentAt, readAt: null });
@@ -95,7 +98,7 @@
       } catch (_) { /* ignore */ }
       S.toast("Reminder sent to " + (ownerOf(r).short || r.owner) + ".");
     } catch (err) {
-      btn.disabled = false; S.toast("Could not send the reminder. Try again.");
+      btn.disabled = false; S.toast(err.message || "Could not send the reminder. Try again.");
     }
   }
   document.addEventListener("click", (e) => {
@@ -104,5 +107,5 @@
   });
   $("search").addEventListener("input", render);
   $("sort").addEventListener("change", render);
-  render();
+  load().then((items) => { all = items; render(); }).catch((error) => { loadError = error.message; S.toast(error.message); render(); });
 })();

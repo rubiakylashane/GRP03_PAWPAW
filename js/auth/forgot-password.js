@@ -1,22 +1,17 @@
 /* js/auth/forgot-password.js
-   Set USE_BACKEND = true and edit API once the backend is ready.
-   While false, everything is simulated (demo OTP: 123456). */
+   Password recovery uses the configured backend email provider. */
 (() => {
-  const USE_BACKEND = false;
   const API = {
-    sendOtp: "/api/forgot-password/send-otp",     // POST { contact }
-    verifyOtp: "/api/forgot-password/verify-otp", // POST { contact, otp }
-    reset: "/api/forgot-password/reset"           // POST { contact, otp, password }
+    sendOtp: "/api/forgot-password/send-otp",     // POST { email }
+    verifyOtp: "/api/forgot-password/verify-otp", // POST { email, otp }
+    reset: "/api/forgot-password/reset"           // POST { email, otp, password }
   };
-  const DEMO_OTP = "123456";
   const RESEND_SECONDS = 60;
 
   const $ = (id) => document.getElementById(id);
   const stepIds = ["step-1", "step-2", "step-3", "step-done"];
-  const state = { contact: "", otp: "" };
+  const state = { email: "", otp: "" };
   let resendTimer = null;
-
-  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
   function showStep(id) {
     stepIds.forEach((s) => { $(s).hidden = s !== id; });
@@ -34,19 +29,20 @@
       body: JSON.stringify(body)
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.message || "Something went wrong. Please try again.");
+    if (!res.ok) throw new Error(data.error || data.message || "Something went wrong. Please try again.");
     return data;
   }
 
-  // Accepts 09XXXXXXXXX, +639XXXXXXXXX, 639XXXXXXXXX -> 09XXXXXXXXX
-  function normalizePH(value) {
-    const n = value.replace(/[\s-]/g, "");
-    if (/^09\d{9}$/.test(n)) return n;
-    if (/^\+?639\d{9}$/.test(n)) return "0" + n.replace(/^\+?63/, "");
-    return null;
+  function normalizeEmail(value) {
+    const email = value.trim().toLowerCase();
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : null;
   }
 
-  const mask = (n) => n.slice(0, 4) + "•••••" + n.slice(-2);
+  function maskEmail(email) {
+    const [local, domain] = email.split("@");
+    const visible = local.length > 2 ? local.slice(0, 2) : local.slice(0, 1);
+    return `${visible}•••@${domain}`;
+  }
 
   function startCooldown() {
     const btn = $("resend-btn");
@@ -66,10 +62,8 @@
     }, 1000);
   }
 
-  async function sendOtp(contact) {
-    if (USE_BACKEND) return post(API.sendOtp, { contact });
-    await wait(500);
-    console.log("[DEMO] OTP for", contact, "is", DEMO_OTP);
+  async function sendOtp(email) {
+    return post(API.sendOtp, { email });
   }
 
   function withLoading(btn, loadingText, fn) {
@@ -82,29 +76,29 @@
     });
   }
 
-  /* Step 1: contact number */
+  /* Step 1: email address */
   $("contact-form").addEventListener("submit", async (e) => {
     e.preventDefault();
-    const input = $("contact");
-    const contact = normalizePH(input.value);
-    if (!contact) {
+    const input = $("email");
+    const email = normalizeEmail(input.value);
+    if (!email) {
       input.classList.add("invalid");
-      return setError($("contact-error"), "Enter a valid PH mobile number (e.g. 09123456789).");
+      return setError($("email-error"), "Enter a valid email address.");
     }
     input.classList.remove("invalid");
-    setError($("contact-error"), "");
+    setError($("email-error"), "");
 
     await withLoading($("contact-submit"), "Sending...", async () => {
       try {
-        await sendOtp(contact);
-        state.contact = contact;
-        $("masked-contact").textContent = mask(contact);
+        await sendOtp(email);
+        state.email = email;
+        $("masked-email").textContent = maskEmail(email);
         showStep("step-2");
         $("otp").focus();
         startCooldown();
       } catch (err) {
         input.classList.add("invalid");
-        setError($("contact-error"), err.message);
+        setError($("email-error"), err.message);
       }
     });
   });
@@ -127,12 +121,7 @@
 
     await withLoading($("otp-submit"), "Verifying...", async () => {
       try {
-        if (USE_BACKEND) {
-          await post(API.verifyOtp, { contact: state.contact, otp });
-        } else {
-          await wait(400);
-          if (otp !== DEMO_OTP) throw new Error("Incorrect or expired OTP.");
-        }
+        await post(API.verifyOtp, { email: state.email, otp });
         state.otp = otp;
         showStep("step-3");
         $("new-password").focus();
@@ -145,7 +134,7 @@
 
   $("resend-btn").addEventListener("click", async () => {
     try {
-      await sendOtp(state.contact);
+      await sendOtp(state.email);
       setError($("otp-error"), "");
       startCooldown();
     } catch (err) {
@@ -186,11 +175,7 @@
 
     await withLoading($("reset-submit"), "Saving...", async () => {
       try {
-        if (USE_BACKEND) {
-          await post(API.reset, { contact: state.contact, otp: state.otp, password: p1.value });
-        } else {
-          await wait(500);
-        }
+        await post(API.reset, { email: state.email, otp: state.otp, password: p1.value });
         showStep("step-done");
       } catch (err) {
         setError($("reset-error"), err.message);

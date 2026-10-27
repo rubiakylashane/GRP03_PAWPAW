@@ -8,6 +8,7 @@
 (() => {
   const me = document.currentScript;
   const allowed = String((me && me.dataset.role) || "").split(",").map((s) => s.trim()).filter(Boolean);
+  if (allowed.length === 1) document.documentElement.dataset.appRole = allowed[0];
   const base = location.pathname.replace(/\/pages\/[^/]*\/[^/]*$/, "/pages/");   // .../pages/
   const HOME = { owner: "owner/dashboard.html", staff: "staff/dashboard.html", vet: "vet/dashboard.html", admin: "admin/dashboard.html" };
 
@@ -73,7 +74,7 @@
         ".pp-lo-row{display:flex;gap:10px;justify-content:flex-end}" +
         ".pp-lo-row button{font:inherit;font-size:14px;font-weight:600;padding:9px 18px;border-radius:8px;cursor:pointer;border:1px solid #cfd8d5;background:#fff;color:#1a1a1a}" +
         ".pp-lo-row .pp-lo-ok{background:#0f6b5c;border-color:#0f6b5c;color:#fff}" +
-        ".pp-lo-row .pp-lo-ok:hover{background:#0b5649}.pp-lo-row button:focus-visible{outline:2px solid #e29d1a;outline-offset:2px}";
+        ".pp-lo-row .pp-lo-ok:hover{background:#0b5649}.pp-lo-row button:focus-visible{outline:2px solid #f2d64f;outline-offset:2px}";
       document.head.appendChild(st);
     }
     box = document.createElement("div");
@@ -133,7 +134,7 @@
         ".sidebar-user .pp-prof-link{cursor:pointer}" +
         ".sidebar-user .avatar.pp-prof-link:hover{box-shadow:0 0 0 2px rgba(255,255,255,.55)}" +
         ".sidebar-user strong.pp-prof-link:hover{text-decoration:underline}" +
-        ".sidebar-user .pp-prof-link:focus-visible{outline:2px solid #e29d1a;outline-offset:2px;border-radius:6px}";
+        ".sidebar-user .pp-prof-link:focus-visible{outline:2px solid #f2d64f;outline-offset:2px;border-radius:6px}";
       document.head.appendChild(st);
     }
     const go = () => { location.href = "profile.html"; };      // same folder: pages/owner/

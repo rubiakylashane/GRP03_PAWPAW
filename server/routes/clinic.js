@@ -92,7 +92,24 @@ async function audit(client, userId, action, table, recordId, description) {
   );
 }
 
-async function getAppointments({ userId, role, ownerId } = {}) {
+async function notify(client, userId, type, title, message) {
+  if (!userId) return;
+  await client.query(
+    `INSERT INTO notification (user_id, notification_type, title, message)
+     VALUES ($1, $2, $3, $4)`,
+    [userId, type, title, message]
+  );
+}
+
+function validAppointmentDate(value) {
+  const date = String(value || '');
+  const parsed = new Date(`${date}T00:00:00Z`);
+  return /^\d{4}-\d{2}-\d{2}$/.test(date)
+    && !Number.isNaN(parsed.getTime())
+    && parsed.toISOString().slice(0, 10) === date;
+}
+
+async function getAppointments({ userId, role, ownerId, status } = {}) {
   const clauses = [];
   const values = [];
   if (role === 'vet') {
@@ -102,6 +119,10 @@ async function getAppointments({ userId, role, ownerId } = {}) {
   if (role === 'owner') {
     values.push(ownerId);
     clauses.push(`p.owner_id = $${values.length}`);
+  }
+  if (status) {
+    values.push(status);
+    clauses.push(`a.status = $${values.length}`);
   }
   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
   const result = await db.query(
@@ -430,7 +451,8 @@ router.get('/owners', authorize('Admin', 'Staff', 'Veterinarian', 'Pet Owner'), 
   );
   const pets = await db.query(
     `SELECT p.pet_id AS id, p.pet_id, p.owner_id, p.name, p.species, p.breed,
-            p.date_of_birth, p.gender, p.allergies, p.notes, p.photo, TRUE AS is_active
+            p.date_of_birth, p.gender, p.allergies, p.notes, p.photo,
+            p.pet_status = 'Active' AS is_active, lower(p.pet_status) AS status
        FROM pet p
        JOIN owner o ON o.owner_id = p.owner_id
        ${where}
@@ -484,39 +506,118 @@ router.get('/owners/:id', authorize('Admin', 'Staff', 'Veterinarian', 'Pet Owner
   if (!result.rows[0]) return notFound(res, 'Owner not found.');
   const pets = await db.query(
     `SELECT pet_id AS id, pet_id, owner_id, name, species, breed, date_of_birth,
-            gender, allergies, notes, photo, TRUE AS is_active
+            gender, allergies, notes, photo, pet_status = 'Active' AS is_active,
+            lower(pet_status) AS status
        FROM pet WHERE owner_id = $1 ORDER BY name`,
     [id]
   );
   return res.json({ ...result.rows[0], pets: pets.rows });
 }));
 
-router.patch('/owners/:id', authorize('Admin', 'Staff'), asyncRoute(async (req, res) => {
+router.patch('/owners/:id', authorize('Admin', 'Staff', 'Pet Owner'), asyncRoute(async (req, res) => {
   const id = Number(req.params.id);
-  const result = await db.query(
-    `UPDATE owner
-        SET name = COALESCE($2, name), email = COALESCE($3, email),
-            phone = COALESCE($4, phone), address = COALESCE($5, address),
-            photo = COALESCE($6, photo)
-      WHERE owner_id = $1
-      RETURNING owner_id AS id, owner_id, user_id, name, email, phone, address, registration_date, photo AS profile_photo`,
-    [id, req.body.name || null, req.body.email || null, req.body.phone || null, req.body.address || null, req.body.photo || null]
-  );
-  if (!result.rows[0]) return notFound(res, 'Owner not found.');
-  if (result.rows[0].user_id) {
-    await db.query(
-      `UPDATE user_account
-          SET display_name = $2, email = $3, phone = $4
-        WHERE user_id = $1`,
-      [result.rows[0].user_id, result.rows[0].name, result.rows[0].email, result.rows[0].phone]
-    );
+  if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: 'Invalid owner ID.' });
+
+  const fields = ['name', 'email', 'phone', 'address', 'photo'];
+  const provided = Object.fromEntries(fields.map((field) => [field, Object.prototype.hasOwnProperty.call(req.body, field)]));
+  const values = {
+    name: provided.name ? requiredString(req.body.name, 'Name', 100) : null,
+    email: provided.email ? (String(req.body.email || '').trim().toLowerCase() || null) : null,
+    phone: provided.phone ? (String(req.body.phone || '').trim() || null) : null,
+    address: provided.address ? (String(req.body.address || '').trim() || null) : null,
+    photo: provided.photo ? (String(req.body.photo || '').trim() || null) : null
+  };
+  const currentPassword = req.body.currentPassword === undefined ? null : requiredString(req.body.currentPassword, 'Current password', 200);
+  const newPassword = req.body.newPassword === undefined ? null : requiredString(req.body.newPassword, 'New password', 200);
+  if ((currentPassword === null) !== (newPassword === null)) {
+    return res.status(400).json({ error: 'Current and new passwords are both required.' });
   }
-  await db.query(
-    `INSERT INTO audit_log (user_id, action_type, table_name, record_id, action_description)
-     VALUES ($1, 'UPDATE', 'owner', $2, $3)`,
-    [req.user.userId, id, `Updated owner ${result.rows[0].name}.`]
-  );
-  return res.json(result.rows[0]);
+  if (newPassword !== null && newPassword.length < 8) {
+    return res.status(400).json({ error: 'Password must be at least 8 characters.' });
+  }
+
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+    const owner = await client.query(
+      `SELECT owner_id, user_id FROM owner WHERE owner_id = $1 FOR UPDATE`,
+      [id]
+    );
+    if (!owner.rows[0]) {
+      await client.query('ROLLBACK');
+      return notFound(res, 'Owner not found.');
+    }
+    if (req.user.role === 'Pet Owner' && owner.rows[0].user_id !== req.user.userId) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ error: 'You can only update your own profile.' });
+    }
+    if (newPassword !== null) {
+      const actor = await client.query(
+        `SELECT password_hash FROM user_account
+          WHERE user_id = $1 AND account_status = 'Active'`,
+        [req.user.userId]
+      );
+      if (!actor.rows[0] || !(await bcrypt.compare(currentPassword, actor.rows[0].password_hash))) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: 'Current password is incorrect.' });
+      }
+      if (!owner.rows[0].user_id) {
+        await client.query('ROLLBACK');
+        return res.status(409).json({ error: 'This owner has no login account.' });
+      }
+      const target = await client.query(
+        `SELECT role FROM user_account WHERE user_id = $1 FOR UPDATE`,
+        [owner.rows[0].user_id]
+      );
+      if (!target.rows[0] || target.rows[0].role !== 'Pet Owner') {
+        await client.query('ROLLBACK');
+        return res.status(409).json({ error: 'This owner has no owner login account.' });
+      }
+      await client.query(
+        `UPDATE user_account SET password_hash = $2 WHERE user_id = $1`,
+        [owner.rows[0].user_id, await bcrypt.hash(newPassword, 12)]
+      );
+      await audit(client, req.user.userId, 'UPDATE', 'user_account', owner.rows[0].user_id, `Changed password for owner ${id}.`);
+    }
+
+    const result = await client.query(
+      `UPDATE owner
+          SET name = CASE WHEN $2::boolean THEN $3 ELSE name END,
+              email = CASE WHEN $4::boolean THEN $5 ELSE email END,
+              phone = CASE WHEN $6::boolean THEN $7 ELSE phone END,
+              address = CASE WHEN $8::boolean THEN $9 ELSE address END,
+              photo = CASE WHEN $10::boolean THEN $11 ELSE photo END
+        WHERE owner_id = $1
+        RETURNING owner_id AS id, owner_id, user_id, name, email, phone, address,
+                  registration_date, photo AS profile_photo`,
+      [
+        id,
+        provided.name, values.name,
+        provided.email, values.email,
+        provided.phone, values.phone,
+        provided.address, values.address,
+        provided.photo, values.photo
+      ]
+    );
+    if (result.rows[0].user_id) {
+      await client.query(
+        `UPDATE user_account
+            SET display_name = $2,
+                email = CASE WHEN $3::boolean THEN $4 ELSE email END,
+                phone = CASE WHEN $5::boolean THEN $6 ELSE phone END
+          WHERE user_id = $1`,
+        [result.rows[0].user_id, result.rows[0].name, provided.email, values.email, provided.phone, values.phone]
+      );
+    }
+    await audit(client, req.user.userId, 'UPDATE', 'owner', id, `Updated owner ${result.rows[0].name}.`);
+    await client.query('COMMIT');
+    return res.json(result.rows[0]);
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 }));
 
 router.patch('/owners/:id/status', authorize('Admin'), asyncRoute(async (req, res) => {
@@ -546,46 +647,89 @@ router.patch('/owners/:id/status', authorize('Admin'), asyncRoute(async (req, re
 
 router.post('/owners/:id/pets', authorize('Admin', 'Staff', 'Pet Owner'), asyncRoute(async (req, res) => {
   const ownerId = Number(req.params.id);
+  if (!Number.isInteger(ownerId) || ownerId < 1) return res.status(400).json({ error: 'Invalid owner ID.' });
   if (req.user.role === 'Pet Owner') {
     const owner = await db.query('SELECT owner_id FROM owner WHERE user_id = $1', [req.user.userId]);
     if (!owner.rows[0] || owner.rows[0].owner_id !== ownerId) return res.status(403).json({ error: 'You can only add pets to your own account.' });
   }
   const name = requiredString(req.body.name, 'Pet name', 100);
   const species = requiredString(req.body.species, 'Species', 50);
+  const breed = req.body.breed == null || req.body.breed === '' ? null : requiredString(req.body.breed, 'Breed', 50);
+  const gender = req.body.gender == null || req.body.gender === '' ? null : requiredString(req.body.gender, 'Gender', 10);
+  if (gender && !['Male', 'Female', 'Unknown'].includes(gender)) {
+    return res.status(400).json({ error: 'Gender must be Male, Female, or Unknown.' });
+  }
+  const dateOfBirth = req.body.dateOfBirth || null;
+  if (dateOfBirth !== null && !validAppointmentDate(String(dateOfBirth))) {
+    return res.status(400).json({ error: 'Date of birth must be a valid YYYY-MM-DD date.' });
+  }
+  if (dateOfBirth) {
+    const currentDate = await db.query('SELECT CURRENT_DATE::text AS today');
+    if (dateOfBirth > currentDate.rows[0].today) {
+      return res.status(400).json({ error: 'Date of birth cannot be in the future.' });
+    }
+  }
   const result = await db.query(
     `INSERT INTO pet
        (owner_id, name, species, breed, date_of_birth, gender, allergies, notes, photo)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-     RETURNING pet_id AS id, pet_id, owner_id, name, species, breed, date_of_birth, gender, allergies, notes, photo`,
-    [ownerId, name, species, req.body.breed || null, req.body.dateOfBirth || null, req.body.gender || null, req.body.allergies || null, req.body.notes || null, req.body.photo || null]
+     RETURNING pet_id AS id, pet_id, owner_id, name, species, breed, date_of_birth, gender, allergies, notes, photo, pet_status = 'Active' AS is_active, lower(pet_status) AS status`,
+    [ownerId, name, species, breed, dateOfBirth, gender, req.body.allergies || null, req.body.notes || null, req.body.photo || null]
   );
   await db.query(
     `INSERT INTO audit_log (user_id, action_type, table_name, record_id, action_description)
      VALUES ($1, 'INSERT', 'pet', $2, $3)`,
     [req.user.userId, result.rows[0].id, `Added pet ${name}.`]
   );
-  return res.status(201).json({ ...result.rows[0], is_active: true, status: 'active' });
+  return res.status(201).json(result.rows[0]);
 }));
 
 router.patch('/owners/:ownerId/pets/:petId', authorize('Admin', 'Staff', 'Pet Owner'), asyncRoute(async (req, res) => {
   const ownerId = Number(req.params.ownerId);
   const petId = Number(req.params.petId);
+  if (!Number.isInteger(ownerId) || ownerId < 1 || !Number.isInteger(petId) || petId < 1) {
+    return res.status(400).json({ error: 'Invalid owner or pet ID.' });
+  }
   if (req.user.role === 'Pet Owner') {
     const owner = await db.query('SELECT owner_id FROM owner WHERE user_id = $1', [req.user.userId]);
     if (!owner.rows[0] || owner.rows[0].owner_id !== ownerId) return res.status(403).json({ error: 'You can only update your own pets.' });
   }
-  if (req.body.status !== undefined && req.body.status !== 'active') {
-    return res.status(409).json({ error: 'The schema has no pet status field; pet deactivation is not supported.' });
+  if (req.body.status !== undefined && !['active', 'inactive'].includes(String(req.body.status).toLowerCase())) {
+    return res.status(400).json({ error: 'Status must be active or inactive.' });
+  }
+  if (req.body.gender !== undefined && req.body.gender !== null
+      && !['Male', 'Female', 'Unknown'].includes(String(req.body.gender))) {
+    return res.status(400).json({ error: 'Gender must be Male, Female, or Unknown.' });
+  }
+  const hasDateOfBirth = Object.prototype.hasOwnProperty.call(req.body, 'dateOfBirth');
+  const dateOfBirth = req.body.dateOfBirth || null;
+  if (dateOfBirth && !validAppointmentDate(String(dateOfBirth))) {
+    return res.status(400).json({ error: 'Date of birth must be a valid YYYY-MM-DD date.' });
+  }
+  if (dateOfBirth) {
+    const currentDate = await db.query('SELECT CURRENT_DATE::text AS today');
+    if (dateOfBirth > currentDate.rows[0].today) {
+      return res.status(400).json({ error: 'Date of birth cannot be in the future.' });
+    }
   }
   const result = await db.query(
     `UPDATE pet
         SET name = COALESCE($3, name), species = COALESCE($4, species),
-            breed = COALESCE($5, breed), date_of_birth = COALESCE($6, date_of_birth),
+            breed = COALESCE($5, breed),
+            date_of_birth = CASE WHEN $12::boolean THEN $6::date ELSE date_of_birth END,
             gender = COALESCE($7, gender), allergies = COALESCE($8, allergies),
-            notes = COALESCE($9, notes), photo = COALESCE($10, photo)
+            notes = COALESCE($9, notes), photo = COALESCE($10, photo),
+            pet_status = CASE WHEN $11::text IS NULL THEN pet_status
+                              WHEN lower($11) = 'inactive' THEN 'Inactive' ELSE 'Active' END
       WHERE owner_id = $1 AND pet_id = $2
-      RETURNING pet_id AS id, pet_id, owner_id, name, species, breed, date_of_birth, gender, allergies, notes, photo`,
-    [ownerId, petId, req.body.name || null, req.body.species || null, req.body.breed || null, req.body.dateOfBirth || null, req.body.gender || null, req.body.allergies || null, req.body.notes || null, req.body.photo || null]
+      RETURNING pet_id AS id, pet_id, owner_id, name, species, breed, date_of_birth, gender, allergies, notes, photo, pet_status = 'Active' AS is_active, lower(pet_status) AS status`,
+    [
+      ownerId, petId,
+      req.body.name || null, req.body.species || null, req.body.breed || null,
+      dateOfBirth, req.body.gender || null, req.body.allergies || null,
+      req.body.notes || null, req.body.photo || null,
+      req.body.status === undefined ? null : String(req.body.status), hasDateOfBirth
+    ]
   );
   if (!result.rows[0]) return notFound(res, 'Pet not found.');
   await db.query(
@@ -593,7 +737,7 @@ router.patch('/owners/:ownerId/pets/:petId', authorize('Admin', 'Staff', 'Pet Ow
      VALUES ($1, 'UPDATE', 'pet', $2, $3)`,
     [req.user.userId, petId, `Updated pet ${result.rows[0].name}.`]
   );
-  return res.json({ ...result.rows[0], is_active: true, status: 'active' });
+  return res.json(result.rows[0]);
 }));
 
 router.get('/services', asyncRoute(async (req, res) => {
@@ -607,7 +751,28 @@ router.get('/services', asyncRoute(async (req, res) => {
       ORDER BY service_name`,
     [INACTIVE_SERVICE_MARKER + '%', INACTIVE_SERVICE_MARKER.length + 1, req.user.role === 'Admin']
   );
-  return res.json(result.rows);
+  const services = result.rows.map((service) => ({
+    ...service,
+    price: Number(service.price)
+  }));
+  if (req.user.role !== 'Pet Owner') return res.json(services);
+
+  const vaccineServices = services.filter((service) => service.name.startsWith('Vaccine: '));
+  const visibleServices = services.filter((service) => !service.name.startsWith('Vaccine: '));
+  if (vaccineServices.length) {
+    visibleServices.push({
+      id: 'vaccination',
+      name: 'Vaccination',
+      price: Math.min(...vaccineServices.map((service) => service.price)),
+      desc: "Core and booster vaccines, recorded in your pet's history with the next due date.",
+      options: vaccineServices.map((service) => ({
+        id: service.id,
+        name: service.name.slice('Vaccine: '.length),
+        price: service.price
+      }))
+    });
+  }
+  return res.json(visibleServices);
 }));
 
 router.post(['/services', '/admin/services'], authorize('Admin'), asyncRoute(async (req, res) => {
@@ -679,8 +844,10 @@ router.patch(['/services/:id', '/admin/services/:id'], authorize('Admin'), async
   }
 }));
 
-router.get('/admin/appointments', authorize('Admin', 'Staff'), asyncRoute(async (_req, res) => {
-  return res.json(await getAppointments());
+router.get('/admin/appointments', authorize('Admin', 'Staff'), asyncRoute(async (req, res) => {
+  const status = req.query.status ? APPOINTMENT_STATUS[String(req.query.status).toLowerCase()] || String(req.query.status) : null;
+  if (status && !Object.values(APPOINTMENT_STATUS).includes(status)) return res.status(400).json({ error: 'Invalid appointment status filter.' });
+  return res.json(await getAppointments({ status }));
 }));
 
 router.get('/staff/appointments', authorize('Admin', 'Staff'), asyncRoute(async (_req, res) => {
@@ -730,6 +897,8 @@ router.post('/appointments', authorize('Admin', 'Staff', 'Pet Owner'), asyncRout
   const vetInput = req.body.veterinarianId ?? req.body.vetId ?? req.body.vet ?? null;
   const date = requiredString(req.body.date, 'Appointment date', 10);
   const time = requiredString(req.body.time, 'Appointment time', 8);
+  if (!validAppointmentDate(date)) return res.status(400).json({ error: 'Appointment date must be a valid YYYY-MM-DD date.' });
+  if (!/^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(time)) return res.status(400).json({ error: 'Appointment time must be a valid 24-hour time.' });
   if (!Number.isInteger(petId) || petId < 1) return res.status(400).json({ error: 'Choose a valid pet.' });
   const client = await db.connect();
   try {
@@ -748,9 +917,9 @@ router.post('/appointments', authorize('Admin', 'Staff', 'Pet Owner'), asyncRout
       return res.status(400).json({ error: 'Choose a valid veterinarian.' });
     }
     const pet = await client.query(
-      `SELECT p.owner_id, o.user_id
+      `SELECT p.owner_id, o.user_id, p.name AS pet_name
          FROM pet p JOIN owner o ON o.owner_id = p.owner_id
-        WHERE p.pet_id = $1 AND (o.user_id IS NULL OR EXISTS (
+        WHERE p.pet_id = $1 AND p.pet_status = 'Active' AND (o.user_id IS NULL OR EXISTS (
           SELECT 1 FROM user_account u WHERE u.user_id = o.user_id AND u.account_status = 'Active'
         ))`,
       [petId]
@@ -800,6 +969,13 @@ router.post('/appointments', authorize('Admin', 'Staff', 'Pet Owner'), asyncRout
       [petId, vetId, date, time, req.body.reason || null, status]
     );
     const appointmentId = created.rows[0].appointment_id;
+    await notify(client, pet.rows[0].user_id, 'appointment', 'Appointment requested',
+      `${pet.rows[0].pet_name}'s appointment request for ${date} at ${time} was received.`);
+    if (vetId !== null) {
+      const vetAccount = await client.query('SELECT user_id FROM veterinarian WHERE veterinarian_id = $1', [vetId]);
+      await notify(client, vetAccount.rows[0]?.user_id, 'appointment', 'New appointment',
+        `${pet.rows[0].pet_name} has an appointment on ${date} at ${time}.`);
+    }
     const requestedServices = Array.isArray(req.body.services) ? req.body.services : [];
     for (const service of requestedServices) {
       let serviceId = Number(typeof service === 'object' ? service.id || service.serviceId : service);
@@ -869,12 +1045,16 @@ router.patch('/appointments/:id', authorize('Admin', 'Staff', 'Veterinarian', 'P
     const ownVet = req.user.role === 'Veterinarian';
     const ownOwner = req.user.role === 'Pet Owner';
     const query = await client.query(
-      `SELECT a.appointment_id, a.status, p.owner_id, a.veterinarian_id, v.user_id
+      `SELECT a.appointment_id, a.status, p.owner_id, p.name AS pet_name,
+              o.user_id AS owner_user_id, a.veterinarian_id, v.user_id,
+              a.appointment_date::text AS appointment_date,
+              to_char(a.appointment_time, 'HH24:MI') AS appointment_time
          FROM appointment a
          JOIN pet p ON p.pet_id = a.pet_id
+         JOIN owner o ON o.owner_id = p.owner_id
          LEFT JOIN veterinarian v ON v.veterinarian_id = a.veterinarian_id
         WHERE a.appointment_id = $1
-        FOR UPDATE`,
+        FOR UPDATE OF a`,
       [id]
     );
     const before = query.rows[0];
@@ -941,6 +1121,26 @@ router.patch('/appointments/:id', authorize('Admin', 'Staff', 'Veterinarian', 'P
         return res.status(400).json({ error: 'Choose an active veterinarian.' });
       }
     }
+    const nextDate = req.body.date || before.appointment_date;
+    const nextTime = req.body.time || before.appointment_time;
+    if (nextVetId !== null && (nextVetId !== before.veterinarian_id || nextDate !== before.appointment_date || nextTime !== before.appointment_time)) {
+      await client.query(
+        'SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))',
+        [`${nextVetId}:${nextDate}`, nextTime]
+      );
+      const conflict = await client.query(
+        `SELECT 1 FROM appointment
+          WHERE veterinarian_id = $1 AND appointment_date = $2::date
+            AND appointment_time = $3::time AND appointment_id <> $4
+            AND status NOT IN ('Completed', 'Cancelled', 'No-show')
+          FOR UPDATE`,
+        [nextVetId, nextDate, nextTime, id]
+      );
+      if (conflict.rowCount) {
+        await client.query('ROLLBACK');
+        return res.status(409).json({ error: 'That veterinarian already has an appointment at this time.' });
+      }
+    }
     const dbStatus = status === undefined ? before.status : status;
     if (ownVet && status !== undefined && !['In Progress', 'Completed'].includes(dbStatus)) {
       await client.query('ROLLBACK');
@@ -966,6 +1166,18 @@ router.patch('/appointments/:id', authorize('Admin', 'Staff', 'Veterinarian', 'P
         req.body.rescheduledFrom?.time || null]
     );
     await audit(client, req.user.userId, 'UPDATE', 'appointment', id, `Updated appointment ${id}.`);
+    if (status !== undefined || req.body.date !== undefined || req.body.time !== undefined || nextVetId !== before.veterinarian_id) {
+      const message = `Appointment for ${before.pet_name} was updated to ${UI_APPOINTMENT_STATUS[dbStatus] || dbStatus} on ${nextDate} at ${nextTime}.`;
+      await notify(client, before.owner_user_id, 'appointment', 'Appointment updated', message);
+      if (before.veterinarian_id && before.veterinarian_id !== nextVetId) {
+        const oldVet = await client.query('SELECT user_id FROM veterinarian WHERE veterinarian_id = $1', [before.veterinarian_id]);
+        await notify(client, oldVet.rows[0]?.user_id, 'appointment', 'Appointment updated', message);
+      }
+      if (nextVetId) {
+        const nextVet = await client.query('SELECT user_id FROM veterinarian WHERE veterinarian_id = $1', [nextVetId]);
+        await notify(client, nextVet.rows[0]?.user_id, 'appointment', 'Appointment updated', message);
+      }
+    }
     await client.query('COMMIT');
     const result = await db.query(`${APPOINTMENT_SELECT} WHERE a.appointment_id = $1`, [update.rows[0].appointment_id]);
     return res.json(mapAppointment(result.rows[0]));
@@ -1214,18 +1426,31 @@ router.get(['/audit', '/audit-log'], authorize('Admin'), asyncRoute(async (req, 
   const values = [];
   const where = [];
   if (req.query.user) {
-    values.push(Number(req.query.user));
+    const userId = Number(req.query.user);
+    if (!Number.isInteger(userId) || userId < 1) return res.status(400).json({ error: 'User filter must be a valid user ID.' });
+    values.push(userId);
     where.push(`l.user_id = $${values.length}`);
   }
   if (req.query.action) {
-    values.push(String(req.query.action).toUpperCase());
+    const action = String(req.query.action).toUpperCase();
+    const mappedAction = action === 'CREATE' ? 'INSERT' : action;
+    if (!['INSERT', 'UPDATE', 'DELETE', 'LOGIN', 'LOGOUT'].includes(mappedAction)) {
+      return res.status(400).json({ error: 'Invalid audit action filter.' });
+    }
+    values.push(mappedAction);
     where.push(`l.action_type = $${values.length}`);
   }
+  if (req.query.record) {
+    values.push(String(req.query.record));
+    where.push(`l.table_name = $${values.length}`);
+  }
   if (req.query.from) {
+    if (!validAppointmentDate(req.query.from)) return res.status(400).json({ error: 'From date must be a valid YYYY-MM-DD date.' });
     values.push(req.query.from);
     where.push(`l.action_date >= $${values.length}::date`);
   }
   if (req.query.to) {
+    if (!validAppointmentDate(req.query.to)) return res.status(400).json({ error: 'To date must be a valid YYYY-MM-DD date.' });
     values.push(req.query.to);
     where.push(`l.action_date < ($${values.length}::date + INTERVAL '1 day')`);
   }

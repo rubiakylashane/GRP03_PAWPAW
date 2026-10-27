@@ -24,6 +24,7 @@
     return rows;
   }
   let rows = readAll();
+  let loadError = "";
 
   const cls = (r) => { if (!r.nextDue) return "ok"; const d = daysTo(r.nextDue); return d < 0 ? "late" : d <= SOON ? "soon" : "ok"; };
   const SORTS = {
@@ -33,6 +34,10 @@
   };
 
   function render() {
+    if (loadError) {
+      $("vx-rows").textContent = loadError;
+      return;
+    }
     const q = $("search").value.trim().toLowerCase();
     const list = rows.filter((r) => !q || [r.pet, r.vaccine, V.ownerName(r.owner)].join(" ").toLowerCase().includes(q)).sort(SORTS[$("sort").value] || SORTS.recent);
     $("vx-rows").innerHTML = list.length ? list.map((r) => `
@@ -60,7 +65,7 @@
     $("rv-date").value = V.today(); $("rv-due").value = suggest(V.today()); $("rv-notes").value = "";
     fillPets(); err(""); dlg.showModal();
   }
-  function save() {
+  async function save() {
     const owner = $("rv-owner").value, petId = $("rv-pet").value;
     let vaccine = $("rv-vaccine").value; if (vaccine === "Other") vaccine = $("rv-other").value.trim();
     const given = $("rv-date").value, due = $("rv-due").value;
@@ -71,12 +76,26 @@
     if (given > V.today()) return err("The date given cannot be in the future.");
     if (!due) return err("Pick the next due date.");
     if (due <= given) return err("The next due date must be after the date given.");
-    const pet = O.getPet(owner, petId), k = KEY + owner, list = V.readJson(k, []);
-    list.push({ id: "vx-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), apptId: "", petId, pet: pet ? pet.name : "", vaccine, dateAdministered: given, nextDue: due, administeredBy: V.mine || "Vet", notes: $("rv-notes").value.trim() });
-    try { localStorage.setItem(k, JSON.stringify(list)); } catch (_) { return err("Could not save. Storage is blocked."); }
-    window.PawOwners.audit("create", "vaccination", "Recorded " + vaccine + " vaccination for " + (pet ? pet.name : "a pet") + ".");
-    window.PawStaffAppts.notify(owner, "record", "Vaccination recorded", vaccine + " given to " + (pet ? pet.name : "your pet") + ". See Vaccination History for the next due date.");
-    rows = readAll(); dlg.close(); render(); S.toast("Vaccination recorded.");
+    const pet = O.getPet(owner, petId);
+    if (window.PawApi.isBackendSession()) {
+      try {
+        await window.PawApi.request("/api/vaccinations", {
+          method: "POST",
+          body: { petId, vaccine, dateAdministered: given, nextDue: due, notes: $("rv-notes").value.trim() }
+        });
+        rows = await window.PawApi.request("/api/vet/vaccinations");
+      } catch (error) {
+        return err(error.message || "Could not save the vaccination.");
+      }
+    } else {
+      const k = KEY + owner, list = V.readJson(k, []);
+      list.push({ id: "vx-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), apptId: "", petId, pet: pet ? pet.name : "", vaccine, dateAdministered: given, nextDue: due, administeredBy: V.mine || "Vet", notes: $("rv-notes").value.trim() });
+      try { localStorage.setItem(k, JSON.stringify(list)); } catch (_) { return err("Could not save. Storage is blocked."); }
+      window.PawOwners.audit("create", "vaccination", "Recorded " + vaccine + " vaccination for " + (pet ? pet.name : "a pet") + ".");
+      window.PawStaffAppts.notify(owner, "record", "Vaccination recorded", vaccine + " given to " + (pet ? pet.name : "your pet") + ". See Vaccination History for the next due date.");
+      rows = readAll();
+    }
+    dlg.close(); render(); S.toast("Vaccination recorded.");
   }
   $("record-btn").addEventListener("click", openRecord);
   $("rv-owner").addEventListener("change", fillPets);
@@ -86,5 +105,9 @@
   $("rv-cancel").addEventListener("click", () => dlg.close());
   $("search").addEventListener("input", render);
   $("sort").addEventListener("change", render);
-  render();
+  if (window.PawApi.isBackendSession()) {
+    window.PawApi.request("/api/vet/vaccinations")
+      .then((data) => { rows = data; render(); })
+      .catch((error) => { loadError = error.message; S.toast(error.message); render(); });
+  } else render();
 })();

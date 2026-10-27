@@ -94,17 +94,60 @@ document.querySelectorAll("[data-toggle]").forEach((btn) =>
 const photo = document.getElementById("photo");
 const preview = document.getElementById("photo-preview");
 const hint = document.getElementById("photo-hint");
+let photoData = "";
 
-photo.addEventListener("change", () => {
+function resizePhoto(file, max = 480) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      const ratio = Math.min(1, max / Math.max(image.width, image.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(image.width * ratio);
+      canvas.height = Math.round(image.height * ratio);
+      const context = canvas.getContext("2d");
+      URL.revokeObjectURL(url);
+      if (!context) return reject(new Error("Could not process that image."));
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL("image/jpeg", 0.82));
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Could not read that image."));
+    };
+    image.src = url;
+  });
+}
+
+photo.addEventListener("change", async () => {
   const file = photo.files[0];
   if (!file) {
+    photoData = "";
     preview.hidden = true;
     hint.hidden = false;
     return;
   }
-  preview.src = URL.createObjectURL(file);
-  preview.hidden = false;
-  hint.hidden = true;
+  if (!file.type.startsWith("image/")) {
+    photo.value = "";
+    setError(photo, "Choose an image file.");
+    return;
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    photo.value = "";
+    setError(photo, "Image must be 5 MB or smaller.");
+    return;
+  }
+  try {
+    photoData = await resizePhoto(file);
+    preview.src = photoData;
+    preview.hidden = false;
+    hint.hidden = true;
+    setError(photo, "");
+  } catch (error) {
+    photo.value = "";
+    photoData = "";
+    setError(photo, error.message || "Could not read that image.");
+  }
 });
 
 /* ---------- Submit ---------- */
@@ -145,7 +188,8 @@ form.addEventListener("submit", async (e) => {
         username: form.elements.username.value.trim(),
         password: form.elements.password.value,
         phone: form.elements.contact_number.value.trim(),
-        address: form.elements.address.value.trim()
+        address: form.elements.address.value.trim(),
+        photo: photoData || null
       }
     });
     btn.textContent = "Account created!";

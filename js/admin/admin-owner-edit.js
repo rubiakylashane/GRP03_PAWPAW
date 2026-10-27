@@ -3,8 +3,11 @@
   const O = window.PawOwners, S = window.PawStaff, $ = (id) => document.getElementById(id);
   const id = S.ownerId();
   const back = "owners-pets.html?owner=" + encodeURIComponent(id);
+  const backend = window.PawApi.isBackendSession();
 
+  function initialize() {
   if (!id || !O.exists(id)) { $("owner-form").hidden = true; $("missing").hidden = false; return; }
+  $("owner-form").hidden = false;
   $("go-back").href = back; $("cancel").href = back;
 
   const o = O.owner(id);
@@ -38,7 +41,7 @@
 
   ["name", "email", "phone", "cur", "new", "conf"].forEach((k) => $(k).addEventListener("input", () => S.setError(k, "")));
 
-  $("owner-form").addEventListener("submit", (e) => {
+  $("owner-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const v = { name: f.name.value.trim().replace(/\s+/g, " "), email: f.email.value.trim(), address: f.address.value.trim(), phone: f.phone.value.replace(/[\s-]/g, "") };
     const cur = $("cur").value, nw = $("new").value, conf = $("conf").value;
@@ -59,10 +62,36 @@
     const patch = { email: v.email, phone: v.phone, address: v.address, photo };
     if (v.name !== o.name) Object.assign(patch, { name: v.name, firstName: "", middleName: "", lastName: "" });
     else if (!O.owner(id).first) patch.name = v.name;
+    const payload = { ...patch };
+    if (cur || nw) Object.assign(payload, { currentPassword: cur, newPassword: nw });
+    const submit = $("owner-form").querySelector('[type="submit"]');
+    submit.disabled = true;
+    try {
+      if (backend) {
+        await window.PawApi.request("/api/owners/" + encodeURIComponent(id), { method: "PATCH", body: payload });
+      } else {
+        O.saveProfile(id, patch, true);
+        window.PawAdmin.log("updated owner " + window.PawAdmin.esc(v.name) + (cur || nw ? " (password changed)" : ""), "update", "owner");
+      }
+    } catch (error) {
+      S.toast(error.message || "Owner changes could not be saved.");
+      submit.disabled = false;
+      return;
+    }
     O.saveProfile(id, patch, true);
-    window.PawAdmin.log("updated owner " + window.PawAdmin.esc(v.name) + (cur || nw ? " (password changed)" : ""), "update", "owner");
-    // when the backend is ready: PUT /api/owners/:id with patch, and (if cur/nw given) POST /api/owners/:id/password
     O.setFlash(cur || nw ? "Changes saved. Password updated." : "Changes saved.");
     location.href = back;
   });
+  }
+
+  if (backend && id) {
+    $("owner-form").hidden = true;
+    window.PawApi.loadOwners().then(initialize).catch((error) => {
+      $("owner-form").hidden = true;
+      $("missing").hidden = false;
+      S.toast(error.message || "Owner data could not be loaded.");
+    });
+  } else {
+    initialize();
+  }
 })();

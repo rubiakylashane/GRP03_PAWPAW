@@ -9,7 +9,7 @@
     "migrate": "node migrate.js",
     "seed": "node scripts/seed.js",
     "create-admin": "node scripts/create-admin.js",
-    "check": "node --check index.js && node --check app.js && node --check routes/auth.js && node --check routes/clinic.js"
+    "check": "node --check index.js && node --check app.js && node --check routes/auth.js && node --check routes/clinic.js && node --check routes/integrations.js && node --check routes/password-reset.js && node --check utils/sms.js && node --check utils/mailer.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

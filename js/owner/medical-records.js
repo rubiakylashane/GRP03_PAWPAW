@@ -1,8 +1,8 @@
 /* js/owner/medical-records.js
    Medical Records (read only for the owner): visit records and prescriptions of the signed-in user's pets.
-   The vet / staff add the records. Set USE_BACKEND = true and edit API when the backend is ready. */
+   The vet / staff add the records. */
 (() => {
-  const USE_BACKEND = false;
+  const USE_BACKEND = true;
   const API = {
     visits: "/api/medical-records",      // [{ id, pet, date, diagnosis, treatment, notes }]
     prescriptions: "/api/prescriptions"  // [{ id, pet, date, medication, dose, instructions, quantity }]
@@ -31,16 +31,17 @@
   };
 
   async function get(url) {
-    const res = await fetch(url, { headers: { Accept: "application/json" } });
-    if (!res.ok) throw new Error("Request failed: " + url);
-    return res.json();
+    return window.PawApi.request(url);
   }
   async function loadData() {
-    if (USE_BACKEND) {
+    if (USE_BACKEND && window.PawApi.isBackendSession()) {
       try {
         const [visits, prescriptions] = await Promise.all([get(API.visits), get(API.prescriptions)]);
         return { visits, prescriptions };
-      } catch (err) { console.warn("[medical records] backend failed:", err.message); }
+      } catch (err) {
+        console.error("[medical records] backend failed:", err);
+        throw err;
+      }
     }
     try {
       const v = JSON.parse(localStorage.getItem(userKey()) || "null");
@@ -49,6 +50,7 @@
   }
 
   let data = { visits: [], prescriptions: [] };
+  let loadError = "";
   const sortEl = $("sort");
 
   function sorted(list) {
@@ -64,6 +66,11 @@
   const dash = (s) => (s ? esc(s) : "-");
 
   function render() {
+    if (loadError) {
+      $("visit-rows").textContent = loadError;
+      $("rx-rows").textContent = loadError;
+      return;
+    }
     $("visit-rows").innerHTML = data.visits.length
       ? sorted(data.visits).map((r) => `
           <div class="mr-row" role="row">
@@ -89,5 +96,9 @@
   }
 
   sortEl.addEventListener("change", render);
-  loadData().then((d) => { data = d; render(); });
+  loadData().then((d) => { data = d; render(); }).catch((error) => {
+    console.error("[medical records] could not load records:", error);
+    loadError = error.message || "Could not load medical records.";
+    render();
+  });
 })();

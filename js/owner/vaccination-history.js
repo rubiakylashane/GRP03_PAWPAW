@@ -3,9 +3,9 @@
      overdue  = next due date already passed
      soon     = next due within DUE_SOON_DAYS days
      ok       = everything else (including records with no next due date)
-   The vet / staff add the records. Set USE_BACKEND = true and edit API when the backend is ready. */
+   The vet / staff add the records. */
 (() => {
-  const USE_BACKEND = false;
+  const USE_BACKEND = true;
   const API = { vaccinations: "/api/vaccinations" }; // [{ id, vaccine, pet, dateAdministered, nextDue, administeredBy, notes }]
   const DUE_SOON_DAYS = 30;
 
@@ -33,12 +33,13 @@
   };
 
   async function loadData() {
-    if (USE_BACKEND) {
+    if (USE_BACKEND && window.PawApi.isBackendSession()) {
       try {
-        const res = await fetch(API.vaccinations, { headers: { Accept: "application/json" } });
-        if (!res.ok) throw new Error("Request failed");
-        return await res.json();
-      } catch (err) { console.warn("[vaccinations] backend failed:", err.message); }
+        return await window.PawApi.request(API.vaccinations);
+      } catch (err) {
+        console.error("[vaccinations] backend failed:", err);
+        throw err;
+      }
     }
     try {
       const v = JSON.parse(localStorage.getItem(userKey()) || "null");
@@ -47,6 +48,7 @@
   }
 
   let records = [];
+  let loadError = "";
   const sortEl = $("sort");
 
   function groupOf(r) {
@@ -90,6 +92,10 @@
   };
 
   function render() {
+    if (loadError) {
+      ["overdue-rows", "soon-rows", "ok-rows"].forEach((id) => { $(id).textContent = loadError; });
+      return;
+    }
     const groups = { overdue: [], soon: [], ok: [] };
     records.forEach((r) => groups[groupOf(r)].push(r));
     for (const key of Object.keys(groups)) {
@@ -101,5 +107,9 @@
   }
 
   sortEl.addEventListener("change", render);
-  loadData().then((d) => { records = d; render(); });
+  loadData().then((d) => { records = d; render(); }).catch((error) => {
+    console.error("[vaccinations] could not load records:", error);
+    loadError = error.message || "Could not load vaccination records.";
+    render();
+  });
 })();

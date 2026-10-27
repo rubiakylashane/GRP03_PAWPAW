@@ -9,7 +9,8 @@
   };
   Object.keys(f).forEach((k) => f[k].addEventListener("input", () => err(k, "")));
 
-  $("walkin-form").addEventListener("submit", (e) => {
+  const backend = window.PawApi.isBackendSession();
+  $("walkin-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const v = {
       first: f.first.value.trim().replace(/\s+/g, " "), middle: f.middle.value.trim().replace(/\s+/g, " "),
@@ -26,8 +27,25 @@
     const bad = Object.keys(errors)[0];
     if (bad) { f[bad].focus(); return; }
 
-    // when the backend is ready: POST /api/owners with v, then use the id it returns
-    const id = O.createWalkin(v);
+    let id;
+    const submit = $("walkin-form").querySelector('[type="submit"]');
+    submit.disabled = true;
+    try {
+      if (backend) {
+        const created = await window.PawApi.request("/api/owners", {
+          method: "POST",
+          body: { name: [v.first, v.middle, v.last].filter(Boolean).join(" "), phone: v.phone, email: v.email || null }
+        });
+        id = String(created.id);
+        await window.PawApi.loadOwners();
+      } else {
+        id = O.createWalkin(v);
+      }
+    } catch (error) {
+      S.toast(error.message || "Walk-in owner could not be registered.");
+      submit.disabled = false;
+      return;
+    }
     O.setFlash("Walk-in owner registered.");
     location.href = "owner-details.html?id=" + encodeURIComponent(id);
   });

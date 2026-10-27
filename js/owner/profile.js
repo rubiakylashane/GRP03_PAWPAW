@@ -5,13 +5,35 @@
   const $ = (id) => document.getElementById(id);
 
   const p = window.PawProfile.load();
-  $("pr-name").textContent = p.name;
-  $("pr-email").textContent = p.email || "-";
-  $("pr-phone").textContent = p.phone || "-";
-  $("pr-since").textContent = new Date(p.memberSince + "T00:00:00")
-    .toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
-  if (p.address) { $("pr-address").textContent = p.address; $("pr-address-row").hidden = false; }
-  if (p.photo) $("pr-avatar").style.backgroundImage = `url('${p.photo}')`;
+  function renderProfile(value) {
+    $("pr-name").textContent = value.name || p.name;
+    $("pr-email").textContent = value.email || "-";
+    $("pr-phone").textContent = value.phone || "-";
+    const memberSince = value.memberSince || p.memberSince;
+    $("pr-since").textContent = new Date(memberSince + "T00:00:00")
+      .toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+    if (value.address) { $("pr-address").textContent = value.address; $("pr-address-row").hidden = false; }
+    if (value.photo) $("pr-avatar").style.backgroundImage = `url('${value.photo}')`;
+  }
+  renderProfile(p);
+  if (window.PawApi.isBackendSession()) {
+    window.PawApi.request("/api/auth/me").then(({ user }) => {
+      const profile = {
+        name: user.name,
+        email: user.email || "",
+        phone: user.phone || "",
+        address: user.address || "",
+        photo: user.photo || "",
+        memberSince: user.memberSince || p.memberSince
+      };
+      window.PawProfile.save(profile);
+      renderProfile(profile);
+    }).catch((error) => {
+      const toast = $("toast");
+      toast.textContent = "Could not load your profile: " + error.message;
+      toast.classList.add("show");
+    });
+  }
 
   /* ----- pets (same card as My Pets) ----- */
   const SHOW = 6;

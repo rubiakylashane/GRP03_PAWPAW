@@ -109,8 +109,9 @@
     list.forEach((breed) => {
       f.breed.add(new Option(breed, breed));
     });
+    f.breed.add(new Option("Unknown / not sure", "Unknown"));
 
-    if (selected && !list.includes(selected)) {
+    if (selected && !list.includes(selected) && selected !== "Unknown") {
       f.breed.add(new Option(selected, selected));
     }
 
@@ -142,12 +143,18 @@
   */
   if (f.dob) {
     f.dob.type = "text";
-    f.dob.placeholder = "MM/DD/YYYY";
+    f.dob.placeholder = "MM/DD/YYYY or N/A";
     f.dob.maxLength = 10;
-    f.dob.inputMode = "numeric";
+    f.dob.inputMode = "text";
     f.dob.autocomplete = "bday";
 
     f.dob.addEventListener("input", () => {
+      const typed = f.dob.value.trim().toLowerCase();
+      const unknownLabels = ["n/a", "na", "unknown", "not known"];
+      if (typed && unknownLabels.some((label) => label.startsWith(typed))) {
+        setError("dob", "");
+        return;
+      }
       const digits = f.dob.value
         .replace(/\D/g, "")
         .slice(0, 8);
@@ -411,7 +418,8 @@
 
     const name = f.name ? f.name.value.trim() : "";
     const rawDob = f.dob ? f.dob.value.trim() : "";
-    const parsedDob = parseDob(rawDob);
+    const dobUnknown = /^(?:n\/?a|unknown|not known)$/i.test(rawDob);
+    const parsedDob = dobUnknown ? null : parseDob(rawDob);
 
     const values = {
       name,
@@ -444,14 +452,16 @@
       errors.sex = "Choose a sex.";
     }
 
-    if (!rawDob) {
-      errors.dob = "Enter the date of birth.";
-    } else if (!values.dob) {
-      errors.dob = "Enter a valid date in MM/DD/YYYY format.";
-    } else if (values.dob > todayIso) {
-      errors.dob = "Date of birth can't be in the future.";
-    } else if (values.dob < "1990-01-01") {
-      errors.dob = "Please check the year.";
+    if (!dobUnknown) {
+      if (!rawDob) {
+        errors.dob = "Enter the date of birth or type N/A if unknown.";
+      } else if (!values.dob) {
+        errors.dob = "Enter a valid date in MM/DD/YYYY format, or type N/A if unknown.";
+      } else if (values.dob > todayIso) {
+        errors.dob = "Date of birth can't be in the future.";
+      } else if (values.dob < "1990-01-01") {
+        errors.dob = "Please check the year.";
+      }
     }
 
     ["name", "species", "breed", "sex", "dob"].forEach((key) => {
@@ -465,12 +475,20 @@
       return;
     }
 
-    const submit = form.querySelector('button[type="submit"]');
     let submitError = form.querySelector(".submit-error");
     if (!submitError) {
       submitError = document.createElement("p");
       submitError.className = "error submit-error";
       submitError.setAttribute("role", "alert");
+    }
+    const submit = document.querySelector('button[type="submit"][form="pet-form"]')
+      || form.querySelector('button[type="submit"]');
+    if (!submit) {
+      submitError.textContent = "The save button could not be found. Please reload the page and try again.";
+      if (!submitError.isConnected) form.prepend(submitError);
+      return;
+    }
+    if (!submitError.isConnected) {
       submit.before(submitError);
     }
     const originalText = submit.textContent;

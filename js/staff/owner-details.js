@@ -4,6 +4,7 @@
   const put = (id, text) => { const el = $(id); if (el) el.textContent = text; };   /* a missing element never stops the rest of the page */
   const id = S.ownerId();
 
+  function render() {
   if (!id || !O.exists(id)) { $("detail").hidden = true; $("missing").hidden = false; return; }
   const o = O.owner(id);
 
@@ -38,4 +39,15 @@
         </dl>
       </a>`;
   }).join("") : `<p class="spets-empty">No pets yet. Click "Add Pet" to register one.</p>`;
+  }
+
+  if (window.PawApi.isBackendSession()) {
+    window.PawApi.loadOwners().then(render).catch((error) => {
+      $("detail").hidden = true;
+      $("missing").hidden = false;
+      S.toast(error.message || "Owner data could not be loaded.");
+    });
+  } else {
+    render();
+  }
 })();

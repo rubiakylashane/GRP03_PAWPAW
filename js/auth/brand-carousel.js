@@ -12,7 +12,7 @@
   ];
   const INTERVAL_MS = 5000;                         // time per slide
   const FADE_MS = 1200;                             // crossfade duration
-  const OVERLAY = "rgba(31, 107, 82, 0.82)";        // green tint over the photos
+  const OVERLAY = "rgba(15, 107, 92, 0.9)";         // match the clinic teal palette
   /* ====================== */
 
   const brand = document.querySelector(".brand");

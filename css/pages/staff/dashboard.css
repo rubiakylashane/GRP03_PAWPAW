@@ -33,6 +33,27 @@ body.sdash {
 .sdash h1, .sdash h2, .sdash h3, .sdash p, .sdash dl, .sdash dd { margin: 0; padding: 0; }
 .sdash [hidden] { display: none !important; }
 
+/* Owner pages share this shell but keep their original teal-and-amber palette. */
+html[data-app-role="owner"] body.sdash {
+  --orange: #f2b53d;
+  --on-lemon: #fff;
+  --sidebar-bg: var(--green);
+  background:
+    url("../../../assets/images/dashboard-bg.svg") 25vw -10vh / 100vw auto no-repeat fixed,
+    #f5f6f4;
+  background-blend-mode: normal;
+}
+html[data-app-role="owner"] body.sdash::before { background: var(--green); }
+html[data-app-role="owner"] .sdash .sidebar { background: var(--green); color: #fff; }
+html[data-app-role="owner"] .sdash .nav-link { color: #fff; }
+html[data-app-role="owner"] .sdash .nav-link:hover { background: rgba(255, 255, 255, .12); }
+html[data-app-role="owner"] .sdash .nav-link.active,
+html[data-app-role="owner"] .sdash .nav-link.active:hover { color: #111; background: var(--orange); }
+html[data-app-role="owner"] .sdash .sidebar-user { border-top-color: rgba(255, 255, 255, .35); }
+html[data-app-role="owner"] .sdash .main { color: #0a0a0a; }
+html[data-app-role="owner"] .sdash .mobile-bar { color: #fff; background: var(--green); }
+html[data-app-role="owner"] .sdash .menu-btn { color: #fff; }
+
 /* ---------- Sidebar ---------- */
 /* the sidebar colour also runs behind it for the whole page height, so a "capture full page" screenshot has no green gap above or below the sidebar */
 body.sdash::before { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: var(--strip); background: var(--sidebar-bg); pointer-events: none; }
@@ -96,7 +117,7 @@ body.sdash::before { content: ""; position: absolute; top: 0; bottom: 0; left: 0
 /* the cards are links (appointments filtered by status) */
 .sdash a.stat-link { display: block; text-decoration: none; color: var(--ink); cursor: pointer; transition: transform .15s ease, box-shadow .15s ease; }
 .sdash a.stat-link:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0, 0, 0, .18); }
-.sdash a.stat-link:focus-visible { outline: 3px solid #e29d1a; outline-offset: 2px; }
+.sdash a.stat-link:focus-visible { outline: 3px solid var(--orange); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .sdash a.stat-link { transition: none; } .sdash a.stat-link:hover { transform: none; } }
 .sdash .stat h3 { font-size: 12.5px; font-weight: 400; color: #333; letter-spacing: 0; }
 .sdash .stat-value { margin-top: 10px; padding-left: 8px; font-size: 28px; font-weight: 700; line-height: 1; }
@@ -235,4 +256,4 @@ body.sdash::before { content: ""; position: absolute; top: 0; bottom: 0; left: 0
 .sdash .user-meta .user-link { flex: 0 1 auto; min-width: 0; max-width: 100%; overflow: hidden; border-radius: 4px; }
 .sdash .user-meta .user-link strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sdash .user-meta .user-link:hover strong { text-decoration: underline; }
-.sdash .user-link:focus-visible { outline: 3px solid #e29d1a; outline-offset: 2px; }
+.sdash .user-link:focus-visible { outline: 3px solid var(--orange); outline-offset: 2px; }

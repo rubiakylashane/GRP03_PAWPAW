@@ -24,7 +24,7 @@ async function writeAudit(client, userId, action, table, recordId, description) 
 async function profileFor(client, userId) {
   const { rows } = await client.query(
     `SELECT u.user_id, u.username, u.role, u.email, COALESCE(u.phone, o.phone, v.phone) AS phone,
-            u.display_name, o.photo,
+            u.display_name, COALESCE(o.photo, u.profile_photo) AS photo,
             o.owner_id, o.name AS owner_name, o.address, o.registration_date,
             v.veterinarian_id, v.name AS veterinarian_name, v.specialization, v.license_number
        FROM user_account u
@@ -50,6 +50,7 @@ function publicUser(row) {
     photo: row.photo || null,
     ownerId: row.owner_id || null,
     address: row.address || null,
+    memberSince: row.registration_date || null,
     specialization: row.specialization || null,
     license: row.license_number || null,
     mustChangePassword: false
@@ -61,7 +62,7 @@ router.post('/login', asyncRoute(async (req, res) => {
   const password = requiredString(req.body.password, 'Password', 200);
   const result = await db.query(
     `SELECT u.user_id, u.username, u.role, u.email, u.phone, u.display_name,
-            u.password_hash, u.account_status, o.photo,
+            u.password_hash, u.account_status, COALESCE(o.photo, u.profile_photo) AS photo,
             o.owner_id, o.name AS owner_name, o.address,
             v.veterinarian_id, v.name AS veterinarian_name, v.specialization, v.license_number
        FROM user_account u
@@ -95,6 +96,10 @@ router.post('/register', asyncRoute(async (req, res) => {
   const email = requiredString(req.body.email, 'Email', 100).toLowerCase();
   const username = requiredString(req.body.username, 'Username', 50).toLowerCase();
   const password = requiredString(req.body.password, 'Password', 200);
+  const photo = req.body.photo == null ? null : requiredString(req.body.photo, 'Profile photo', 800000);
+  if (photo && !/^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/.test(photo)) {
+    return res.status(400).json({ error: 'Profile photo must be a valid JPEG image.' });
+  }
   if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters.' });
 
   const client = await db.connect();
@@ -102,15 +107,15 @@ router.post('/register', asyncRoute(async (req, res) => {
     await client.query('BEGIN');
     const account = await client.query(
       `INSERT INTO user_account
-         (username, password_hash, role, email, phone, display_name)
-       VALUES ($1, $2, 'Pet Owner', $3, $4, $5)
+         (username, password_hash, role, email, phone, display_name, profile_photo)
+       VALUES ($1, $2, 'Pet Owner', $3, $4, $5, $6)
        RETURNING user_id`,
-      [username, await bcrypt.hash(password, 12), email, req.body.phone || null, name]
+      [username, await bcrypt.hash(password, 12), email, req.body.phone || null, name, photo]
     );
     const owner = await client.query(
-      `INSERT INTO owner (user_id, name, email, phone, address)
-       VALUES ($1, $2, $3, $4, $5) RETURNING owner_id`,
-      [account.rows[0].user_id, name, email, req.body.phone || null, req.body.address || null]
+      `INSERT INTO owner (user_id, name, email, phone, address, photo)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING owner_id`,
+      [account.rows[0].user_id, name, email, req.body.phone || null, req.body.address || null, photo]
     );
     await writeAudit(client, account.rows[0].user_id, 'INSERT', 'owner', owner.rows[0].owner_id, 'Registered a pet owner account.');
     await client.query('COMMIT');
@@ -131,8 +136,12 @@ router.get('/me', authenticate, asyncRoute(async (req, res) => {
 
 router.put('/me', authenticate, asyncRoute(async (req, res) => {
   const name = requiredString(req.body.name, 'Name', 100);
-  const email = req.body.email ? requiredString(req.body.email, 'Email', 100).toLowerCase() : null;
-  const phone = req.body.phone == null ? null : requiredString(req.body.phone, 'Phone', 20);
+  const hasEmail = Object.prototype.hasOwnProperty.call(req.body, 'email');
+  const hasPhone = Object.prototype.hasOwnProperty.call(req.body, 'phone');
+  const hasPhoto = Object.prototype.hasOwnProperty.call(req.body, 'photo');
+  const hasAddress = Object.prototype.hasOwnProperty.call(req.body, 'address');
+  const email = hasEmail && req.body.email ? requiredString(req.body.email, 'Email', 100).toLowerCase() : null;
+  const phone = hasPhone && req.body.phone ? requiredString(req.body.phone, 'Phone', 20) : null;
   const username = req.body.username ? requiredString(req.body.username, 'Username', 50).toLowerCase() : null;
   const client = await db.connect();
   try {
@@ -140,10 +149,12 @@ router.put('/me', authenticate, asyncRoute(async (req, res) => {
     const account = await client.query(
       `UPDATE user_account
           SET username = COALESCE($2, username), display_name = $3,
-              email = COALESCE($4, email), phone = COALESCE($5, phone)
+              email = CASE WHEN $4::boolean THEN $5 ELSE email END,
+              phone = CASE WHEN $6::boolean THEN $7 ELSE phone END,
+              profile_photo = CASE WHEN $8::boolean THEN $9 ELSE profile_photo END
         WHERE user_id = $1 AND account_status = 'Active'
         RETURNING user_id, role`,
-      [req.user.userId, username, name, email, phone]
+      [req.user.userId, username, name, hasEmail, email, hasPhone, phone, hasPhoto, hasPhoto ? (req.body.photo || null) : null]
     );
     if (!account.rowCount) {
       await client.query('ROLLBACK');
@@ -151,18 +162,30 @@ router.put('/me', authenticate, asyncRoute(async (req, res) => {
     }
     if (account.rows[0].role === 'Pet Owner') {
       await client.query(
-        `UPDATE owner SET name = $2, email = COALESCE($3, email), phone = COALESCE($4, phone),
-                address = COALESCE($5, address), photo = COALESCE($6, photo)
+        `UPDATE owner
+            SET name = $2,
+                email = CASE WHEN $3::boolean THEN $4 ELSE email END,
+                phone = CASE WHEN $5::boolean THEN $6 ELSE phone END,
+                address = CASE WHEN $7::boolean THEN $8 ELSE address END,
+                photo = CASE WHEN $9::boolean THEN $10 ELSE photo END
           WHERE user_id = $1`,
-        [req.user.userId, name, email, phone, req.body.address || null, req.body.photo || null]
+        [
+          req.user.userId, name,
+          hasEmail, email,
+          hasPhone, phone,
+          hasAddress, hasAddress ? (req.body.address || null) : null,
+          hasPhoto, hasPhoto ? (req.body.photo || null) : null
+        ]
       );
     } else if (account.rows[0].role === 'Veterinarian') {
       await client.query(
-        `UPDATE veterinarian SET name = $2, email = COALESCE($3, email), phone = COALESCE($4, phone),
-                specialization = COALESCE($5, specialization),
-                license_number = COALESCE($6, license_number)
+        `UPDATE veterinarian SET name = $2,
+                email = CASE WHEN $3::boolean THEN $4 ELSE email END,
+                phone = CASE WHEN $5::boolean THEN $6 ELSE phone END,
+                specialization = COALESCE($7, specialization),
+                license_number = COALESCE($8, license_number)
           WHERE user_id = $1`,
-        [req.user.userId, name, email, phone, req.body.specialization || null, req.body.license || null]
+        [req.user.userId, name, hasEmail, email, hasPhone, phone, req.body.specialization || null, req.body.license || null]
       );
     }
     await writeAudit(client, req.user.userId, 'UPDATE', 'user_account', req.user.userId, 'Updated their profile.');

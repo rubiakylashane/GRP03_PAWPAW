@@ -41,10 +41,10 @@ body {
 
   background-image:
     linear-gradient(
-      rgba(15, 107, 92, 0.78),
-      rgba(15, 107, 92, 0.78)
+      rgba(15, 107, 92, 0.9),
+      rgba(15, 107, 92, 0.9)
     ),
-    url("../../assets/images/login-bg.jpg");
+    url("../../assets/images/auth/slide-1.jpg");
 
   background-repeat: no-repeat;
   background-size: cover;

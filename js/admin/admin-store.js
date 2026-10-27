@@ -350,7 +350,13 @@ window.PawAdmin = (() => {
 
   const setFlash = (m) => { try { sessionStorage.setItem(FLASH, m); } catch (_) { /* ignore */ } };
   const takeFlash = () => { try { const m = sessionStorage.getItem(FLASH) || ""; sessionStorage.removeItem(FLASH); return m; } catch (_) { return ""; } };
-  const fmtDate = (s) => { if (!s) return "-"; const d = new Date(s + "T00:00:00"); return isNaN(d) ? "-" : d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); };
+  const fmtDate = (s) => {
+    if (!s) return "-";
+    const value = String(s);
+    const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);
+    const d = dateOnly ? new Date(value + "T00:00:00") : new Date(value);
+    return isNaN(d) ? "-" : d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  };
 
   return { services, addService, updateService, deleteService, setServiceStatus, serviceUses, serviceNameTaken, peso, log, ownerHistory, describe, deleteOwner, deletePet, ownerStatus, setOwnerStatus, setPetStatus, VETS, SPECS, vets, history, addVet, updateVet, setVetStatus, removeVet, withDr, phoneShow, normLicense, licenseTaken, vetEmailTaken, freeVetAccounts, validName: (s) => /^[A-Za-zÀ-ÿ.'\- ]{2,60}$/.test(s), ROLES, list, add, makeUsername, updateUser, myAccount, myProfile, saveMyProfile, setRole, setStatus, resetPassword, validPhone, validEmail, emailTaken, usernameTaken, setFlash, takeFlash, fmtDate, esc, me };
 })();

@@ -35,7 +35,8 @@
     const avatar = $("user-avatar");
     if (avatar && saved) {
       const prof = JSON.parse(localStorage.getItem("pawpaw_profile:" + String(saved.name).trim().toLowerCase()) || "null");
-      if (prof && prof.photo) avatar.style.cssText += `;background-image:url('${prof.photo}');background-size:cover;background-position:center`;
+      const photo = (prof && prof.photo) || saved.photo;
+      if (photo) avatar.style.cssText += `;background-image:url('${photo}');background-size:cover;background-position:center`;
     }
   } catch (_) { /* ignore */ }
 

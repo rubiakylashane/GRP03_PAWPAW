@@ -34,7 +34,7 @@
 .adm .au-foot { display: flex; align-items: center; gap: 10px; margin-top: 14px; padding-top: 16px; border-top: 1px solid #e6ebe9; font-size: 13px; color: #44544f; }
 .adm .au-foot #au-count { margin-right: auto; }
 .adm .au-page { min-width: 92px; height: 36px; padding: 0 16px; font: inherit; font-size: 13px; font-weight: 600; color: #fff; background: var(--green); border: 0; border-radius: 8px; cursor: pointer; }
-.adm .au-page-next { color: #1b1300; background: #e29d1a; }
+.adm .au-page-next { color: #fff; background: #0f6b5c; }
 .adm .au-page:hover:not(:disabled) { filter: brightness(.94); }
 .adm .au-page:disabled { color: #8a9692; background: #e6ebe9; cursor: default; }
 .adm .au-page:focus-visible { outline: 3px solid rgba(15, 107, 92, .5); outline-offset: 2px; }

@@ -45,7 +45,7 @@
         <span role="cell" data-label="Breed">${esc(p.breed || "-")}</span>
         <span role="cell" data-label="Gender">${esc(p.sex || "-")}</span>
         <span role="cell" data-label="Born">${esc(O.fmtShort(p.dob))}</span>
-        <span role="cell" class="o-acts"><a class="u-act" href="owner-pet-form.html?owner=${encodeURIComponent(o.id)}&id=${encodeURIComponent(p.id)}">Edit</a>${backend ? "" : p.status === "inactive" ? `<button type="button" class="u-act u-act-green" data-act-pet="${esc(p.id)}">Activate</button>` : `<button type="button" class="u-act u-act-red" data-act-pet="${esc(p.id)}">Deactivate</button>`}</span>
+        <span role="cell" class="o-acts"><a class="u-act" href="owner-pet-form.html?owner=${encodeURIComponent(o.id)}&id=${encodeURIComponent(p.id)}">Edit</a>${p.status === "inactive" ? `<button type="button" class="u-act u-act-green" data-act-pet="${esc(p.id)}">Activate</button>` : `<button type="button" class="u-act u-act-red" data-act-pet="${esc(p.id)}">Deactivate</button>`}</span>
       </div>`).join("") : `<p class="u-empty">${esc(o.name)} has no pets yet.</p>`;
   }
   const render = () => { renderOwners(); renderPets(); };
@@ -67,8 +67,12 @@
         off ? o.name + " will be marked inactive. Their pets, appointments and records stay in the clinic history. You can activate them again anytime." : o.name + " will be active again.",
         off ? "Deactivate" : "Activate", off,
         async () => {
-          if (backend) await window.PawApi.request("/api/owners/" + encodeURIComponent(o.id) + "/status", { method: "PATCH", body: { status: off ? "inactive" : "active" } });
-          A.setOwnerStatus(o.id, o.name, off ? "inactive" : "active");
+          if (backend) {
+            await window.PawApi.request("/api/owners/" + encodeURIComponent(o.id) + "/status", { method: "PATCH", body: { status: off ? "inactive" : "active" } });
+            await window.PawApi.loadOwners();
+          } else {
+            A.setOwnerStatus(o.id, o.name, off ? "inactive" : "active");
+          }
           render();
           S.toast(o.name + (off ? " deactivated." : " activated."));
         });
@@ -81,8 +85,12 @@
         off ? p.name + " of " + o.name + " will be marked inactive. The history stays and you can activate the pet again anytime." : p.name + " will be active again.",
         off ? "Deactivate" : "Activate", off,
         async () => {
-          if (backend) await window.PawApi.request("/api/owners/" + encodeURIComponent(o.id) + "/pets/" + encodeURIComponent(p.id), { method: "PATCH", body: { status: off ? "inactive" : "active" } });
-          A.setPetStatus(o.id, p.id, p.name, o.name, off ? "inactive" : "active");
+          if (backend) {
+            await window.PawApi.request("/api/owners/" + encodeURIComponent(o.id) + "/pets/" + encodeURIComponent(p.id), { method: "PATCH", body: { status: off ? "inactive" : "active" } });
+            await window.PawApi.loadOwners();
+          } else {
+            A.setPetStatus(o.id, p.id, p.name, o.name, off ? "inactive" : "active");
+          }
           render();
           S.toast(p.name + (off ? " deactivated." : " activated."));
         });

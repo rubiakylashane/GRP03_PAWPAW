@@ -3,10 +3,13 @@
 .app {
   font-family: var(--font-ui);
   --sidebar-w: clamp(250px, 22vw, 318px);
+  --on-lemon: #fff;
+  --yellow: #f2b53d;
+  --line: #bdbdbd;
 
- background:
-  url("../assets/images/dashboard-bg.svg") 25vw -10vh / 100vw auto no-repeat fixed,
-  var(--paper);
+  background:
+    url("../assets/images/dashboard-bg.svg") 25vw -10vh / 100vw auto no-repeat fixed,
+    var(--paper);
 }
 .sidebar {
   position: fixed;
@@ -17,7 +20,7 @@
   width: var(--sidebar-w);
   padding: 16px 16px 0;
   overflow-y: auto;
-  color: #fff;
+  color: var(--on-lemon);
   background: var(--green);
 }
 
@@ -38,13 +41,13 @@
   gap: 16px;
   padding: 12px;
   border-radius: 10px;
-  color: #fff;
+  color: var(--on-lemon);
   font-size: clamp(17px, 1.55vw, 22px);
   font-weight: 600;
   text-decoration: none;
 }
 .nav-link:hover { background: rgba(255, 255, 255, 0.12); text-decoration: none; }
-.nav-link.active { background: var(--yellow); }
+.nav-link.active { color: #111; background: var(--yellow); }
 .nav-link svg { width: 28px; height: 28px; flex-shrink: 0; }
 
 .sidebar-user {
@@ -62,7 +65,7 @@
   align-items: center;
   gap: 8px;
   margin-top: 4px;
-  color: #fff;
+  color: var(--on-lemon);
   font-size: 15px;
   font-weight: 500;
   letter-spacing: 0.02em;
@@ -73,7 +76,9 @@
   min-height: 100vh;
   margin-left: var(--sidebar-w);
   padding: 40px clamp(24px, 4.5vw, 64px) 48px 36px;
+  color: var(--ink);
 }
+.app .card, .app .stat { color: var(--ink); background: #fff; }
 
 .mobile-bar, .overlay { display: none; }
 

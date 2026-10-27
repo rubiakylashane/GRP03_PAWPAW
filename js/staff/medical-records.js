@@ -2,13 +2,13 @@
    Demo storage (same lists the owner's Medical Records page reads):
      "pawpaw_records:<owner>" = { visits: [{ id, pet, date, diagnosis, treatment, notes }],
                                   prescriptions: [{ id, pet, date, medication, dose, instructions, quantity }] }
-   Backend: set USE_BACKEND = true.
+   Backend records are stored through the clinic API.
      GET  /api/staff/records            -> { visits: [{ ..., owner }], prescriptions: [{ ..., owner }] }
      POST /api/staff/records/visits           body: { owner, pet, date, diagnosis, treatment, notes }
      POST /api/staff/records/prescriptions    body: { owner, pet, date, medication, dose, instructions, quantity }
    Open with ?q=<pet name> to start with the search filled in (used by Appointments > View Record). */
 (() => {
-  const USE_BACKEND = false;
+  const USE_BACKEND = true;
   const O = window.PawOwners, S = window.PawStaff, $ = (id) => document.getElementById(id), esc = O.esc;
   const KEY = "pawpaw_records:";
 
@@ -18,11 +18,17 @@
   const pad = (n) => String(n).padStart(2, "0");
   const today = () => { const d = new Date(); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); };
   const fmt = (iso) => { const d = new Date(iso + "T00:00:00"); return !iso || isNaN(d) ? "-" : d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" }); };
-  const ownerName = (key) => { try { return O.owner(key).short; } catch (_) { return key; } };
+  const ownerName = (key, fallback) => { try { return O.owner(key).short || fallback || key; } catch (_) { return fallback || key; } };
 
-  let visits = [], rxs = [];
-  function load() {
-    visits = []; rxs = [];
+  let visits = [], rxs = [], loadError = "";
+  async function load() {
+    visits = []; rxs = []; loadError = "";
+    if (USE_BACKEND && window.PawApi.isBackendSession()) {
+      const data = await window.PawApi.request("/api/staff/records");
+      visits = data.visits || [];
+      rxs = data.prescriptions || [];
+      return;
+    }
     try {
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
@@ -37,7 +43,7 @@
   /* opened from "View Record": only this owner's pet (matched by pet id; older records without an id by name) */
   const params = new URLSearchParams(location.search);
   let scope = params.get("owner") ? { owner: params.get("owner"), petId: params.get("petid") || "", name: params.get("q") || "" } : null;
-  const inScope = (r) => !scope || (r.owner === scope.owner && (scope.petId && r.petId ? r.petId === scope.petId : !scope.name || r.pet === scope.name));
+  const inScope = (r) => !scope || (String(r.owner) === String(scope.owner) && (scope.petId && r.petId ? String(r.petId) === String(scope.petId) : !scope.name || r.pet === scope.name));
   function drawScope() {
     const el = $("scope"); if (!el) return;
     el.hidden = !scope;
@@ -49,10 +55,15 @@
     pet: (a, b) => String(a.pet).localeCompare(String(b.pet)) || (b.date || "").localeCompare(a.date || "")
   };
   const cell = (t) => `<span role="cell" class="r-clip" title="${esc(t || "")}">${t ? esc(t) : '<span class="a-muted">-</span>'}</span>`;
-  const who = (r) => `<span role="cell"><span class="o-name">${esc(r.pet)}</span><span class="o-email">${esc(ownerName(r.owner))}</span></span>`;
+  const who = (r) => `<span role="cell"><span class="o-name">${esc(r.pet)}</span><span class="o-email">${esc(ownerName(r.owner, r.ownerName))}</span></span>`;
 
   function render() {
     drawScope();
+    if (loadError) {
+      $("visit-rows").textContent = loadError;
+      $("rx-rows").textContent = loadError;
+      return;
+    }
     const q = $("search").value.trim().toLowerCase(), sort = by[$("sort").value] || by.new;
     const hit = (r) => inScope(r) && (!q || Object.values({ ...r, ownerName: ownerName(r.owner) }).join(" ").toLowerCase().includes(q));
     const v = visits.filter(hit).sort(sort), r = rxs.filter(hit).sort(sort);
@@ -103,14 +114,15 @@
     $(dialog).showModal();
   }
   async function save(owner, kind, rec) {
-    if (USE_BACKEND) {
-      const res = await fetch("/api/staff/records/" + (kind === "v" ? "visits" : "prescriptions"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ owner, ...rec }) });
-      if (!res.ok) throw new Error("Request failed");
-      rec = { ...rec, ...(await res.json()) };
+    if (USE_BACKEND && window.PawApi.isBackendSession()) {
+      await window.PawApi.request("/api/staff/records/" + (kind === "v" ? "visits" : "prescriptions"), {
+        method: "POST",
+        body: { owner, ...rec }
+      });
     } else {
       const d = read(owner); d[kind === "v" ? "visits" : "prescriptions"].push(rec); write(owner, d);
     }
-    load(); render();
+    await load(); render();
   }
   on("add-visit", "click", () => openAdd("visit-dialog", "v"));
   on("add-rx", "click", () => openAdd("rx-dialog", "r"));
@@ -123,7 +135,7 @@
     if (!date) return err("v-err", "Pick the visit date.");
     if (!diagnosis) return err("v-err", "Enter the diagnosis.");
     try { await save(owner, "v", { id: uid(), petId, pet, date, diagnosis, treatment: $("v-treat").value.trim(), notes: $("v-notes").value.trim() }); }
-    catch (_) { return err("v-err", "Could not save. Try again."); }
+    catch (error) { return err("v-err", error.message || "Could not save. Try again."); }
     ["v-diag", "v-treat", "v-notes"].forEach((id) => { $(id).value = ""; });
     $("visit-dialog").close(); S.toast("Visit record saved.");
   });
@@ -133,7 +145,7 @@
     if (!date) return err("r-err", "Pick the date.");
     if (!medication) return err("r-err", "Enter the medication.");
     try { await save(owner, "r", { id: uid(), petId, pet, date, medication, dose: $("r-dose").value.trim(), instructions: $("r-inst").value.trim(), quantity: $("r-qty").value.trim() }); }
-    catch (_) { return err("r-err", "Could not save. Try again."); }
+    catch (error) { return err("r-err", error.message || "Could not save. Try again."); }
     ["r-med", "r-dose", "r-qty", "r-inst"].forEach((id) => { $(id).value = ""; });
     $("rx-dialog").close(); S.toast("Prescription saved.");
   });
@@ -142,5 +154,5 @@
   $("search").addEventListener("input", render);
   $("sort").addEventListener("change", render);
   if (!scope) { try { const q = params.get("q"); if (q) $("search").value = q; } catch (_) {} }
-  load(); render();
+  load().then(render).catch((error) => { loadError = error.message; S.toast(error.message); render(); });
 })();

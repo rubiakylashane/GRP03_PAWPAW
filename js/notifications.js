@@ -4,13 +4,35 @@
    The bell is added by this script (top right), no HTML or CSS changes needed.
 
    Demo data: localStorage "pawpaw_notifications:<owner>" = [{ id, type, title, text, createdAt, readAt }]
-   (the staff pages write to it). Backend: set USE_BACKEND = true and match API below:
+   (the staff pages write to it). Backend API:
      GET   /api/notifications            -> [{ id, type, title, text, createdAt, readAt }]
      PATCH /api/notifications/:id/read
      POST  /api/notifications/read-all */
 (() => {
-  const USE_BACKEND = false;
+  const USE_BACKEND = true;
   const API = { list: "/api/notifications", read: (id) => "/api/notifications/" + encodeURIComponent(id) + "/read", readAll: "/api/notifications/read-all" };
+  const backendToken = () => {
+    for (const store of [sessionStorage, localStorage]) {
+      for (const key of ["token", "pawpaw_token"]) {
+        const value = store.getItem(key);
+        if (value) return value;
+      }
+    }
+    return "";
+  };
+  const backendSession = () => window.PawApi
+    ? window.PawApi.isBackendSession()
+    : Boolean(backendToken() && backendToken() !== "demo-token");
+  async function backendRequest(url, options = {}) {
+    if (window.PawApi) return window.PawApi.request(url, options);
+    const headers = new Headers(options.headers || {});
+    const token = backendToken();
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+    const response = await fetch(url, { ...options, headers });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || data.message || `Request failed (${response.status}).`);
+    return data;
+  }
 
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   /* Notifications are scoped to locally known vet identities only in demo mode. */
@@ -36,8 +58,8 @@
 
   let items = [];
   async function load() {
-    if (USE_BACKEND) {
-      try { const r = await fetch(API.list, { headers: { Accept: "application/json" } }); if (r.ok) return (await r.json()).map((n) => ({ ...n, _k: KEYS[0] })); } catch (_) {}
+    if (USE_BACKEND && backendSession()) {
+      return backendRequest(API.list);
     }
     const out = [];
     KEYS.forEach((k) => { try { const v = JSON.parse(localStorage.getItem(k) || "[]"); if (Array.isArray(v)) v.forEach((n) => out.push({ ...n, _k: k })); } catch (_) {} });
@@ -47,7 +69,7 @@
 
   const IS_STAFF = role === "staff" || role === "admin";   // staff bell reads "pawpaw_notifications:staff" (owner book / cancel / reschedule)
   const IS_VET = role === "vet";                            // vet bell: new patient, check-in, reschedule, cancel
-  const ACCENT = (IS_STAFF || IS_VET) ? "#f2d64f" : "#e29d1a";   // bell ring + toast edge: Golden Lemon for staff and vet, orange for owners
+  const ACCENT = "#f2d64f";
   /* Where a notification leads: the page of what it is about. A notification can carry its own page in
      "link" (e.g. "medical-records.html"); older ones are matched by their title / type. */
   function pageOf(n) {
@@ -176,24 +198,38 @@
 
   async function markRead(id) {
     const n = items.find((x) => x.id === id); if (!n || n.readAt) return;
+    if (USE_BACKEND && backendSession()) {
+      const saved = await backendRequest(API.read(id), { method: "PATCH" });
+      n.readAt = saved.readAt;
+      render();
+      return;
+    }
     n.readAt = new Date().toISOString(); save();
-    if (USE_BACKEND) { try { await fetch(API.read(id), { method: "PATCH" }); } catch (_) {} }
   }
   async function markAll() {
+    if (USE_BACKEND && backendSession()) {
+      await backendRequest(API.readAll, { method: "POST" });
+      const now = new Date().toISOString();
+      items.forEach((n) => { if (!n.readAt) n.readAt = now; });
+      render();
+      return;
+    }
     const now = new Date().toISOString(); items.forEach((n) => { if (!n.readAt) n.readAt = now; }); save(); render();
-    if (USE_BACKEND) { try { await fetch(API.readAll, { method: "POST" }); } catch (_) {} }
   }
   const setOpen = (open) => { if (open) tab = "all"; panel.hidden = !open; bell.setAttribute("aria-expanded", String(open)); if (open) render(); };
 
   bell.addEventListener("click", () => setOpen(panel.hidden));
-  allBtn.addEventListener("click", markAll);
+  allBtn.addEventListener("click", () => { markAll().catch((error) => console.error("[notifications] could not mark all read:", error)); });
   panel.querySelector(".nb-tabs").addEventListener("click", (e) => { const t = e.target.closest("[data-tab]"); if (t) { tab = t.dataset.tab; render(); } });
-  list.addEventListener("click", (e) => { const a = e.target.closest("[data-id]"); if (a) markRead(a.dataset.id); });   // then follows the link
+  list.addEventListener("click", (e) => { const a = e.target.closest("[data-id]"); if (a) markRead(a.dataset.id).catch((error) => console.error("[notifications] could not mark read:", error)); });
   document.addEventListener("click", (e) => { if (!panel.hidden && !panel.contains(e.target) && !bell.contains(e.target)) setOpen(false); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !panel.hidden) { setOpen(false); bell.focus(); } });
 
   /* refresh when the staff page (another tab) adds something, or when this tab is shown again */
-  const refresh = () => load().then((v) => { items = v; render(); popToasts(); });
+  const refresh = () => load().then((v) => { items = v; render(); popToasts(); }).catch((error) => {
+    console.error("[notifications] backend failed:", error);
+    list.textContent = error.message || "Could not load notifications.";
+  });
   window.addEventListener("storage", (e) => { if (KEYS.indexOf(e.key) >= 0) refresh(); });
   document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
   setInterval(refresh, 15000);

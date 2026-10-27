@@ -10,6 +10,26 @@ const transporter = nodemailer.createTransport({
   }
 });
 
+function ensureEmailConfigured() {
+  if (!process.env.EMAIL_HOST || !process.env.EMAIL_PORT
+      || !process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    const error = new Error('Email delivery is not configured. Set EMAIL_HOST, EMAIL_PORT, EMAIL_USER, and EMAIL_PASS.');
+    error.status = 503;
+    throw error;
+  }
+}
+
+async function sendPasswordResetCode(toEmail, code) {
+  ensureEmailConfigured();
+  await transporter.sendMail({
+    from: process.env.EMAIL_FROM || '"Pawpaw Clinic Support" <support@pawpaw.clinic>',
+    to: toEmail,
+    subject: 'Your Pawpaw Clinic password reset code',
+    text: `Your Pawpaw Clinic password reset code is ${code}. It expires in 15 minutes. If you did not request this, you can ignore this email.`,
+    html: `<p>Your Pawpaw Clinic password reset code is:</p><p style="font-size:24px;font-weight:bold;letter-spacing:4px">${code}</p><p>It expires in 15 minutes. If you did not request this, you can ignore this email.</p>`
+  });
+}
+
 const sendResetEmail = async (toEmail, resetToken) => {
   const resetLink = `${process.env.CLIENT_URL}/pages/auth/set-new-password.html?token=${resetToken}`;
   
@@ -27,4 +47,4 @@ const sendResetEmail = async (toEmail, resetToken) => {
   });
 };
 
-module.exports = { sendResetEmail };
+module.exports = { sendResetEmail, sendPasswordResetCode, ensureEmailConfigured };

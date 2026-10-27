@@ -10,6 +10,7 @@
   const ROLE = { admin: "Admin", staff: "Staff", vet: "Veterinarian", owner: "Owner" };
   const RECORDS = ["owner", "pet", "appointment", "medical_record", "prescription", "vaccination", "veterinarian", "user", "service"];
   const ACTIONS = { create: "CREATE", update: "UPDATE", delete: "DELETE", login: "LOGIN", logout: "LOGOUT" };
+  const backend = window.PawApi.isBackendSession();
 
   const plain = (h) => String(h || "").replace(/<[^>]*>/g, "").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&").trim();
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -27,7 +28,7 @@
     const action = ACTIONS[e.action] ? e.action : /^(regist|add|creat|book|request)/.test(low) ? "create" : /^(delet|remov)/.test(low) ? "delete" : "update";
     const record = e.record || (/veterinarian/.test(low) ? "veterinarian" : /appointment/.test(low) ? "appointment" : /\bpet\b/.test(low) ? "pet" : /owner/.test(low) ? "owner" : /service/.test(low) ? "service" : "user");
     const role = String(e.role || (String(user).toLowerCase() === "admin" ? "admin" : "")).toLowerCase();
-    return { at: e.at, t: Date.parse(e.at) || 0, user, role, action, record, details };
+    return { at: e.at, t: Date.parse(e.at) || 0, user, userId: e.user_id == null ? null : String(e.user_id), role, action, record, details };
   }
   function load() {
     let raw = [];
@@ -35,7 +36,7 @@
     return raw.map((e, i) => ({ ...normal(e), i })).sort((a, b) => b.t - a.t || b.i - a.i);   // newest first (same-second entries: the later one first)
   }
 
-  let all = load();
+  let all = backend ? [] : load();
   let page = 1;
   const pad = (n) => String(n).padStart(2, "0");
   const dayOf = (t) => { const d = new Date(t); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); };   // local date, to match the date pickers
@@ -44,24 +45,40 @@
   const recLabel = (r) => String(r || "").replace(/\s+/g, "_");                                       // raw value (filters, CSV)
   const recNice = (r) => { const t = String(r || "").replace(/_/g, " "); return t.charAt(0).toUpperCase() + t.slice(1); };   // shown on screen: "Medical record"
 
-  /* filters
-     "All users" lists every account (owners, staff, vets, admins from PawAdmin.list()) even if they have no entry yet,
-     plus any name that is only found in the log (in the demo the log uses the username typed at login, e.g. "staff" or "vet"). */
+  /* Backend filters use database users and audit actors; demo storage is only used without a backend session. */
   const A = window.PawAdmin;
-  const people = [];
-  try { (A ? A.list() : []).forEach((u) => people.push({ label: u.name, role: u.role, keys: [String(u.name).toLowerCase(), String(u.username || "").toLowerCase()].filter(Boolean) })); } catch (_) { /* ignore */ }
-  const personOf = (name) => { const n = String(name).toLowerCase(); const i = people.findIndex((p) => p.keys.indexOf(n) >= 0); return i; };
-  all.forEach((e) => { if (personOf(e.user) < 0) people.push({ label: e.user, role: e.role, keys: [String(e.user).toLowerCase()] }); });
-  const opts = people.map((p, i) => ({ i, label: p.label + (p.role && String(p.label).toLowerCase() !== String(ROLE[p.role] || p.role).toLowerCase() ? " (" + (ROLE[p.role] || p.role) + ")" : "") })).sort((a, b) => a.label.localeCompare(b.label));
-  $("f-user").innerHTML = '<option value="">All users</option>' + opts.map((o) => `<option value="${o.i}">${esc(o.label)}</option>`).join("");
+  let people = [];
+  function renderPeople() {
+    const opts = people.map((p, i) => ({
+      i,
+      label: p.label + (p.role && String(p.label).toLowerCase() !== String(ROLE[p.role] || p.role).toLowerCase()
+        ? " (" + (ROLE[p.role] || p.role) + ")" : "")
+    })).sort((a, b) => a.label.localeCompare(b.label));
+    $("f-user").innerHTML = '<option value="">All users</option>' + opts.map((o) => `<option value="${o.i}">${esc(o.label)}</option>`).join("");
+  }
+  if (!backend) {
+    try {
+      (A ? A.list() : []).forEach((u) => people.push({
+        label: u.name, role: u.role, keys: [String(u.name).toLowerCase(), String(u.username || "").toLowerCase()].filter(Boolean)
+      }));
+    } catch (_) { /* demo store may be unavailable */ }
+    all.forEach((e) => {
+      if (!people.some((p) => p.keys.includes(String(e.user).toLowerCase()))) {
+        people.push({ label: e.user, role: e.role, keys: [String(e.user).toLowerCase()] });
+      }
+    });
+    renderPeople();
+  }
   $("f-action").innerHTML = '<option value="">All actions</option>' + Object.keys(ACTIONS).map((a) => `<option value="${a}">${a.charAt(0).toUpperCase() + a.slice(1)}</option>`).join("");
   const recs = [...new Set([...RECORDS, ...all.map((e) => e.record)])];
   $("f-record").innerHTML = '<option value="">All records</option>' + recs.map((r) => `<option value="${esc(r)}">${esc(recNice(r))}</option>`).join("");
 
   function filtered() {
     const u = $("f-user").value, a = $("f-action").value, r = $("f-record").value, from = $("f-from").value, to = $("f-to").value;
-    const keys = u === "" ? null : people[+u].keys;
-    return all.filter((e) => (!keys || keys.indexOf(String(e.user).toLowerCase()) >= 0) && (!a || e.action === a) && (!r || e.record === r)
+    const person = u === "" ? null : people[+u];
+    return all.filter((e) => (!person || (backend && person.userId
+      ? person.userId === e.userId
+      : person.keys.includes(String(e.user).toLowerCase()))) && (!a || e.action === a) && (!r || e.record === r)
       && (!from || dayOf(e.t) >= from) && (!to || dayOf(e.t) <= to));
   }
 
@@ -85,18 +102,28 @@
 
   async function refreshFromBackend() {
     if (!window.PawApi.isBackendSession()) return;
-    const data = await window.PawApi.request("/api/audit-log");
+    const [data, users] = await Promise.all([
+      window.PawApi.request("/api/audit-log"),
+      window.PawApi.request("/api/admin/users")
+    ]);
     all = data.map((entry, i) => ({ ...normal(entry), i })).sort((a, b) => b.t - a.t || b.i - a.i);
+    people = users.map((u) => ({
+      label: u.name || u.username,
+      role: String(u.role || "").toLowerCase(),
+      userId: String(u.id),
+      keys: [String(u.name || "").toLowerCase(), String(u.username || "").toLowerCase()].filter(Boolean)
+    }));
     all.forEach((entry) => {
-      if (personOf(entry.user) < 0) {
-        const index = people.length;
-        people.push({ label: entry.user, role: entry.role, keys: [String(entry.user).toLowerCase()] });
-        const option = document.createElement("option");
-        option.value = String(index);
-        option.textContent = entry.user + (entry.role ? " (" + (ROLE[entry.role] || entry.role) + ")" : "");
-        $("f-user").appendChild(option);
-      }
+      if (people.some((person) => (entry.userId && person.userId === entry.userId)
+        || person.keys.includes(String(entry.user).toLowerCase()))) return;
+      people.push({
+        label: entry.user || "Unknown",
+        role: entry.role,
+        userId: entry.userId,
+        keys: [String(entry.user || "Unknown").toLowerCase()]
+      });
     });
+    renderPeople();
     page = 1;
     render();
   }
@@ -104,7 +131,7 @@
   ["f-user", "f-action", "f-record", "f-from", "f-to"].forEach((id) => $(id).addEventListener("change", () => { page = 1; render(); }));
   $("au-prev").addEventListener("click", () => { if (page > 1) { page--; render(); } });
   $("au-next").addEventListener("click", () => { page++; render(); });
-  if (window.PawApi.isBackendSession()) refreshFromBackend().catch((error) => S.toast(error.message));
+  if (backend) refreshFromBackend().catch((error) => S.toast(error.message));
 
   /* export: the filtered rows (all pages) as a .csv that opens in Excel */
   const cell = (v) => {

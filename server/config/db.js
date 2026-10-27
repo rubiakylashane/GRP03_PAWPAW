@@ -7,6 +7,7 @@ const pool = new Pool({
   database: process.env.DB_NAME,
   password: process.env.DB_PASSWORD,
   port: process.env.DB_PORT,
+  options: '-c search_path=public,accounts,clinic,medical,system',
 });
 
 module.exports = {

@@ -108,7 +108,7 @@ photo.addEventListener("change", () => {
 });
 
 /* ---------- Submit ---------- */
-form.addEventListener("submit", (e) => {
+form.addEventListener("submit", async (e) => {
   e.preventDefault();
 
   // Re-check steps 1 and 2 in case something was skipped
@@ -119,14 +119,40 @@ form.addEventListener("submit", (e) => {
     }
   }
 
-  const data = new FormData(form);
-  data.delete("confirm_password");
-  console.log("register:", Object.fromEntries(data));
-  // TODO: send `data` to your backend register endpoint
-
-  // Feedback while there is no backend yet
   const btn = form.querySelector('button[type="submit"]');
+  let error = form.querySelector('[role="alert"].submit-error');
+  if (!error) {
+    error = document.createElement("p");
+    error.className = "error submit-error";
+    error.setAttribute("role", "alert");
+    btn.before(error);
+  }
+  error.textContent = "";
+  const name = [
+    form.elements.first_name.value.trim(),
+    form.elements.middle_name.value.trim(),
+    form.elements.last_name.value.trim()
+  ].filter(Boolean).join(" ");
   btn.disabled = true;
-  btn.textContent = "Account created!";
-  setTimeout(() => (window.location.href = "login.html"), 1200);
+  const originalText = btn.textContent;
+  btn.textContent = "Creating account...";
+  try {
+    await window.PawApi.request("/api/auth/register", {
+      method: "POST",
+      body: {
+        name,
+        email: form.elements.email.value.trim(),
+        username: form.elements.username.value.trim(),
+        password: form.elements.password.value,
+        phone: form.elements.contact_number.value.trim(),
+        address: form.elements.address.value.trim()
+      }
+    });
+    btn.textContent = "Account created!";
+    setTimeout(() => (window.location.href = "login.html"), 1200);
+  } catch (err) {
+    error.textContent = err.message || "Unable to create your account.";
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
 });

@@ -64,5 +64,7 @@ function loadUserData(userId) {
 function clearSession() {
   for (const store of [sessionStorage, localStorage]) {
     SESSION_KEYS.forEach((k) => store.removeItem(k));
+    store.removeItem("token");
+    store.removeItem("pawpaw_token");
   }
 }

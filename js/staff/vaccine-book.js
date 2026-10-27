@@ -1,10 +1,26 @@
 /* js/staff/vaccine-book.js - staff books a vaccination visit for an owner (opened from Vaccination Reminder)
    URL: vaccine-book.html?owner=<key>&pet=<pet name>&vaccine=<vaccine name>
    Saves a confirmed appointment in the owner's list, so it appears in Appointments and on the owner's Dashboard. */
-(() => {
+(async () => {
   const A = window.PawStaffAppts, O = window.PawOwners, S = window.PawStaff, $ = (id) => document.getElementById(id), esc = O.esc;
   const qs = new URLSearchParams(location.search);
   const ownerKey = qs.get("owner") || "", petParam = qs.get("pet") || "", petIdParam = qs.get("petid") || "", vaccineParam = qs.get("vaccine") || "";
+  if (A.backend) {
+    try {
+      await A.ready;
+      const signedInUser = (() => { try { return JSON.parse(sessionStorage.getItem("pawpaw_user") || localStorage.getItem("pawpaw_user") || "{}"); } catch (_) { return {}; } })();
+      const role = String(signedInUser.role || "").toLowerCase();
+      const vaccination = (await window.PawApi.request("/api/services")).find((service) => /vaccin/i.test(service.name));
+      if (!vaccination) throw new Error("No active vaccination service is configured by the clinic.");
+      const destination = role === "owner"
+        ? `book-appointment.html?service=${encodeURIComponent(vaccination.id)}&pet=${encodeURIComponent(petIdParam)}`
+        : `appointments.html?owner=${encodeURIComponent(ownerKey)}&petid=${encodeURIComponent(petIdParam)}&service=${encodeURIComponent(vaccination.name)}`;
+      location.replace(destination);
+    } catch (error) {
+      S.toast(error.message || "Clinic services could not be loaded.");
+    }
+    return;
+  }
   if (!ownerKey || !O.exists(ownerKey)) { location.replace("vaccine-reminders.html"); return; }
 
   const owner = O.owner(ownerKey), pets = O.petsOf(ownerKey), TBA = A.TBA;

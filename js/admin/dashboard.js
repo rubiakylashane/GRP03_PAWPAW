@@ -1,16 +1,7 @@
-/* js/admin/dashboard.js
-   Admin Dashboard (demo mode): totals computed from this browser's localStorage
-   (owners, pets, every owner's appointments). If nothing is saved yet it shows sample figures.
-   Backend: set USE_BACKEND = true; GET /api/admin/summary should return
-     { owners, pets, appointmentsThisMonth, revenueThisMonth,
-       revenueByService: [{ name, amount }], activity: [{ text, at }],
-       revenueLastMonth, completedThisMonth, cancelRate, noShowRate,   (rates are % of this month's appointments up to today)
-       vetsToday: [{ name, done, total }], unassignedToday,
-       weekRevenue: [Mon..Sun amounts], topServices: [{ name, n }] (this week),
-       today: [{ time: "09:00", pet, owner, vet, status }] } */
+/* js/admin/dashboard.js - admin dashboard backed by authenticated clinic data. */
 (() => {
-  const USE_BACKEND = false;
-  const API = "/api/admin/summary";
+  const USE_BACKEND = Boolean(window.PawApi && window.PawApi.isBackendSession());
+  const P = window.PawStaffAppts;
 
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -18,35 +9,6 @@
   const pad = (n) => String(n).padStart(2, "0");
   const month = () => { const d = new Date(); return d.getFullYear() + "-" + pad(d.getMonth() + 1); };
   const STAFF_NAMES = ["guest", "staff", "vet", "admin"];
-
-  const SAMPLE = {
-    owners: 48, pets: 71, appointmentsThisMonth: 126, revenueThisMonth: 84350,
-    revenueByService: [
-      { name: "Consultation", amount: 31000 }, { name: "Vaccination", amount: 18200 }, { name: "Dental Cleaning", amount: 15000 },
-      { name: "Laboratory Test", amount: 9900 }, { name: "Grooming", amount: 6600 }, { name: "Deworming", amount: 3650 }
-    ],
-    activity: [
-      { text: "<strong>Ana Dela Cruz</strong> approved an appointment", at: "9:12 AM" },
-      { text: "<strong>Dr. Carlo Tan</strong> created a medical record", at: "9:48 AM" },
-      { text: "<strong>Ana Dela Cruz</strong> registered owner Ben Cruz", at: "12:40 PM" },
-      { text: "<strong>Admin</strong> updated a service price", at: "Yesterday" }
-    ],
-    revenueLastMonth: 75300, completedThisMonth: 98, cancelRate: 9, noShowRate: 4,
-    vetsToday: [
-      { name: "Dr. Anajoy N. Abila", done: 3, total: 5 }, { name: "Dr. Sean Kurvie G. Buerano", done: 2, total: 4 }, { name: "Dr. Roxanne N. Regulacion", done: 1, total: 3 },
-      { name: "Dr. Jenmarc M. Ronquillo", done: 0, total: 2 }, { name: "Dr. Kyla Shane T. Rubia", done: 0, total: 0 }
-    ],
-    unassignedToday: 1,
-    weekRevenue: [8200, 12400, 9100, 15600, 11800, 18900, 4300],
-    topServices: [{ name: "Vaccination", n: 48 }, { name: "General Consultation", n: 32 }, { name: "Grooming", n: 20 }, { name: "Dental Cleaning", n: 12 }, { name: "Laboratory Test", n: 8 }],
-    today: [
-      { time: "09:00", pet: "Luna", owner: "Maria Santos", vet: "Dr. Anajoy N. Abila", status: "completed" },
-      { time: "10:30", pet: "Biscuit", owner: "Ben Cruz", vet: "Dr. Sean Kurvie G. Buerano", status: "with_vet" },
-      { time: "13:00", pet: "Mochi", owner: "Rico Soriano", vet: "Dr. Kyla Shane T. Rubia", status: "confirmed" },
-      { time: "15:30", pet: "Pepper", owner: "Ana Reyes", vet: "To be assigned", status: "pending" }
-    ],
-    sample: true
-  };
 
   /* ---------- Demo data from localStorage ---------- */
   function fromStorage() {
@@ -108,7 +70,7 @@
     const svcNames = (a) => [...new Set((a.services || []).map((l) => String(l.name || "").split(" (")[0]).filter(Boolean))];
     const todayRows = [], latest = {}, vetNames = ((readJson("pawpaw_vets", []) || []).map((v) => v.name).filter(Boolean)), byVet = {};
     const from90 = isoOf(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 89)), days = [0, 0, 0, 0, 0, 0, 0], hours = {};
-    (vetNames.length ? vetNames : ["Dr. Anajoy N. Abila", "Dr. Sean Kurvie G. Buerano", "Dr. Roxanne N. Regulacion", "Dr. Jenmarc M. Ronquillo", "Dr. Kyla Shane T. Rubia"]).forEach((n) => { byVet[n] = { name: n, done: 0, total: 0 }; });
+    vetNames.forEach((n) => { byVet[n] = { name: n, done: 0, total: 0 }; });
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i) || "";
       if (k.indexOf("pawpaw_appointments:") === 0) {
@@ -161,11 +123,97 @@
   }
 
   async function load() {
-    if (USE_BACKEND) {
-      try { const r = await fetch(API, { headers: { Accept: "application/json" } }); if (r.ok) return await r.json(); } catch (err) { console.warn("[admin dashboard] backend failed:", err.message); }
-      return { owners: 0, pets: 0, appointmentsThisMonth: 0, revenueThisMonth: 0, revenueByService: [], activity: [] };
+    if (!USE_BACKEND) return { owners: 0, pets: 0, appointmentsThisMonth: 0, revenueThisMonth: 0, revenueByService: [], activity: [], today: [], vetsToday: [], weekRevenue: [0, 0, 0, 0, 0, 0, 0], topServices: [] };
+    await P.ready;
+    const [owners, veterinarians, services] = await Promise.all([
+      window.PawApi.loadOwners(),
+      window.PawApi.request("/api/vets"),
+      window.PawApi.request("/api/services")
+    ]);
+    const appointments = P.load();
+    const now = new Date();
+    const today = isoOf(now), thisMonth = month();
+    const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastMonth = lastMonthDate.getFullYear() + "-" + pad(lastMonthDate.getMonth() + 1);
+    const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((now.getDay() + 6) % 7));
+    const weekStart = isoOf(monday), weekEnd = isoOf(new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6));
+    const weekRevenue = [0, 0, 0, 0, 0, 0, 0], revenueByService = {}, topServices = {};
+    let revenueThisMonth = 0, revenueLastMonth = 0, completedThisMonth = 0, cancelled = 0, noShows = 0, nonCancelledThisMonth = 0;
+    const veterinarianStats = new Map(veterinarians.map((vet) => [vet.name, { name: vet.name, done: 0, total: 0 }]));
+    const todayAppointments = [];
+    const activity = [];
+    for (const appointment of appointments) {
+      const monthKey = String(appointment.date || "").slice(0, 7);
+      if (monthKey === thisMonth && appointment.status !== "cancelled") {
+        nonCancelledThisMonth++;
+        if (appointment.status === "cancelled") cancelled++;
+        if (appointment.status === "no_show") noShows++;
+        if (appointment.status === "completed") {
+          completedThisMonth++;
+          revenueThisMonth += Number(appointment.total) || 0;
+          for (const service of appointment.services || []) {
+            const amount = (Number(service.price) || 0) * (Number(service.quantity) || 1);
+            revenueByService[service.name] = (revenueByService[service.name] || 0) + amount;
+          }
+        }
+      } else if (monthKey === thisMonth && appointment.status === "cancelled") cancelled++;
+      if (monthKey === lastMonth && appointment.status === "completed") revenueLastMonth += Number(appointment.total) || 0;
+      if (appointment.date >= weekStart && appointment.date <= weekEnd && appointment.status === "completed") {
+        const index = Math.round((new Date(appointment.date + "T00:00:00") - new Date(weekStart + "T00:00:00")) / 86400000);
+        weekRevenue[index] += Number(appointment.total) || 0;
+        for (const service of appointment.services || []) topServices[service.name] = (topServices[service.name] || 0) + (Number(service.quantity) || 1);
+      }
+      if (appointment.date === today) {
+        if (!appointment.vet || appointment.vet === "To be assigned") {
+          // Unassigned appointments are counted separately from veterinarian workload.
+        } else {
+          const stats = veterinarianStats.get(appointment.vet);
+          if (stats) {
+            stats.total++;
+            if (appointment.status === "completed") stats.done++;
+          }
+        }
+        todayAppointments.push({
+          time: appointment.time,
+          pet: appointment.petName,
+          owner: appointment.ownerName,
+          vet: appointment.vet || "To be assigned",
+          status: appointment.status
+        });
+      }
+      const at = appointment.updatedAt || appointment.createdAt;
+      if (at) {
+        const action = appointment.status === "pending" ? "requested an appointment for"
+          : appointment.status === "confirmed" ? "has an approved appointment for"
+            : appointment.status === "completed" ? "completed a visit for"
+              : appointment.status === "cancelled" ? "cancelled an appointment for" : "updated an appointment for";
+        activity.push({ at, text: `<strong>${esc(appointment.ownerName || "Owner")}</strong> ${action} ${esc(appointment.petName || "a pet")}` });
+      }
     }
-    return fromStorage() || SAMPLE;
+    for (const service of services) {
+      if (!(service.name in revenueByService)) revenueByService[service.name] = 0;
+    }
+    activity.sort((a, b) => String(b.at).localeCompare(String(a.at)));
+    todayAppointments.sort((a, b) => String(a.time).localeCompare(String(b.time)));
+    const allToday = appointments.filter((appointment) => appointment.date === today);
+    return {
+      sample: false,
+      owners: owners.length,
+      pets: owners.reduce((total, owner) => total + (owner.pets || []).length, 0),
+      appointmentsThisMonth: appointments.filter((appointment) => String(appointment.date || "").slice(0, 7) === thisMonth && appointment.status !== "cancelled").length,
+      revenueThisMonth,
+      revenueByService: Object.entries(revenueByService).map(([name, amount]) => ({ name, amount })).sort((a, b) => b.amount - a.amount),
+      activity: activity.slice(0, 5).map((entry) => ({ text: entry.text, at: when(entry.at) })),
+      revenueLastMonth,
+      completedThisMonth,
+      cancelRate: nonCancelledThisMonth + cancelled ? Math.round(cancelled / (nonCancelledThisMonth + cancelled) * 100) : null,
+      noShowRate: nonCancelledThisMonth ? Math.round(noShows / nonCancelledThisMonth * 100) : null,
+      vetsToday: [...veterinarianStats.values()].sort((a, b) => b.total - a.total || a.name.localeCompare(b.name)),
+      unassignedToday: allToday.filter((appointment) => !appointment.vet || appointment.vet === "To be assigned").length,
+      weekRevenue,
+      topServices: Object.entries(topServices).map(([name, n]) => ({ name, n })).sort((a, b) => b.n - a.n).slice(0, 5),
+      today: todayAppointments
+    };
   }
 
   function render(d) {
@@ -212,7 +260,7 @@
       ? td.slice(0, 5).map((t) => { const [h, m] = String(t.time || "00:00").split(":").map(Number); const time = t.time ? new Date(2000, 0, 1, h, m).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : "-";
           return `<li><span class="td-time">${esc(time)}</span><span class="td-main"><b>${esc(t.pet)}</b><i>${esc(t.owner)} · ${esc(t.vet)}</i></span><span class="td-pill td-${esc(t.status)}">${esc(LABEL[t.status] || t.status)}</span></li>`; }).join("")
       : `<li class="empty">No appointments today.</li>`;
-    $("subtitle").textContent = d.sample ? "Clinic totals at a glance. Sample figures for the prototype." : "Clinic totals at a glance.";
+    $("subtitle").textContent = "Clinic totals at a glance.";
 
     const max = Math.max(1, ...d.revenueByService.map((r) => r.amount));
     $("rev-list").innerHTML = d.revenueByService.length
@@ -237,5 +285,9 @@
 
   $("today").textContent = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
 
-  load().then(render);
+  load().then(render).catch((error) => {
+    console.error("[admin dashboard] Could not load clinic data:", error);
+    render({ owners: 0, pets: 0, appointmentsThisMonth: 0, revenueThisMonth: 0, revenueByService: [], activity: [], today: [], vetsToday: [], weekRevenue: [0, 0, 0, 0, 0, 0, 0], topServices: [] });
+    $("subtitle").textContent = "Unable to load live clinic data. Refresh the page to try again.";
+  });
 })();

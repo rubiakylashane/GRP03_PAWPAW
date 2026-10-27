@@ -50,19 +50,23 @@
 
   const dlg = $("done-dialog");
   const find = (u) => all.find((a) => a.owner + "|" + a.id === u);
-  function finish(goRecord) {
+  async function finish(goRecord) {
     const a = cur; dlg.close();
-    A.change(a, { status: "completed" });
+    try { await A.change(a, { status: "completed" }); }
+    catch (error) { S.toast(error.message); return; }
     A.notify(a.owner, "appointment", "Visit completed", petName(a) + " has finished the visit. The medical record will be added by the vet.");
     if (goRecord) { location.href = V.recordHref(a); return; }
     render(); S.toast(petName(a) + " marked as completed.");
   }
 
-  document.addEventListener("click", (e) => {
+  document.addEventListener("click", async (e) => {
     if (e.target.closest("[data-close]")) { e.target.closest("dialog").close(); return; }
     const b = e.target.closest("[data-act]"); if (!b) return;
     const a = find(b.dataset.id); if (!a) return;
-    if (b.dataset.act === "start") { A.change(a, { status: "with_vet" }); render(); S.toast("Visit started for " + petName(a) + "."); }
+    if (b.dataset.act === "start") {
+      try { await A.change(a, { status: "with_vet" }); render(); S.toast("Visit started for " + petName(a) + "."); }
+      catch (error) { S.toast(error.message); }
+    }
     else { cur = a; $("done-sub").textContent = petName(a) + " - " + ownerName(a) + ", " + fmtDate(a.date) + " " + fmtTime(a.time); dlg.showModal(); }
   });
   $("done-ok").addEventListener("click", () => finish(false));
@@ -70,4 +74,5 @@
   $("search").addEventListener("input", render);
   $("sort").addEventListener("change", render);
   render();
+  A.ready.then((appointments) => { all = appointments; render(); }).catch((error) => S.toast(error.message));
 })();

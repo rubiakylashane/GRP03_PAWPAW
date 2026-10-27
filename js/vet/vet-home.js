@@ -4,9 +4,11 @@
      -> { stats, today: [appointment], upcoming: [appointment], recent: [appointment] } */
 (() => {
   const V = window.PawVet, A = V.A, S = window.PawStaff, O = window.PawOwners, $ = (id) => document.getElementById(id), esc = O.esc;
-  const all = A.load().filter(V.visible), t = V.today();
+  const t = V.today();
   const by = (a, b) => V.stamp(a).localeCompare(V.stamp(b));
 
+  function render(all) {
+  all = all.filter(V.visible);
   $("greeting").textContent = V.greeting;
   $("today").textContent = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
 
@@ -55,4 +57,6 @@
         <a class="btn btn-primary" href="medical-records.html?${V.recQuery(a)}">View Record</a>
       </div>
     </div>`).join("") : `<p class="empty">No completed visits yet.</p>`;
+  }
+  A.ready.then((appointments) => render(appointments)).catch((error) => S.toast(error.message));
 })();

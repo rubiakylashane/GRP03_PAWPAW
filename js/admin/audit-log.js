@@ -9,7 +9,7 @@
   const S = window.PawStaff, PAGE = 10;
   const ROLE = { admin: "Admin", staff: "Staff", vet: "Veterinarian", owner: "Owner" };
   const RECORDS = ["owner", "pet", "appointment", "medical_record", "prescription", "vaccination", "veterinarian", "user", "service"];
-  const ACTIONS = { create: "CREATE", update: "UPDATE", delete: "DELETE" };
+  const ACTIONS = { create: "CREATE", update: "UPDATE", delete: "DELETE", login: "LOGIN", logout: "LOGOUT" };
 
   const plain = (h) => String(h || "").replace(/<[^>]*>/g, "").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&").trim();
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -35,7 +35,7 @@
     return raw.map((e, i) => ({ ...normal(e), i })).sort((a, b) => b.t - a.t || b.i - a.i);   // newest first (same-second entries: the later one first)
   }
 
-  const all = load();
+  let all = load();
   let page = 1;
   const pad = (n) => String(n).padStart(2, "0");
   const dayOf = (t) => { const d = new Date(t); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); };   // local date, to match the date pickers
@@ -83,9 +83,28 @@
     $("au-next").disabled = page >= pages;
   }
 
+  async function refreshFromBackend() {
+    if (!window.PawApi.isBackendSession()) return;
+    const data = await window.PawApi.request("/api/audit-log");
+    all = data.map((entry, i) => ({ ...normal(entry), i })).sort((a, b) => b.t - a.t || b.i - a.i);
+    all.forEach((entry) => {
+      if (personOf(entry.user) < 0) {
+        const index = people.length;
+        people.push({ label: entry.user, role: entry.role, keys: [String(entry.user).toLowerCase()] });
+        const option = document.createElement("option");
+        option.value = String(index);
+        option.textContent = entry.user + (entry.role ? " (" + (ROLE[entry.role] || entry.role) + ")" : "");
+        $("f-user").appendChild(option);
+      }
+    });
+    page = 1;
+    render();
+  }
+
   ["f-user", "f-action", "f-record", "f-from", "f-to"].forEach((id) => $(id).addEventListener("change", () => { page = 1; render(); }));
   $("au-prev").addEventListener("click", () => { if (page > 1) { page--; render(); } });
   $("au-next").addEventListener("click", () => { page++; render(); });
+  if (window.PawApi.isBackendSession()) refreshFromBackend().catch((error) => S.toast(error.message));
 
   /* export: the filtered rows (all pages) as a .csv that opens in Excel */
   const cell = (v) => {

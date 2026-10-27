@@ -2,7 +2,7 @@
    Add a new pet / Edit pet.
    The page decides which one with <body data-mode="add"> or "edit".
 */
-(() => {
+(async () => {
   const P = window.PawPets || {
     get: () => null,
     add: () => {},
@@ -76,6 +76,7 @@
 
   const form = $("pet-form");
   if (!form) return;
+  const backend = Boolean(window.PawApi && window.PawApi.isBackendSession());
 
   const f = {
     name: $("name"),
@@ -343,12 +344,29 @@
 
   /* ----- Edit mode: load existing pet ----- */
   if (mode === "edit") {
+    if (backend) {
+      try {
+        await P.refresh();
+      } catch (error) {
+        const message = document.createElement("p");
+        message.className = "error";
+        message.setAttribute("role", "alert");
+        message.textContent = "Could not load your pet details. " + error.message;
+        form.prepend(message);
+        form.querySelectorAll("input, select, textarea, button").forEach((el) => { el.disabled = true; });
+        return;
+      }
+    }
     editingId = new URLSearchParams(location.search).get("id");
 
     const pet = editingId && P.get(editingId);
 
     if (!pet) {
-      location.replace(document.body.dataset.return || "my-pets.html");
+      const message = document.createElement("p");
+      message.className = "error";
+      message.setAttribute("role", "alert");
+      message.textContent = "This pet could not be found in your account. Return to My Pets and try again.";
+      form.prepend(message);
       return;
     }
 
@@ -388,7 +406,7 @@
   }
 
   /* ----- Submit form ----- */
-  form.addEventListener("submit", (event) => {
+  form.addEventListener("submit", async (event) => {
     event.preventDefault();
 
     const name = f.name ? f.name.value.trim() : "";
@@ -447,14 +465,48 @@
       return;
     }
 
-    if (mode === "edit") {
-      P.update(editingId, values);
-      P.setFlash("Changes saved.");
-    } else {
-      P.add(values);
-      P.setFlash("Pet added.");
+    const submit = form.querySelector('button[type="submit"]');
+    let submitError = form.querySelector(".submit-error");
+    if (!submitError) {
+      submitError = document.createElement("p");
+      submitError.className = "error submit-error";
+      submitError.setAttribute("role", "alert");
+      submit.before(submitError);
     }
-
-    location.href = document.body.dataset.return || "my-pets.html";
+    const originalText = submit.textContent;
+    submit.disabled = true;
+    submit.textContent = mode === "edit" ? "Saving..." : "Adding pet...";
+    submitError.textContent = "";
+    try {
+      if (backend) {
+        const owners = await window.PawApi.loadOwners();
+        const owner = owners[0];
+        if (!owner) throw new Error("Your owner profile could not be found. Sign out and sign in again.");
+        const body = {
+          name: values.name,
+          species: values.species,
+          breed: values.breed,
+          dateOfBirth: values.dob || null,
+          gender: values.sex,
+          allergies: values.allergies || null,
+          notes: values.notes || null,
+          photo: values.photo || null
+        };
+        const saved = mode === "edit"
+          ? await window.PawApi.request(`/api/owners/${encodeURIComponent(owner.id)}/pets/${encodeURIComponent(editingId)}`, { method: "PATCH", body })
+          : await window.PawApi.request(`/api/owners/${encodeURIComponent(owner.id)}/pets`, { method: "POST", body });
+        P.cacheApiPet(saved);
+      } else if (mode === "edit") {
+        P.update(editingId, values);
+      } else {
+        P.add(values);
+      }
+      P.setFlash(mode === "edit" ? "Changes saved." : "Pet added.");
+      location.href = document.body.dataset.return || "my-pets.html";
+    } catch (error) {
+      submitError.textContent = error.message || "Could not save your pet. Please try again.";
+      submit.disabled = false;
+      submit.textContent = originalText;
+    }
   });
 })();

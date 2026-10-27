@@ -51,7 +51,10 @@
   }
 
   /* filters */
-  $("f-vet").innerHTML = `<option value="">All veterinarians</option><option value="__tba">Unassigned</option>` + P.VETS.map((v) => `<option>${esc(v)}</option>`).join("");
+  function renderVetFilter() {
+    $("f-vet").innerHTML = `<option value="">All veterinarians</option><option value="__tba">Unassigned</option>` + P.VETS.map((v) => `<option>${esc(v)}</option>`).join("");
+  }
+  renderVetFilter();
   ["f-vet", "f-from", "f-to"].forEach((id) => $(id).addEventListener("change", () => { page = 0; render(); }));
   document.querySelector(".ap-tabs").addEventListener("click", (e) => { const t = e.target.closest("[data-s]"); if (t) { tab = t.dataset.s; page = 0; render(); } });
   $("ap-prev").addEventListener("click", () => { page--; render(); });
@@ -143,4 +146,9 @@
   if (q.get("vet") === "unassigned") $("f-vet").value = "__tba";
 
   load(); render();
+  P.ready.then(() => {
+    all = P.load();
+    renderVetFilter();
+    render();
+  }).catch((error) => S.toast(error.message));
 })();

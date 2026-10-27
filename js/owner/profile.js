@@ -1,7 +1,7 @@
 /* js/owner/profile.js
    My Profile: the owner's details and up to six of their pets. Needs pets-store.js and profile-store.js. */
 (() => {
-  const { esc, load: loadPets, ageText, fmtDate, takeFlash } = window.PawPets;
+  const { esc, ageText, fmtDate, takeFlash } = window.PawPets;
   const $ = (id) => document.getElementById(id);
 
   const p = window.PawProfile.load();
@@ -15,7 +15,6 @@
 
   /* ----- pets (same card as My Pets) ----- */
   const SHOW = 6;
-  const pets = loadPets();
   const card = (x) => {
     const age = ageText(x.dob);
     return `
@@ -34,10 +33,15 @@
         </dl>
       </a>`;
   };
-  $("pr-pets").innerHTML = pets.length
-    ? pets.slice(0, SHOW).map(card).join("")
-    : `<div class="pets-empty"><h2>No pets yet</h2><p>Add your first pet so we can prepare for your visit.</p><a class="pbtn pbtn-primary" href="add-pet.html">Add Pet</a></div>`;
-  $("pr-viewall").hidden = pets.length <= SHOW;
+  Promise.resolve(window.PawPets.refresh()).then((pets) => {
+    $("pr-pets").innerHTML = pets.length
+      ? pets.slice(0, SHOW).map(card).join("")
+      : `<div class="pets-empty"><h2>No pets yet</h2><p>Add your first pet so we can prepare for your visit.</p><a class="pbtn pbtn-primary" href="add-pet.html">Add Pet</a></div>`;
+    $("pr-viewall").hidden = pets.length <= SHOW;
+  }).catch((error) => {
+    $("pr-pets").innerHTML = `<p class="pets-empty" role="alert">Could not load your pets. ${esc(error.message)}</p>`;
+    $("pr-viewall").hidden = true;
+  });
 
   /* ----- message from Edit Profile ----- */
   const flash = takeFlash();

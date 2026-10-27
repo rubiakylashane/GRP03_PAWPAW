@@ -7,14 +7,31 @@
      POST  /api/staff/appointments       { owner, petId, service, date, time, vet } */
 window.PawStaffAppts = (() => {
   const KEY = "pawpaw_appointments:";
-  /* the doctors: the admin Veterinarians page saves them in "pawpaw_vets"; until then these are used */
-  const VETS = (() => { try { const v = JSON.parse(localStorage.getItem("pawpaw_vets") || "null"); if (Array.isArray(v) && v.length) return v.filter((x) => x.status !== "inactive").map((x) => x.name); } catch (_) { /* default */ } return ["Dr. Anajoy N. Abila", "Dr. Sean Kurvie G. Buerano", "Dr. Roxanne N. Regulacion", "Dr. Jenmarc M. Ronquillo", "Dr. Kyla Shane T. Rubia"]; })();
-  /* same names as the owner Services page: the admin Services page saves them in "pawpaw_services"; until then these are used */
-  const SERVICES = (() => { try { const v = JSON.parse(localStorage.getItem("pawpaw_services") || "null"); if (Array.isArray(v) && v.length) return v.filter((x) => x.status !== "inactive").map((x) => x.name); } catch (_) { /* default */ } return ["General Consultation", "Vaccination", "Deworming", "Grooming", "Dental Cleaning", "Laboratory Test"]; })();
+  const backend = Boolean(window.PawApi && window.PawApi.isBackendSession());
+  const signedInRole = (() => {
+    try { return String(JSON.parse(sessionStorage.getItem("pawpaw_user") || localStorage.getItem("pawpaw_user") || "{}").role || "").toLowerCase(); }
+    catch (_) { return ""; }
+  })();
+  let VETS = backend ? [] : (() => { try { const v = JSON.parse(localStorage.getItem("pawpaw_vets") || "null"); if (Array.isArray(v) && v.length) return v.filter((x) => x.status !== "inactive").map((x) => x.name); } catch (_) { /* default */ } return []; })();
+  let SERVICES = backend ? [] : (() => { try { const v = JSON.parse(localStorage.getItem("pawpaw_services") || "null"); if (Array.isArray(v) && v.length) return v.filter((x) => x.status !== "inactive").map((x) => x.name); } catch (_) { /* default */ } return []; })();
   const STATUS = { pending: "Pending", confirmed: "Confirmed", checked_in: "Checked in", with_vet: "With vet", completed: "Completed", cancelled: "Cancelled", no_show: "No-show" };
   const ORDER = ["pending", "confirmed", "checked_in", "with_vet", "completed", "no_show", "cancelled"];
   const ACTIVE = ["pending", "confirmed", "checked_in", "with_vet"];   // still occupy a vet's time
   const TBA = "To be assigned";
+  let remoteAppointments = [];
+  let remoteOwners = [];
+  const ready = backend ? Promise.all([
+    window.PawApi.request(signedInRole === "vet" ? "/api/vet/appointments" : signedInRole === "owner" ? "/api/appointments" : "/api/staff/appointments"),
+    window.PawApi.loadOwners(),
+    window.PawApi.request("/api/vets"),
+    window.PawApi.request("/api/services")
+  ]).then(([appointments, owners, vets, services]) => {
+    remoteAppointments = appointments.map((a) => ({ ...a, id: String(a.id), owner: String(a.owner), _key: KEY + String(a.owner), pet: a.petName }));
+    remoteOwners = owners;
+    VETS = vets.filter((v) => v.status !== "inactive").map((v) => v.name);
+    SERVICES = services.filter((s) => s.status !== "inactive").map((s) => s.name);
+    return remoteAppointments;
+  }) : Promise.resolve([]);
 
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   /* audit trail (demo): shared list "pawpaw_audit", read by the admin Audit Log page.
@@ -33,6 +50,7 @@ window.PawStaffAppts = (() => {
   function ownerLabel(key) { try { return (JSON.parse(localStorage.getItem("pawpaw_profile:" + key) || "{}") || {}).name || key; } catch (_) { return key; } }
 
   function load() {
+    if (backend) return remoteAppointments.slice();
     const out = [];
     try {
       for (let i = 0; i < localStorage.length; i++) {
@@ -73,15 +91,17 @@ window.PawStaffAppts = (() => {
 
   /* save a change (status / vet / date / time ...) back to the owner's list */
   /* quiet = true when the caller writes its own audit line (the admin Appointments page does) */
-  function change(appt, patch, quiet) {
+  async function change(appt, patch, quiet) {
     const before = { ...appt };
-    try {
+    if (backend) {
+      await window.PawApi.request("/api/appointments/" + encodeURIComponent(appt.id), { method: "PATCH", body: patch });
+    } else try {
       const list = JSON.parse(localStorage.getItem(appt._key) || "[]");
       const i = list.findIndex((a) => a.id === appt.id);
       if (i >= 0) { list[i] = { ...list[i], ...patch, updatedAt: new Date().toISOString() }; localStorage.setItem(appt._key, JSON.stringify(list)); }
     } catch (_) { /* ignore */ }
-    vetChanged(before, patch);
-    if (!quiet) {
+    if (!backend) vetChanged(before, patch);
+    if (!backend && !quiet) {
       const bits = [];
       if (patch.status && patch.status !== before.status) bits.push("status from " + (STATUS[before.status] || before.status) + " to " + (STATUS[patch.status] || patch.status));
       if (patch.vet && patch.vet !== before.vet) bits.push("veterinarian to " + patch.vet);
@@ -93,10 +113,19 @@ window.PawStaffAppts = (() => {
   }
 
   /* staff books for an owner that is already registered */
-  function add(ownerKey, data) {
+  async function add(ownerKey, data) {
     const key = KEY + ownerKey;
     const now = new Date().toISOString();
     const a = { id: "ap-" + Date.now().toString(36), status: "confirmed", total: 0, reason: "", createdAt: now, updatedAt: now, ...data };
+    if (backend) {
+      const saved = await window.PawApi.request("/api/appointments", {
+        method: "POST",
+        body: { ownerId: ownerKey, petId: data.petId, vet: data.vet, date: data.date, time: data.time, reason: data.reason, services: data.services }
+      });
+      const mapped = { ...saved, id: String(saved.id), owner: String(saved.owner), _key: KEY + String(saved.owner), pet: saved.petName };
+      remoteAppointments.push(mapped);
+      return mapped;
+    }
     try {
       const list = JSON.parse(localStorage.getItem(key) || "[]");
       list.push(a);
@@ -123,5 +152,11 @@ window.PawStaffAppts = (() => {
       localStorage.setItem(key, JSON.stringify(list.slice(-50)));
     } catch (_) { /* ignore */ }
   }
-  return { load, change, add, conflict, notify, notifyVet, vetChanged, VETS, SERVICES, STATUS, ORDER, ACTIVE, TBA };
+  return {
+    load, change, add, ready, backend, conflict, notify, notifyVet, vetChanged,
+    get VETS() { return VETS; },
+    get SERVICES() { return SERVICES; },
+    getOwners: () => remoteOwners,
+    STATUS, ORDER, ACTIVE, TBA
+  };
 })();

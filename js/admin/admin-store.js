@@ -21,17 +21,7 @@ window.PawAdmin = (() => {
   const validPhone = (s) => /^(09\d{9}|\+639\d{9})$/.test(String(s).replace(/[\s-]/g, ""));
   const validEmail = (s) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
 
-  const SEED = [
-    { id: "u-1", username: "adelacruz", name: "Ana Dela Cruz", email: "ana.delacruz@pawpaw.clinic", phone: "09170000001", role: "staff", status: "active", createdAt: "2026-02-02" },
-    { id: "u-2", username: "rsoriano", name: "Rico Soriano", email: "rico.soriano@pawpaw.clinic", phone: "09170000002", role: "staff", status: "inactive", createdAt: "2026-02-02" },
-    { id: "u-3", username: "aabila", name: "Dr. Anajoy N. Abila", email: "anajoy.abila@pawpaw.clinic", phone: "09175550101", role: "vet", status: "active", createdAt: "2026-01-15" },
-    { id: "u-4", username: "sbuerano", name: "Dr. Sean Kurvie G. Buerano", email: "sean.buerano@pawpaw.clinic", phone: "09175550102", role: "vet", status: "active", createdAt: "2026-01-15" },
-    { id: "u-6", username: "rregulacion", name: "Dr. Roxanne N. Regulacion", email: "roxanne.regulacion@pawpaw.clinic", phone: "09175550103", role: "vet", status: "active", createdAt: "2026-01-15" },
-    { id: "u-7", username: "jronquillo", name: "Dr. Jenmarc M. Ronquillo", email: "jenmarc.ronquillo@pawpaw.clinic", phone: "09175550104", role: "vet", status: "active", createdAt: "2026-01-15" },
-    { id: "u-8", username: "krubia", name: "Dr. Kyla Shane T. Rubia", email: "kyla.rubia@pawpaw.clinic", phone: "09175550105", role: "vet", status: "active", createdAt: "2026-01-15" },
-    { id: "u-5", username: "admin", name: "Admin", email: "admin@pawpaw.clinic", phone: "09170000005", role: "admin", status: "active", createdAt: "2026-01-01" }
-  ];
-  /* one-time: the first sample doctors (Paolo Reyes, Lia Mendoza, Carlo Tan) are replaced by the clinic's real doctors */
+  const SEED = [];
   try {
     if (localStorage.getItem("pawpaw_seed_v") !== "2") {
       const old = JSON.parse(localStorage.getItem("pawpaw_users") || "null");
@@ -39,7 +29,7 @@ window.PawAdmin = (() => {
       localStorage.removeItem("pawpaw_vets"); localStorage.setItem("pawpaw_seed_v", "2");
     }
   } catch (_) { /* ignore */ }
-  const accounts = () => { let v = read(USERS, null); if (!Array.isArray(v)) { v = SEED.map((u) => ({ ...u })); write(USERS, v); } else if (v.some((u) => !u || typeof u !== "object")) { v = v.filter((u) => u && typeof u === "object"); write(USERS, v); } return v; };   // a broken saved entry is dropped instead of stopping every admin page
+  const accounts = () => { let v = read(USERS, null); if (!Array.isArray(v)) { v = []; write(USERS, v); } else if (v.some((u) => !u || typeof u !== "object")) { v = v.filter((u) => u && typeof u === "object"); write(USERS, v); } return v; };
 
   /* signed-in admin (for the audit log and so you cannot lock yourself out) */
   function me() {
@@ -143,9 +133,9 @@ window.PawAdmin = (() => {
   const usernameTaken = (un, exceptId) => list().some((u) => u.id !== exceptId && String(u.username || "").toLowerCase() === String(un).toLowerCase());
   const emailTaken = (email, exceptId) => list().some((u) => u.id !== exceptId && u.email && u.email.toLowerCase() === email.toLowerCase());
 
-  function add({ name, phone, email, role }) {
+  function add({ name, phone, email, role, username, id }) {
     const all = accounts();
-    const u = { id: "u-" + Date.now().toString(36), username: makeUsername(name), name, email, phone: phone.replace(/[\s-]/g, ""), role, status: "active", createdAt: iso(), mustChange: true };
+    const u = { id: id || "u-" + Date.now().toString(36), username: username || makeUsername(name), name, email, phone: phone.replace(/[\s-]/g, ""), role, status: "active", createdAt: iso(), mustChange: true };
     if (role === "owner") {   // an owner is saved the way the owner pages save their own profile (key = username), so the owner pages and staff list find it
       write("pawpaw_profile:" + u.username, { name, email, phone: u.phone, memberSince: u.createdAt });
       u.id = "o:" + u.username; u.owner = true;
@@ -198,15 +188,8 @@ window.PawAdmin = (() => {
      pawpaw_vets  [ { id, name, specialization, license, phone, email, userId } ]   userId = the vet's login account (pawpaw_users) */
   const VETS = "pawpaw_vets";
   const SPECS = ["General Practice", "Dermatology", "Surgery", "Internal Medicine", "Dentistry", "Emergency and Critical Care", "Exotic Animals"];
-  const SEEDV = [
-    { id: "v-1", name: "Dr. Anajoy N. Abila", specialization: "General Practice", license: "PRC 0012345", phone: "09175550101", email: "anajoy.abila@pawpaw.clinic", userId: "u-3" },
-    { id: "v-2", name: "Dr. Sean Kurvie G. Buerano", specialization: "Surgery", license: "PRC 0023456", phone: "09175550102", email: "sean.buerano@pawpaw.clinic", userId: "u-4" },
-    { id: "v-3", name: "Dr. Roxanne N. Regulacion", specialization: "Dermatology", license: "PRC 0034567", phone: "09175550103", email: "roxanne.regulacion@pawpaw.clinic", userId: "u-6" },
-    { id: "v-4", name: "Dr. Jenmarc M. Ronquillo", specialization: "Internal Medicine", license: "PRC 0045678", phone: "09175550104", email: "jenmarc.ronquillo@pawpaw.clinic", userId: "u-7" },
-    { id: "v-5", name: "Dr. Kyla Shane T. Rubia", specialization: "Dentistry", license: "PRC 0056789", phone: "09175550105", email: "kyla.rubia@pawpaw.clinic", userId: "u-8" }
-  ];
-  accounts();   // seeds the login accounts first (the sample vets point to them)
-  const vets = () => { let v = read(VETS, null); if (!Array.isArray(v)) { v = SEEDV.map((x) => ({ ...x })); write(VETS, v); } return v; };
+  accounts();
+  const vets = () => { let v = read(VETS, null); if (!Array.isArray(v)) { v = []; write(VETS, v); } return v; };
   const withDr = (n) => { const t = String(n).trim().replace(/\s+/g, " "); const rest = t.replace(/^dr\.?\s+/i, "").split(" ").map((w) => (w === w.toLowerCase() ? w.charAt(0).toUpperCase() + w.slice(1) : w)).join(" "); return "Dr. " + rest; };
   const phoneShow = (p) => { const d = String(p || "").replace(/\D/g, ""); return /^09\d{9}$/.test(d) ? d.slice(0, 4) + " " + d.slice(4, 7) + " " + d.slice(7) : (p || "-"); };
   const normLicense = (s) => { const m = String(s).trim().match(/^(?:PRC)?\s*(\d{7})$/i); return m ? "PRC " + m[1] : ""; };
@@ -230,12 +213,19 @@ window.PawAdmin = (() => {
   }
 
   /* account: "new" creates a login account for the vet, or the id of an existing vet account without a profile */
-  function addVet({ name, specialization, license, phone, email, account }) {
-    const list = vets(), v = { id: "v-" + Date.now().toString(36), name: withDr(name), specialization, license, phone: phone.replace(/[\s-]/g, ""), email, userId: null };
+  function addVet({ name, specialization, license, phone, email, account, id, username }) {
+    const list = vets(), v = { id: id || "v-" + Date.now().toString(36), name: withDr(name), specialization, license, phone: phone.replace(/[\s-]/g, ""), email, userId: null };
     if (account && account !== "new") v.userId = account;
     else {
       const all = accounts(), u = { id: "u-" + Date.now().toString(36), username: makeUsername(v.name.replace(/^Dr\.\s*/, "")), name: v.name, email, phone: v.phone, role: "vet", status: "active", createdAt: iso(), mustChange: true };
       all.push(u); write(USERS, all); v.userId = u.id;
+    }
+    if (v.userId && username) {
+      const all = accounts();
+      if (!all.some((u) => String(u.id) === String(v.userId))) {
+        all.push({ id: v.userId, username, name: v.name, email, phone: v.phone, role: "vet", status: "active", createdAt: iso(), mustChange: true });
+        write(USERS, all);
+      }
     }
     list.push(v); write(VETS, list);
     log("added veterinarian " + esc(v.name), "create", "veterinarian");
@@ -310,7 +300,7 @@ window.PawAdmin = (() => {
   };
   const peso = (n) => "\u20B1" + Number(n).toLocaleString("en-US", { maximumFractionDigits: 2 });
   const svcKey = (n) => String(n).trim().replace(/\s+/g, " ").toLowerCase();
-  const serviceNameTaken = (name, exceptId) => services().some((x) => x.id !== exceptId && svcKey(x.name) === svcKey(name));
+  const serviceNameTaken = (name, exceptId) => services().some((x) => String(x.id) !== String(exceptId) && svcKey(x.name) === svcKey(name));
   /* how many appointments (of every owner) already include this service: delete is blocked when any */
   function serviceUses(sv) {
     let n = 0;
@@ -325,10 +315,10 @@ window.PawAdmin = (() => {
     } catch (_) { /* ignore */ }
     return n;
   }
-  function addService({ name, price, desc }) {
+  function addService({ name, price, desc, id }) {
     const all = services(), base = svcKey(name).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "service";
-    let id = base, n = 2; while (all.some((x) => x.id === id)) id = base + "-" + n++;
-    const sv = { id, name: name.trim().replace(/\s+/g, " "), price, desc: desc.trim() };
+    let serviceId = id || base, n = 2; while (all.some((x) => String(x.id) === String(serviceId))) serviceId = base + "-" + n++;
+    const sv = { id: serviceId, name: name.trim().replace(/\s+/g, " "), price, desc: desc.trim() };
     all.push(sv); write(SVC, all);
     log("added service " + esc(sv.name) + " (" + esc(peso(price)) + ")", "create", "service");
     return sv;
@@ -362,5 +352,5 @@ window.PawAdmin = (() => {
   const takeFlash = () => { try { const m = sessionStorage.getItem(FLASH) || ""; sessionStorage.removeItem(FLASH); return m; } catch (_) { return ""; } };
   const fmtDate = (s) => { if (!s) return "-"; const d = new Date(s + "T00:00:00"); return isNaN(d) ? "-" : d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); };
 
-  return { services, addService, updateService, deleteService, setServiceStatus, serviceUses, serviceNameTaken, peso, log, ownerHistory, describe, deleteOwner, deletePet, ownerStatus, setOwnerStatus, setPetStatus, VETS, SPECS, vets, history, addVet, updateVet, setVetStatus, removeVet, withDr, phoneShow, normLicense, licenseTaken, vetEmailTaken, freeVetAccounts, validName: (s) => /^[A-Za-zÀ-ÿ.'\- ]{2,60}$/.test(s), ROLES, list, add, updateUser, myAccount, myProfile, saveMyProfile, setRole, setStatus, resetPassword, validPhone, validEmail, emailTaken, usernameTaken, setFlash, takeFlash, fmtDate, esc, me };
+  return { services, addService, updateService, deleteService, setServiceStatus, serviceUses, serviceNameTaken, peso, log, ownerHistory, describe, deleteOwner, deletePet, ownerStatus, setOwnerStatus, setPetStatus, VETS, SPECS, vets, history, addVet, updateVet, setVetStatus, removeVet, withDr, phoneShow, normLicense, licenseTaken, vetEmailTaken, freeVetAccounts, validName: (s) => /^[A-Za-zÀ-ÿ.'\- ]{2,60}$/.test(s), ROLES, list, add, makeUsername, updateUser, myAccount, myProfile, saveMyProfile, setRole, setStatus, resetPassword, validPhone, validEmail, emailTaken, usernameTaken, setFlash, takeFlash, fmtDate, esc, me };
 })();

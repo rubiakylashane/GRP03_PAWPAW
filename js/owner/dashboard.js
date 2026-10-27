@@ -1,69 +1,15 @@
-/* js/owner/dashboard.js
-   Sample data is used until the backend is ready.
-   Set USE_BACKEND = true and edit API to load real data. */
+/* js/owner/dashboard.js - owner dashboard backed by authenticated clinic data. */
 (() => {
-  const USE_BACKEND = false;
+  const USE_BACKEND = Boolean(window.PawApi && window.PawApi.isBackendSession());
   const API = {
-    me: "/api/me",                          // { name, avatar }
-    appointments: "/api/appointments",      // [{ date, time, pet, doctor, service, status }]
-    pets: "/api/pets",                      // [{ name, species, breed, photo }]
-    overdue: "/api/vaccinations/overdue"    // [{ pet, photo }]
-  };
-
-  /* ---------- Demo data (NOT used now, kept for testing the layout) ---------- */
-  const DEMO_DATA = {
-    user: { name: "User", avatar: "" },
-    appointments: [
-      { date: "2026-10-20", time: "09:00", pet: "Bruno",  doctor: "Dr. Maria Santos", service: "Checkup",     status: "confirmed" },
-      { date: "2026-10-24", time: "14:30", pet: "Luna",   doctor: "Dr. Jose Reyes",   service: "Vaccination", status: "confirmed" },
-      { date: "2026-10-27", time: "10:00", pet: "Bruno",  doctor: "Dr. Maria Santos", service: "Grooming",    status: "pending" },
-      { date: "2026-10-30", time: "16:00", pet: "Milo",   doctor: "Dr. Jose Reyes",   service: "Dental",      status: "pending" }
-    ],
-    pets: [
-      { name: "Bruno", species: "Dog", breed: "Aspin",       photo: "" },
-      { name: "Luna",  species: "Cat", breed: "Puspin",      photo: "" },
-      { name: "Milo",  species: "Dog", breed: "Shih Tzu",    photo: "" }
-    ],
-    overdue: [
-      { pet: "Bruno", photo: "" },
-      { pet: "Milo",  photo: "" }
-    ]
+    me: "/api/auth/me",
+    appointments: "/api/appointments",
+    overdue: "/api/owner/vaccinations/overdue"
   };
 
   const $ = (id) => document.getElementById(id);
-
-  // Empty for now: a new user has no appointments, pets or vaccinations yet.
-  // To preview the filled layout, replace this with: const SAMPLE = DEMO_DATA;
-  const SAMPLE = {
-    user: { name: "User", avatar: "" },
-    appointments: [],
-    pets: [],
-    overdue: []
-  };
-
-  // Pets added on the Add pet page (saved by pets-store.js in demo mode)
-  try { if (window.PawPets) SAMPLE.pets = window.PawPets.load(); } catch (_) {}
-
-  // Appointments and vaccinations saved in demo mode (the staff pages update the same lists)
   const pad = (n) => String(n).padStart(2, "0");
   const todayIso = () => { const d = new Date(); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); };
-  const readList = (base) => {
-    let name = "guest";
-    for (const store of ["sessionStorage", "localStorage"]) {
-      try { const u = JSON.parse(window[store].getItem("pawpaw_user") || "null"); if (u && u.name) { name = String(u.name).trim().toLowerCase(); break; } } catch (_) {}
-    }
-    try { const v = JSON.parse(localStorage.getItem(base + ":" + name) || "null"); return Array.isArray(v) ? v : []; } catch (_) { return []; }
-  };
-  SAMPLE.appointments = readList("pawpaw_appointments").map((a) => ({
-    date: a.date, time: a.time || "00:00", pet: a.petName || a.pet || "-",
-    doctor: a.vet || a.doctor || "To be assigned",
-    service: (a.services || []).map((x) => x.name).join(", ") || a.service || "-",
-    status: a.status || "pending",
-    note: a.status === "cancelled" ? (a.declineReason || "") : (["pending", "confirmed"].indexOf(a.status) >= 0 ? (a.rescheduleReason || "") : "")
-  }));
-  SAMPLE.overdue = readList("pawpaw_vaccinations")
-    .filter((r) => r.nextDue && r.nextDue < todayIso())
-    .map((r) => { const p = SAMPLE.pets.find((x) => x.name === r.pet); return { pet: r.pet, photo: p ? p.photo : "" }; });
 
   // colours for the statuses the clinic staff can set
   (function () {
@@ -75,35 +21,47 @@
     document.head.appendChild(st);
   })();
 
-  // Name saved by login.js (demo mode)
-  (function () {
-    for (const store of ["sessionStorage", "localStorage"]) {
-      try {
-        const saved = JSON.parse(window[store].getItem("pawpaw_user") || "null");
-        if (saved && saved.name) { SAMPLE.user.name = saved.name; return; }
-      } catch (_) {}
-    }
-  })();
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-  async function get(url) {
-    const res = await fetch(url, { headers: { Accept: "application/json" } });
-    if (!res.ok) throw new Error("Request failed: " + url);
-    return res.json();
-  }
-
   async function loadData() {
-    if (!USE_BACKEND) return SAMPLE;
-    try {
-      const [user, appointments, pets, overdue] = await Promise.all([
-        get(API.me), get(API.appointments), get(API.pets), get(API.overdue)
-      ]);
-      return { user, appointments, pets, overdue };
-    } catch (err) {
-      console.warn("[dashboard] backend failed, using sample data:", err.message);
-      return SAMPLE;
-    }
+    if (!USE_BACKEND) throw new Error("An authenticated clinic session is required.");
+    const [profile, appointments, owners, overdue] = await Promise.all([
+      window.PawApi.request(API.me),
+      window.PawApi.request(API.appointments),
+      window.PawApi.loadOwners(),
+      window.PawApi.request(API.overdue)
+    ]);
+    const owner = owners[0] || {};
+    return {
+      user: {
+        name: profile.user.name || owner.name || "User",
+        avatar: profile.user.photo || owner.profile_photo || ""
+      },
+      appointments: appointments.map((appointment) => ({
+        date: appointment.date,
+        time: appointment.time || "00:00",
+        pet: appointment.petName || "Pet",
+        doctor: appointment.vet || "To be assigned",
+        service: (appointment.services || []).map((service) => service.name).join(", ") || "-",
+        status: appointment.status,
+        note: appointment.status === "cancelled"
+          ? appointment.declineReason || ""
+          : appointment.status === "pending"
+            ? appointment.rescheduleReason || ""
+            : ""
+      })),
+      pets: (owner.pets || []).map((pet) => ({
+        name: pet.name,
+        species: pet.species || "",
+        breed: pet.breed || "",
+        photo: pet.photo || ""
+      })),
+      overdue: overdue.map((vaccination) => ({
+        pet: vaccination.pet,
+        photo: vaccination.photo || ""
+      }))
+    };
   }
 
   /* ---------- Formatting ---------- */
@@ -149,15 +107,11 @@
   }
 
   function render(data) {
-    const name = SAMPLE.user.name !== "User" ? SAMPLE.user.name : (data.user.name || "User");
+    const name = data.user.name || "User";
     $("greeting-name").textContent = name;
     $("sidebar-name").textContent = name;
     // profile picture: the one saved on Edit Profile (per user), else the one from the API
-    let avatar = data.user.avatar || "";
-    try {
-      const prof = JSON.parse(localStorage.getItem("pawpaw_profile:" + String(name).trim().toLowerCase()) || "null");
-      if (prof && prof.photo) avatar = prof.photo;
-    } catch (_) { /* ignore */ }
+    const avatar = data.user.avatar || "";
     if (avatar) {
       const av = $("user-avatar");
       av.style.backgroundImage = `url('${avatar}')`;
@@ -212,10 +166,22 @@
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") setMenu(false); });
 
   /* ---------- Logout ---------- */
-  $("logout").addEventListener("click", () => {
+  $("logout").addEventListener("click", (event) => {
+    if (!window.confirm("Are you sure you want to log out?")) {
+      event.preventDefault();
+      return;
+    }
     try { localStorage.removeItem("token"); localStorage.removeItem("pawpaw_user"); sessionStorage.clear(); } catch (_) {}
     // then follows href="login.html"
   });
 
-  loadData().then(render);
+  loadData().then(render).catch((error) => {
+    console.error("[owner dashboard] Could not load live clinic data:", error);
+    $("greeting-name").textContent = "Dashboard unavailable";
+    $("sidebar-name").textContent = "Dashboard unavailable";
+    const notice = document.createElement("p");
+    notice.setAttribute("role", "alert");
+    notice.textContent = "Could not load clinic data. Refresh the page to try again.";
+    document.querySelector(".main").prepend(notice);
+  });
 })();

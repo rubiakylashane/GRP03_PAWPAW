@@ -1,4 +1,4 @@
-/* css/pages/admin/users.css - Users and Staff + Register User (load after admin.css) */
+/* css/pages/admin/users.css - Users and Staff + Add User (load after admin.css) */
 
 .adm { --accent: #e29d1a; --accent-dark: #c98712; }
 .adm .head-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 34px; }

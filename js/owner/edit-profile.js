@@ -6,10 +6,8 @@
   const profile = window.PawProfile;
   const { setFlash } = window.PawPets;
 
-  /* Password change. Demo mode cannot check the current password (the login accepts anything),
-     so only the rules are checked. With a backend: POST { current, next } to API.password and show its error. */
-  const USE_BACKEND = false;
-  const API = { password: "/api/me/password" };
+  const USE_BACKEND = window.PawApi.isBackendSession();
+  const API = { profile: "/api/auth/me", password: "/api/auth/me/password" };
   const MIN_PASSWORD = 8;
 
   const f = { name: $("name"), email: $("email"), address: $("address"), phone: $("phone"), photo: $("photo"),
@@ -17,12 +15,24 @@
   let photoData = "";
 
   /* ----- fill the form ----- */
-  const p = profile.load();
-  f.name.value = p.name;
-  f.email.value = p.email;
-  f.address.value = p.address;
-  f.phone.value = p.phone;
-  setPhoto(p.photo);
+  let p = profile.load(), profileError = null;
+  const fillProfile = (value) => {
+    f.name.value = value.name || "";
+    f.email.value = value.email || "";
+    f.address.value = value.address || "";
+    f.phone.value = value.phone || "";
+    setPhoto(value.photo || "");
+  };
+  fillProfile(p);
+  const profileLoaded = USE_BACKEND
+    ? window.PawApi.request(API.profile).then(({ user }) => {
+      p = { ...p, ...user, photo: user.photo || "", address: user.address || "" };
+      fillProfile(p);
+    }).catch((error) => {
+      profileError = error;
+      setError("email", error.message);
+    })
+    : Promise.resolve();
 
   function setError(key, msg) {
     const el = $("err-" + key);
@@ -82,6 +92,8 @@
 
   $("pr-form").addEventListener("submit", async (e) => {
     e.preventDefault();
+    await profileLoaded;
+    if (profileError) return;
     const errs = {};
     const name = f.name.value.trim();
     const email = f.email.value.trim();
@@ -105,21 +117,44 @@
 
     if (changing && USE_BACKEND) {
       try {
-        const res = await fetch(API.password, {
+        await window.PawApi.request(API.password, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ current: f.current.value, next: f.new.value })
+          body: { current: f.current.value, new: f.new.value }
         });
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          setError("current", data.message || "Current password is incorrect.");
-          f.current.focus();
-          return;
-        }
-      } catch (_) { setError("current", "Could not reach the server. Try again."); return; }
+      } catch (error) {
+        setError("current", error.message);
+        f.current.focus();
+        return;
+      }
+    }
+
+    if (USE_BACKEND) {
+      try {
+        await window.PawApi.request(API.profile, {
+          method: "PUT",
+          body: { name, email: email || null, phone, address: f.address.value.trim(), photo: photoData }
+        });
+      } catch (error) {
+        setError("email", error.message);
+        f.email.focus();
+        return;
+      }
     }
 
     profile.save({ name, email, phone: f.phone.value.trim(), address: f.address.value.trim(), photo: photoData });
+    for (const storage of [sessionStorage, localStorage]) {
+      try {
+        const user = JSON.parse(storage.getItem("pawpaw_user") || "null");
+        if (user) {
+          user.name = name;
+          user.email = email || null;
+          user.phone = phone || null;
+          storage.setItem("pawpaw_user", JSON.stringify(user));
+        }
+      } catch (error) {
+        console.error("Could not update the saved profile identity:", error);
+      }
+    }
     setFlash(changing ? "Profile and password updated." : "Profile updated.");
     location.href = "profile.html";
   });

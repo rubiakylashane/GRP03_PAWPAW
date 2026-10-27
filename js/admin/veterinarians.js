@@ -3,7 +3,8 @@
    the "assign a vet" lists and turns off their login account. Activate brings them back. */
 (() => {
   const A = window.PawAdmin, S = window.PawStaff, $ = (id) => document.getElementById(id);
-  let list = A.vets(), current = null;
+  const backend = window.PawApi.isBackendSession();
+  let list = backend ? [] : A.vets(), current = null;
 
   const off = (v) => v.status === "inactive";
   const row = (v) => `
@@ -18,8 +19,21 @@
         : `<button type="button" class="u-act u-act-red" data-act="status" data-id="${A.esc(v.id)}">Deactivate</button>`}</span>
     </div>`;
   function render() {
-    list = A.vets();
+    if (!backend) list = A.vets();
     $("v-rows").innerHTML = list.length ? list.map(row).join("") : `<p class="u-empty">No veterinarians yet.</p>`;
+  }
+  async function refreshFromBackend() {
+    if (!backend) return;
+    const data = await window.PawApi.request("/api/admin/veterinarians");
+    localStorage.setItem("pawpaw_vets", JSON.stringify(data.map((v) => ({
+      ...v,
+      id: String(v.id),
+      userId: v.userId == null ? null : String(v.userId),
+      license: v.license || v.license_number,
+      status: String(v.status || "active").toLowerCase()
+    }))));
+    list = JSON.parse(localStorage.getItem("pawpaw_vets") || "[]");
+    render();
   }
 
   /* Specialization is a dropdown (the list lives in admin-store.js); an older saved value that is not in the list is kept as an extra option */
@@ -35,12 +49,12 @@
     if (!v.specialization) e.spec = "Choose a specialization.";
     if (!$(p + "license").value.trim()) e.license = "Enter the license number.";
     else if (!v.license) e.license = "Use the format PRC 0012345.";
-    else if (A.licenseTaken(v.license, exceptId)) e.license = "This license number is already registered.";
+    else if (list.some((item) => item.id !== exceptId && item.license === v.license)) e.license = "This license number is already registered.";
     if (!v.phone) e.phone = "Enter the phone number.";
     else if (!A.validPhone(v.phone)) e.phone = "Use a mobile number like 09XXXXXXXXX.";
     if (!v.email) e.email = "Enter the email address.";
     else if (!A.validEmail(v.email)) e.email = "Enter a valid email address.";
-    else if (A.vetEmailTaken(v.email, exceptId) || (!exceptId && A.emailTaken(v.email)) ) e.email = "This email is already used by another account.";
+    else if (list.some((item) => item.id !== exceptId && String(item.email).toLowerCase() === v.email.toLowerCase())) e.email = "This email is already used by another veterinarian.";
     ["name", "spec", "license", "phone", "email"].forEach((k) => err(p, k, e[k]));
     const first = ["name", "spec", "license", "phone", "email"].find((k) => e[k]);
     if (first) $(p + first).focus();
@@ -68,10 +82,37 @@
     }
   });
   $("edit-cancel").addEventListener("click", () => editDlg.close());
-  $("edit-form").addEventListener("submit", (ev) => { ev.preventDefault(); const v = check("e-", current.id); if (!v) return; editDlg.close(); A.updateVet(current, v); render(); S.toast("Changes saved."); });
+  $("edit-form").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const v = check("e-", current.id);
+    if (!v) return;
+    if (backend) {
+      try {
+        await window.PawApi.request("/api/admin/veterinarians/" + encodeURIComponent(current.id), { method: "PATCH", body: v });
+        A.updateVet(current, v);
+        await refreshFromBackend();
+      } catch (error) { S.toast(error.message); return; }
+    } else A.updateVet(current, v);
+    editDlg.close();
+    render();
+    S.toast("Changes saved.");
+  });
   $("st-cancel").addEventListener("click", () => stDlg.close());
-  $("st-ok").addEventListener("click", () => { const to = $("st-ok").dataset.to; stDlg.close(); A.setVetStatus(current, to); render(); S.toast(current.name + (to === "active" ? " activated." : " deactivated.")); });
+  $("st-ok").addEventListener("click", async () => {
+    const to = $("st-ok").dataset.to;
+    if (backend) {
+      try {
+        await window.PawApi.request("/api/admin/veterinarians/" + encodeURIComponent(current.id) + "/status", { method: "PATCH", body: { status: to } });
+        A.setVetStatus(current, to);
+        await refreshFromBackend();
+      } catch (error) { S.toast(error.message); return; }
+    } else A.setVetStatus(current, to);
+    stDlg.close();
+    render();
+    S.toast(current.name + (to === "active" ? " activated." : " deactivated."));
+  });
 
   render();
+  if (backend) refreshFromBackend().catch((error) => S.toast(error.message));
   S.toast(A.takeFlash());
 })();

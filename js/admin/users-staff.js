@@ -7,13 +7,14 @@
   if (!A) { fail("js/admin/admin-store.js did not load"); return; }
   /* skip broken saved entries (a null or a record without a username) so one bad record cannot stop the whole page */
   const load = () => { try { return A.list().filter((u) => u && typeof u.username === "string"); } catch (e) { console.error(e); loadFailed = e.message; return []; } };
-  let all = load(), filter = "all", current = null, loadFailed = "";
+  const backend = window.PawApi.isBackendSession();
+  let all = backend ? [] : load(), filter = "all", current = null, loadFailed = "", loading = backend;
 
   const btn = (act, cls, label, id) => `<button type="button" class="u-act ${cls}" data-act="${act}" data-id="${A.esc(id)}">${label}</button>`;
-  /* every account shows the same buttons: Edit details, Edit role (not for owners), Reset password, Deactivate / Activate */
+  /* Every account can be managed consistently, including reversible role changes. */
   function actions(u) {
-    const edit = u.role === "owner" ? `<a class="u-act" href="owner-edit.html?id=${encodeURIComponent(u.username)}">Edit details</a>` : btn("edit", "", "Edit details", u.id);
-    const role = u.role === "owner" ? "" : btn("role", "", "Edit role", u.id);
+    const edit = btn("edit", "", "Edit details", u.id);
+    const role = btn("role", "", "Edit role", u.id);
     const reset = btn("reset", "", "Reset password", u.id);
     const toggle = u.status === "active" ? btn("deactivate", "u-act-red", "Deactivate", u.id) : btn("activate", "u-act-green", "Activate", u.id);
     return edit + role + reset + toggle;
@@ -31,8 +32,25 @@
   function render() {
     const rows = all.filter((u) => filter === "all" || u.role === filter);
     if (loadFailed) { fail(loadFailed); return; }
+    if (loading) { $("u-rows").innerHTML = `<p class="u-empty">Loading users…</p>`; return; }
     try { $("u-rows").innerHTML = rows.length ? rows.map(row).join("") : `<p class="u-empty">No users here yet.</p>`; } catch (e) { console.error(e); fail(e.message); }
     document.querySelectorAll(".u-tab").forEach((t) => { const on = t.dataset.role === filter; t.classList.toggle("on", on); t.setAttribute("aria-selected", String(on)); });
+  }
+
+  async function refreshFromBackend() {
+    if (!backend) return;
+    loading = true;
+    render();
+    const data = await window.PawApi.request("/api/admin/users");
+    all = data.map((u) => ({
+      ...u,
+      id: String(u.id),
+      role: String(u.role || "").toLowerCase(),
+      status: String(u.status || "active").toLowerCase()
+    }));
+    loading = false;
+    loadFailed = "";
+    render();
   }
 
   document.querySelector(".u-tabs").addEventListener("click", (e) => { const t = e.target.closest("[data-role]"); if (t) { filter = t.dataset.role; render(); } });
@@ -58,30 +76,77 @@
   const edErr = (k, m) => { const e = $("ed-err-" + k); e.textContent = m || ""; e.hidden = !m; $("ed-" + k).setAttribute("aria-invalid", m ? "true" : "false"); };
   ["name", "phone", "email"].forEach((k) => $("ed-" + k).addEventListener("input", () => edErr(k, "")));
   $("ed-cancel").addEventListener("click", () => edDlg.close());
-  $("ed-save").addEventListener("click", () => {
+  $("ed-save").addEventListener("click", async () => {
     const v = { name: $("ed-name").value.trim().replace(/\s+/g, " "), phone: $("ed-phone").value.replace(/[\s-]/g, ""), email: $("ed-email").value.trim() }, e = {};
     if (!v.name) e.name = "Enter the full name."; else if (!A.validName(v.name)) e.name = "Use letters only.";
     if (!v.phone) e.phone = "Enter the phone number."; else if (!A.validPhone(v.phone)) e.phone = "Use a mobile number like 09XXXXXXXXX.";
     if (!v.email) e.email = "Enter the email address."; else if (!A.validEmail(v.email)) e.email = "Enter a valid email address."; else if (A.emailTaken(v.email, current.id)) e.email = "This email is already used by another account.";
     ["name", "phone", "email"].forEach((k) => edErr(k, e[k]));
     const bad = ["name", "phone", "email"].find((k) => e[k]); if (bad) { $("ed-" + bad).focus(); return; }
-    edDlg.close(); A.updateUser(current, v); render(); toast("Details updated for " + current.username + ".");
+    if (backend) {
+      try {
+        await window.PawApi.request("/api/admin/users/" + encodeURIComponent(current.id), { method: "PATCH", body: v });
+        await refreshFromBackend();
+      } catch (error) { toast(error.message); return; }
+    } else {
+      A.updateUser(current, v);
+      render();
+    }
+    edDlg.close();
+    toast("Details updated for " + current.username + ".");
   });
   $("role-cancel").addEventListener("click", () => roleDlg.close());
-  $("role-save").addEventListener("click", () => {
+  $("role-save").addEventListener("click", async () => {
     const r = $("role-select").value;
     /* keep at least one active admin, otherwise nobody could manage the system */
     if (current.role === "admin" && r !== "admin" && all.filter((u) => u.role === "admin" && u.status === "active").length < 2) { $("role-err").textContent = "This is the only active admin. Add or promote another admin first."; $("role-err").hidden = false; return; }
-    roleDlg.close(); if (r !== current.role) { A.setRole(current, r); render(); toast("Role changed to " + A.ROLES[r] + "."); } });
+    if (r !== current.role && backend) {
+      try {
+        await window.PawApi.request("/api/admin/users/" + encodeURIComponent(current.id), { method: "PATCH", body: { role: r } });
+        await refreshFromBackend();
+      } catch (error) { $("role-err").textContent = error.message; $("role-err").hidden = false; return; }
+    } else if (r !== current.role) {
+      A.setRole(current, r);
+      render();
+    }
+    roleDlg.close();
+    if (r !== current.role) toast("Role changed to " + A.ROLES[r] + ".");
+  });
   $("pw-cancel").addEventListener("click", () => pwDlg.close());
-  $("pw-save").addEventListener("click", () => {
+  $("pw-save").addEventListener("click", async () => {
     const v = $("pw-new").value;
     if (v.length < 8) { $("pw-err").textContent = "Use at least 8 characters."; $("pw-err").hidden = false; return; }
-    pwDlg.close(); A.resetPassword(current); toast("Password reset. " + current.username + " must change it at the next login.");   // the password itself is sent to the backend, never saved here
+    if (backend) {
+      try {
+        await window.PawApi.request("/api/admin/users/" + encodeURIComponent(current.id) + "/reset-password", {
+          method: "POST",
+          body: { temporaryPassword: v }
+        });
+      } catch (error) { $("pw-err").textContent = error.message; $("pw-err").hidden = false; return; }
+    }
+    pwDlg.close(); A.resetPassword(current); toast("Password reset. " + current.username + " must change it at the next login.");
   });
   $("st-cancel").addEventListener("click", () => stDlg.close());
-  $("st-ok").addEventListener("click", () => { const to = $("st-ok").dataset.to; stDlg.close(); A.setStatus(current, to); render(); toast(current.username + (to === "active" ? " activated." : " deactivated.")); });
+  $("st-ok").addEventListener("click", async () => {
+    const to = $("st-ok").dataset.to;
+    if (backend) {
+      try {
+        await window.PawApi.request("/api/admin/users/" + encodeURIComponent(current.id), { method: "PATCH", body: { status: to } });
+        await refreshFromBackend();
+      } catch (error) { toast(error.message); return; }
+    } else {
+      A.setStatus(current, to);
+      render();
+    }
+    stDlg.close();
+    toast(current.username + (to === "active" ? " activated." : " deactivated."));
+  });
 
   render();
+  if (backend) refreshFromBackend().catch((error) => {
+    loading = false;
+    loadFailed = error.message;
+    render();
+  });
   toast(A.takeFlash());
 })();

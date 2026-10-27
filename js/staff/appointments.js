@@ -4,7 +4,12 @@
 (() => {
   const A = window.PawStaffAppts, O = window.PawOwners, S = window.PawStaff, $ = (id) => document.getElementById(id);
   const esc = O.esc, PAGE = 6, TBA = A.TBA;
-  let all = A.load(), tab = "all", dateF = "", shown = PAGE;
+  const signedInUser = (() => { try { return JSON.parse(sessionStorage.getItem("pawpaw_user") || localStorage.getItem("pawpaw_user") || "{}"); } catch (_) { return {}; } })();
+  if (A.backend && String(signedInUser.role || "").toLowerCase() === "owner") {
+    location.replace("my-appointments.html");
+    return;
+  }
+  let all = A.load(), tab = "all", dateF = "", shown = PAGE, dataReady = !A.backend;
 
   const pad = (n) => String(n).padStart(2, "0");
   const iso = (d) => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
@@ -135,7 +140,9 @@
 
   /* 10: add appointment */
   function openAdd() {
-    const owners = O.list().filter((o) => o.id);
+    if (!dataReady) { S.toast("Clinic data is still loading."); return; }
+    if (A.backend && !A.SERVICES.length) { S.toast("No active clinic services are configured. Ask an administrator to add a service first."); return; }
+    const owners = (A.backend ? A.getOwners().map((owner) => O.owner(String(owner.id))) : O.list()).filter((o) => o.id);
     if (!owners.length) { S.toast("Register an owner first."); return; }
     $("add-owner").innerHTML = owners.map((o) => `<option value="${esc(o.id)}">${esc(o.short || o.name)}</option>`).join("");
     $("add-service").innerHTML = A.SERVICES.map((s) => `<option>${esc(s)}</option>`).join("");
@@ -159,7 +166,14 @@
     else if (patch.status === "completed") n("Visit completed", petName(a) + " has finished the visit.");
     else if (patch.status === "no_show") n("Marked as no-show", petName(a) + " did not arrive for the " + fmtShort(a.date) + " appointment.");
   }
-  function set(a, patch, msg) { const before = a.status; A.change(a, patch); tell(a, before, patch); render(); S.toast(msg); }
+  async function set(a, patch, msg) {
+    const before = a.status;
+    try { await A.change(a, patch); }
+    catch (error) { S.toast(error.message); return; }
+    tell(a, before, patch);
+    render();
+    S.toast(msg);
+  }
 
   /* ---------- events ---------- */
   document.addEventListener("click", (e) => {
@@ -169,6 +183,7 @@
     const b = e.target.closest("[data-act]");
     if (b) {
       e.stopPropagation();
+      if (!dataReady) { S.toast("Clinic appointments and veterinarian data are still loading."); return; }
       const a = find(b.dataset.id); if (!a) return;
       ({
         approve: () => openApprove(a), decline: () => openDecline(a), assign: () => openAssign(a), resched: () => openResched(a),
@@ -220,15 +235,34 @@
 
   $("add-owner").addEventListener("change", fillPets);
   ["add-vet", "add-date", "add-time"].forEach((id) => $(id).addEventListener("change", checkAdd));
-  $("add-ok").addEventListener("click", () => {
+  $("add-ok").addEventListener("click", async () => {
     const key = $("add-owner").value, petId = $("add-pet").value, date = $("add-date").value;
+    const time = $("add-time").value;
     if (!petId) { S.toast("This owner has no pet yet."); return; }
     if (!date) { S.toast("Pick a date."); return; }
     const pet = O.getPet(key, petId), svc = $("add-service").value;
-    const a = A.add(key, { petId, petName: pet ? pet.name : "", vet: $("add-vet").value, date, time: $("add-time").value, services: [{ name: svc, price: 0 }] });
+    let a;
+    try {
+      a = await A.add(key, { petId, petName: pet ? pet.name : "", vet: $("add-vet").value, date, time, services: [{ name: svc, price: 0 }] });
+    } catch (error) { S.toast(error.message); return; }
     A.notify(a.owner, "appointment", "Appointment booked", petName(a) + ", " + fmtShort(a.date) + " " + fmtTime(a.time) + ", " + services(a) + ".");
     all.push(a); D.add.close(); render(); S.toast("Appointment added for " + petName(a) + ".");
   });
 
   render();
+  A.ready.then(() => {
+    dataReady = true;
+    all = A.load();
+    render();
+    const params = new URLSearchParams(location.search), ownerId = params.get("owner");
+    if (ownerId) {
+      openAdd();
+      if ([...$("add-owner").options].some((option) => option.value === ownerId)) $("add-owner").value = ownerId;
+      fillPets();
+      const petId = params.get("petid");
+      if (petId && [...$("add-pet").options].some((option) => option.value === petId)) $("add-pet").value = petId;
+      const service = params.get("service");
+      if (service && [...$("add-service").options].some((option) => option.value.toLowerCase() === service.toLowerCase())) $("add-service").value = service;
+    }
+  }).catch((error) => S.toast(error.message));
 })();

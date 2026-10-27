@@ -1,9 +1,10 @@
 /* js/owner/services.js
    Services page: draws one card per service from services-data.js (two cards per row, every other row shifted right).
    Clicking a card opens Book Appointment with that service already ticked. */
-(() => {
+(async () => {
   const list = document.getElementById("svc-list");
-  const services = window.PawServices || [];
+  const backend = window.PawApi && window.PawApi.isBackendSession();
+  let services = backend ? [] : window.PawServices || [];
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const peso = (n) => "₱" + Number(n).toLocaleString("en-US");
@@ -18,10 +19,21 @@
       </div>
     </a>`;
 
-  let html = "";
-  for (let i = 0; i < services.length; i += 2) {
-    const row = services.slice(i, i + 2).map(card).join("");
-    html += `<div class="svc-row${(i / 2) % 2 === 1 ? " is-shifted" : ""}">${row}</div>`;
+  function render() {
+    let html = "";
+    for (let i = 0; i < services.length; i += 2) {
+      const row = services.slice(i, i + 2).map(card).join("");
+      html += `<div class="svc-row${(i / 2) % 2 === 1 ? " is-shifted" : ""}">${row}</div>`;
+    }
+    list.innerHTML = html || `<p class="svc-empty">${services.length ? "No services listed yet." : "No active services are available."}</p>`;
   }
-  list.innerHTML = html || `<p class="svc-empty">No services listed yet.</p>`;
+  if (backend) {
+    list.innerHTML = `<p class="svc-empty">Loading services…</p>`;
+    try {
+      services = await window.PawApi.request("/api/services");
+      render();
+    } catch (error) {
+      list.textContent = "Could not load services: " + (error.message || "Request failed.");
+    }
+  } else render();
 })();

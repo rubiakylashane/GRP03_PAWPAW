@@ -84,6 +84,7 @@
       <h1>Book Appointment</h1>
       <p class="ap-sub-title">Pick a pet, a time, and what they need. The clinic will confirm your request.</p>
     </header>
+    <p id="booking-error" class="ap-error" role="alert" hidden></p>
 
     <div class="ap-layout" id="book-layout">
       <form id="appt-form" class="ap-card" novalidate>
@@ -164,11 +165,11 @@
 
   </main>
 
+  <script src="../../js/core/api.js"></script>
   <script src="../../js/owner/app-shell.js"></script>
   <script src="../../js/owner/calendar.js"></script>
   <script src="../../js/owner/pets-store.js"></script>
   <script src="../../js/owner/appts-store.js"></script>
-  <script src="../../js/owner/services-data.js"></script>
   <script src="../../js/owner/book-appointment.js"></script>
     
 </body>

@@ -2,14 +2,14 @@
    Staff dashboard (demo mode).
    Reads the appointment requests that owners made (saved in this browser's localStorage by
    js/owner/appts-store.js, one list per owner: "pawpaw_appointments:<owner name>").
-   Set USE_BACKEND = true and edit API when the backend is ready. */
+   Backend mode uses the shared authenticated API client. */
 (() => {
-  const USE_BACKEND = false;
+  const USE_BACKEND = Boolean(window.PawApi && window.PawApi.isBackendSession());
   const API = {
     appointments: "/api/staff/appointments",   // GET   -> [{ id, owner, petName, vet, date, time, services:[{name}], status, walkIn }]
-    update: "/api/staff/appointments/"         // PATCH /:id  { status, vet }
+    update: "/api/appointments/"               // PATCH /:id  { status, vet }
   };
-  const VETS = (window.PawStaffAppts && window.PawStaffAppts.VETS) || ["Dr. Anajoy N. Abila", "Dr. Sean Kurvie G. Buerano", "Dr. Roxanne N. Regulacion", "Dr. Jenmarc M. Ronquillo", "Dr. Kyla Shane T. Rubia"];
+  const VETS = (window.PawStaffAppts && window.PawStaffAppts.VETS) || [];
   const SHOW_DEMO = false; // true = fill the page with sample rows to preview the layout
 
   const KEY = "pawpaw_appointments:";
@@ -45,21 +45,22 @@
 
   async function load() {
     if (!USE_BACKEND) return readAll();
-    try {
-      const res = await fetch(API.appointments, { headers: { Accept: "application/json" } });
-      if (!res.ok) throw new Error("Request failed");
-      return await res.json();
-    } catch (err) {
-      console.warn("[staff dashboard] backend failed:", err.message);
-      return [];
-    }
+    const [appointments] = await Promise.all([
+      window.PawApi.request(API.appointments),
+      window.PawApi.loadOwners()
+    ]);
+    return appointments.map((a) => ({ ...a, id: String(a.id), owner: String(a.owner), _key: KEY + String(a.owner) }));
   }
 
   /* save a change (status / vet) back to the owner's list */
   async function change(appt, patch) {
     if (USE_BACKEND) {
-      try { await fetch(API.update + encodeURIComponent(appt.id), { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch) }); }
-      catch (err) { console.warn(err); }
+      try {
+        await window.PawApi.request(API.update + encodeURIComponent(appt.id), { method: "PATCH", body: patch });
+      } catch (err) {
+        say(err.message);
+        return false;
+      }
     } else if (SHOW_DEMO) {
       Object.assign(memory.find((a) => a.id === appt.id) || {}, patch);
     } else {
@@ -72,6 +73,7 @@
     tellOwner(appt, patch);
     if (!USE_BACKEND && window.PawStaffAppts) window.PawStaffAppts.vetChanged({ ...appt }, patch);
     Object.assign(appt, patch);
+    return true;
   }
 
   /* message for the owner's notification bell (the server does this itself when there is a backend) */
@@ -180,7 +182,7 @@
   function openReview(a) {
     current = a;
     const rows = [
-      ["Pet", a.petName || a.pet], ["Owner", a.owner || "-"], ["Date", fmtDate(a.date)], ["Time", fmtTime(a.time)],
+      ["Pet", a.petName || a.pet], ["Owner", a.ownerName || a.owner || "-"], ["Date", fmtDate(a.date)], ["Time", fmtTime(a.time)],
       ["Vet", a.vet || "To be assigned"], ["Services", serviceText(a)], ["Reason", a.reason || "-"],
       ["Estimated", a.total != null ? "₱" + Number(a.total).toLocaleString("en-US") : "-"]
     ];
@@ -200,7 +202,7 @@
 
   function openVet(a) {
     current = a;
-    $("vet-sub").textContent = (a.petName || a.pet) + " - " + (a.owner || "");
+    $("vet-sub").textContent = (a.petName || a.pet) + " - " + (a.ownerName || a.owner || "");
     const sel = $("vet-select");
     sel.innerHTML = VETS.map((v) => `<option>${esc(v)}</option>`).join("");
     if (VETS.includes(a.vet)) sel.value = a.vet;
@@ -211,7 +213,8 @@
   async function approve(a, vet) {
     const patch = { status: "confirmed" };
     if (vet) patch.vet = vet;
-    await change(a, patch); render(); say("Request approved.");
+    if (!await change(a, patch)) return;
+    render(); say("Request approved.");
   }
 
   document.addEventListener("click", async (e) => {
@@ -222,7 +225,9 @@
     if (b.dataset.act === "approve") openReview(a);
     else if (b.dataset.act === "review") openReview(a);
     else if (b.dataset.act === "assign") openVet(a);
-    else if (b.dataset.act === "checkin") { await change(a, { status: "checked_in" }); render(); say(a.petName + " checked in."); }
+    else if (b.dataset.act === "checkin") {
+      if (await change(a, { status: "checked_in" })) { render(); say(a.petName + " checked in."); }
+    }
   });
 
   $("review-close").addEventListener("click", () => reviewDlg.close());
@@ -230,14 +235,14 @@
   $("review-decline").addEventListener("click", async () => {
     const reason = $("review-reason").value.trim();
     reviewDlg.close();
-    await change(current, { status: "cancelled", declineReason: reason });
+    if (!await change(current, { status: "cancelled", declineReason: reason })) return;
     render(); say("Request declined.");
   });
   $("vet-cancel").addEventListener("click", () => vetDlg.close());
   $("vet-save").addEventListener("click", async () => {
     const vet = $("vet-select").value;
     vetDlg.close();
-    await change(current, { vet, status: "with_vet" });
+    if (!await change(current, { vet, status: "with_vet" })) return;
     render(); say("Assigned to " + vet + ".");
   });
 
@@ -280,5 +285,5 @@
     try { localStorage.removeItem("token"); localStorage.removeItem("pawpaw_user"); sessionStorage.clear(); } catch (_) { /* ignore */ }
   });
 
-  load().then((list) => { all = list; render(); });
+  load().then((list) => { all = list; render(); }).catch((error) => say(error.message));
 })();

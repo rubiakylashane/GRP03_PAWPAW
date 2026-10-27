@@ -5,6 +5,8 @@
   const { esc } = window.PawPets;
   const Appts = window.PawAppts;
   const $ = (id) => document.getElementById(id);
+  const backend = window.PawApi && window.PawApi.isBackendSession();
+  let appointmentList = [], loading = backend, loadError = "";
 
   const rowsEl = $("rows"), search = $("search"), sortEl = $("sort");
   const dialog = $("cancel-dialog"), toast = $("toast");
@@ -61,7 +63,7 @@
 
   function visible() {
     const q = search.value.trim().toLowerCase();
-    let list = Appts.load();
+    let list = backend ? appointmentList.slice() : Appts.load();
     if (q) {
       list = list.filter((a) => [a.petName, a.vet, a.status, longDate(a.date), (a.services || []).map((l) => l.name).join(" ")]
         .join(" ").toLowerCase().includes(q));
@@ -77,13 +79,27 @@
   }
 
   function render() {
-    const all = Appts.load();
+    const all = backend ? appointmentList : Appts.load();
     const list = visible();
     rowsEl.innerHTML = list.length
       ? list.map(row).join("")
-      : `<div class="ma-empty">${all.length
+      : `<div class="ma-empty">${loading ? "Loading your appointments…" : loadError ? "Could not load appointments: " + esc(loadError) : all.length
           ? "No appointments match your search."
           : `No appointments yet. <a href="book-appointment.html">Book an appointment</a>`}</div>`;
+  }
+  async function refresh() {
+    if (!backend) { loading = false; render(); return; }
+    loading = true;
+    loadError = "";
+    render();
+    try {
+      appointmentList = await window.PawApi.request("/api/appointments");
+    } catch (error) {
+      loadError = error.message || "Request failed.";
+    } finally {
+      loading = false;
+      render();
+    }
   }
 
   /* ----- Cancel ----- */
@@ -91,7 +107,7 @@
   rowsEl.addEventListener("click", (e) => {
     const btn = e.target.closest("[data-cancel]");
     if (!btn) return;
-    const a = Appts.get(btn.dataset.cancel);
+    const a = backend ? appointmentList.find((item) => String(item.id) === btn.dataset.cancel) : Appts.get(btn.dataset.cancel);
     if (!a) return;
     cancelId = a.id;
     $("cancel-text").textContent = a.petName + " · " + longDate(a.date) + ", " + time12(a.time);
@@ -99,12 +115,28 @@
   });
   $("cancel-keep").addEventListener("click", () => dialog.close());
   dialog.addEventListener("click", (e) => { if (e.target === dialog) dialog.close(); });
-  $("cancel-yes").addEventListener("click", () => {
-    if (cancelId) Appts.update(cancelId, { status: "cancelled" });
-    cancelId = null;
-    dialog.close();
-    render();
-    showToast("Appointment cancelled.");
+  $("cancel-yes").addEventListener("click", async () => {
+    if (!cancelId) return;
+    const id = cancelId;
+    $("cancel-yes").disabled = true;
+    try {
+      if (backend) {
+        await window.PawApi.request("/api/appointments/" + encodeURIComponent(id), {
+          method: "PATCH", body: { status: "cancelled" }
+        });
+        await refresh();
+      } else {
+        Appts.update(id, { status: "cancelled" });
+        render();
+      }
+      cancelId = null;
+      dialog.close();
+      showToast("Appointment cancelled.");
+    } catch (error) {
+      showToast(error.message || "The appointment could not be cancelled.");
+    } finally {
+      $("cancel-yes").disabled = false;
+    }
   });
 
   function showToast(msg) {
@@ -117,6 +149,7 @@
   sortEl.addEventListener("change", render);
 
   render();
+  if (backend) refresh();
   try {
     const m = sessionStorage.getItem("pawpaw_flash");
     if (m) { sessionStorage.removeItem("pawpaw_flash"); showToast(m); }

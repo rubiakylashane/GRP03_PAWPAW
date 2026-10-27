@@ -95,8 +95,12 @@
     setTimeout(() => toast.classList.remove("show"), 2800);
   }
 
-  render();
-  route();
-  const flash = takeFlash();
-  if (flash) showToast(flash);
+  Promise.resolve(window.PawPets.refresh()).then(() => {
+    render();
+    route();
+    const flash = takeFlash();
+    if (flash) showToast(flash);
+  }).catch((error) => {
+    grid.innerHTML = `<div class="pets-empty" role="alert">Could not load your pets. ${esc(error.message)}</div>`;
+  });
 })();

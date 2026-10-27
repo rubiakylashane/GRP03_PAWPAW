@@ -13,9 +13,8 @@
   const API = { list: "/api/notifications", read: (id) => "/api/notifications/" + encodeURIComponent(id) + "/read", readAll: "/api/notifications/read-all" };
 
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-  /* who is signed in: owner (own list), staff / admin (shared "staff" list), vet (list of that vet).
-     VETS mirrors js/staff/staff-appts-store.js; a vet login that matches none of them sees every vet's list. */
-  const VETS = (() => { try { const v = JSON.parse(localStorage.getItem("pawpaw_vets") || "null"); if (Array.isArray(v) && v.length) return v.map((x) => x.name); } catch (_) { /* default */ } return ["Dr. Anajoy N. Abila", "Dr. Sean Kurvie G. Buerano", "Dr. Roxanne N. Regulacion", "Dr. Jenmarc M. Ronquillo", "Dr. Kyla Shane T. Rubia"]; })();
+  /* Notifications are scoped to locally known vet identities only in demo mode. */
+  const VETS = (() => { try { const v = JSON.parse(localStorage.getItem("pawpaw_vets") || "null"); if (Array.isArray(v)) return v.map((x) => x.name); } catch (_) { /* use no cached names */ } return []; })();
   const user = (() => {
     for (const st of ["sessionStorage", "localStorage"]) {
       try { const u = JSON.parse(window[st].getItem("pawpaw_user") || "null"); if (u && u.name) return u; } catch (_) {}

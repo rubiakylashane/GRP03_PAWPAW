@@ -1,14 +1,4 @@
-/* js/admin/reports.js - admin Reports (demo mode)
-   Numbers are worked out from every owner's appointment list (PawStaffAppts.load()).
-   Revenue = completed appointments only, priced with the CURRENT service prices (services-data.js, or "pawpaw_services"
-   when the admin Services page saves one), so a price change also changes past totals (see the note on the page).
-   If nothing is saved yet it shows sample figures, like the Dashboard.
-   Backend: GET /api/admin/reports?from=YYYY-MM-DD&to=YYYY-MM-DD should return
-     { revenue, appointments, completed, cancelled,
-       revenueByService: [{ name, amount }], perPeriod: [{ label, count }], perPeriodUnit: "week"|"month",
-       byStatus: { pending, confirmed, checked_in, with_vet, completed, cancelled, no_show },
-       perVet: [{ name, count }] }
-   and GET /api/admin/reports/export.csv with the same dates. */
+/* js/admin/reports.js - reports computed from live clinic appointments. */
 (() => {
   const $ = (id) => document.getElementById(id);
   const S = window.PawStaff, P = window.PawStaffAppts;
@@ -24,15 +14,18 @@
   const STATUS_LABEL = { completed: "Completed", confirmed: "Approved", checked_in: "Checked-in", with_vet: "In Progress", pending: "Pending", cancelled: "Cancelled", no_show: "No-show" };
   const ALWAYS = ["completed", "confirmed", "pending", "cancelled"];   // always listed, the rest only when they have something
 
+  const backend = P.backend;
+
   /* ---------- service prices (current) ---------- */
   function catalog() {
     try { const v = JSON.parse(localStorage.getItem("pawpaw_services") || "null"); if (Array.isArray(v) && v.length) return v; } catch (_) { /* default */ }
     return Array.isArray(window.PawServices) ? window.PawServices : [];
   }
-  const CAT = catalog();
+  const CAT = backend ? [] : catalog();
   /* one appointment line -> { name: base service name, amount: current price x qty } */
   function priceLine(l) {
     const qty = Number(l.qty) || 1, id = String(l.id || ""), [base, opt] = id.split(":");
+    if (backend && Number.isFinite(Number(l.price))) return { name: String(l.name || "Other"), amount: Number(l.price) * (Number(l.quantity) || qty) };
     let svc = CAT.find((s) => s.id === base);
     if (!svc) { const n = String(l.name || "").split(" (")[0].toLowerCase(); svc = CAT.find((s) => String(s.name).toLowerCase() === n); }
     if (!svc) return { name: String(l.name || "Other").split(" (")[0], amount: (Number(l.unit) || (Number(l.price) || 0) / qty) * qty };
@@ -52,14 +45,6 @@
   const LABEL = { this: "Revenue this month", last: "Revenue last month", "3m": "Revenue, last 3 months", custom: "Revenue, custom range" };
 
   /* ---------- the numbers ---------- */
-  const SAMPLE = {
-    sample: true, revenue: 84350, appointments: 126, completed: 98, cancelled: 11,
-    revenueByService: [{ name: "Consultation", amount: 31000 }, { name: "Vaccination", amount: 18200 }, { name: "Dental Cleaning", amount: 15000 }, { name: "Laboratory Test", amount: 9900 }, { name: "Grooming", amount: 6600 }, { name: "Deworming", amount: 3650 }],
-    unit: "week", perPeriod: [{ label: "Week 1", count: 28 }, { label: "Week 2", count: 35 }, { label: "Week 3", count: 31 }, { label: "Week 4", count: 32 }],
-    byStatus: { completed: 98, confirmed: 9, pending: 8, cancelled: 11 },
-    perVet: [{ name: "Dr. Anajoy N. Abila", count: 34 }, { name: "Dr. Sean Kurvie G. Buerano", count: 31 }, { name: "Dr. Roxanne N. Regulacion", count: 24 }, { name: "Dr. Jenmarc M. Ronquillo", count: 21 }, { name: "Dr. Kyla Shane T. Rubia", count: 16 }]
-  };
-
   function compute(all, from, to) {
     const rows = all.filter((a) => a.date && a.date >= from && a.date <= to);
     const byStatus = {}, svc = {}, vets = {};
@@ -104,17 +89,15 @@
   };
 
   let kind = "this", data = null;
-  const hasReal = () => P.load().length > 0;
-
   function render() {
-    const all = P.load(), real = all.length > 0;
+    const all = P.load();
     const r = range(kind);
     const bad = kind === "custom" && (!r.from || !r.to || r.from > r.to);
     $("rp-period").classList.toggle("bad", !!bad);
-    $("rp-period").textContent = bad ? (!r.from || !r.to ? "Pick both dates to see the report." : "The From date must be on or before the To date.") : (real ? nice(r.from) + " to " + nice(r.to) : "");
-    data = !real ? SAMPLE : bad ? compute([], "2000-01-01", "2000-01-31") : compute(all, r.from, r.to);
+    $("rp-period").textContent = bad ? (!r.from || !r.to ? "Pick both dates to see the report." : "The From date must be on or before the To date.") : nice(r.from) + " to " + nice(r.to);
+    data = bad ? compute([], "2000-01-01", "2000-01-31") : compute(all, r.from, r.to);
     data.range = r;
-    $("subtitle").textContent = real ? "Revenue and activity for the clinic." : "Revenue and activity for the clinic. Sample figures for the prototype.";
+    $("subtitle").textContent = "Revenue and activity from recorded clinic appointments.";
 
     $("k-rev-l").textContent = LABEL[kind];
     $("k-rev").textContent = peso(data.revenue);
@@ -162,4 +145,7 @@
   });
 
   render();
+  P.ready.then(render).catch((error) => {
+    S.toast("Could not load live clinic reports: " + error.message);
+  });
 })();

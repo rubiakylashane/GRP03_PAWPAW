@@ -2,7 +2,13 @@
 (() => {
   const O = window.PawOwners, $ = (id) => document.getElementById(id);
   const rowsEl = $("owner-rows");
-  const owners = O.list();
+  const backend = window.PawApi.isBackendSession();
+  const signedInUser = (() => { try { return JSON.parse(sessionStorage.getItem("pawpaw_user") || localStorage.getItem("pawpaw_user") || "{}"); } catch (_) { return {}; } })();
+  if (backend && String(signedInUser.role || "").toLowerCase() === "owner") {
+    location.replace("my-pets.html");
+    return;
+  }
+  let owners = backend ? [] : O.list(), loading = backend, loadError = "";
 
   const sorters = {
     "name-asc": (a, b) => a.name.localeCompare(b.name),
@@ -24,6 +30,10 @@
   }
 
   function render() {
+    if (loading || loadError) {
+      rowsEl.innerHTML = `<p class="o-empty">${loading ? "Loading owners…" : "Could not load owners: " + O.esc(loadError)}</p>`;
+      return;
+    }
     const q = $("search").value.trim().toLowerCase();
     const list = owners
       .filter((o) => !q || [o.name, o.email, o.phone].join(" ").toLowerCase().includes(q))
@@ -33,7 +43,23 @@
       : `<p class="o-empty">${owners.length ? "No owners match your search." : "No owners yet."}</p>`;
   }
 
+  async function refreshFromBackend() {
+    if (!backend) return;
+    loading = true;
+    loadError = "";
+    render();
+    const data = await window.PawApi.loadOwners();
+    owners = data.map((owner) => ({ ...O.owner(String(owner.id)), userId: owner.user_id }));
+    loading = false;
+    render();
+  }
+
   $("search").addEventListener("input", render);
   $("sort").addEventListener("change", render);
   render();
+  if (backend) refreshFromBackend().catch((error) => {
+    loading = false;
+    loadError = error.message || "Request failed.";
+    render();
+  });
 })();

@@ -23,7 +23,7 @@ window.PawVet = (() => {
   const LABEL = { confirmed: "Approved", checked_in: "Checked in", with_vet: "In Progress", completed: "Completed" };
   const label = (a) => LABEL[a.status] || A.STATUS[a.status] || a.status;
   const SHOWN = ["confirmed", "checked_in", "with_vet", "completed"];
-  const visible = (a) => SHOWN.indexOf(a.status) >= 0 && a.vet && a.vet !== A.TBA && (!mine || a.vet === mine);
+  const visible = (a) => SHOWN.indexOf(a.status) >= 0 && a.vet && a.vet !== A.TBA && (A.backend || !mine || a.vet === mine);
 
   const fmtDate = (d) => new Date(d + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
   const fmtShort = (d) => new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });

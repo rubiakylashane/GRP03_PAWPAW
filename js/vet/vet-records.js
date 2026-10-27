@@ -5,8 +5,8 @@
      "pawpaw_records:<owner>".visits          { id, apptId, petId, pet, date, diagnosis, treatment, notes, vet, services:[{type,name,notes}] }
      "pawpaw_records:<owner>".prescriptions   { id, apptId, petId, pet, date, medication, dose, instructions, quantity }
      "pawpaw_vaccinations:<owner>"            { id, apptId, petId, vaccine, pet, dateAdministered, nextDue, administeredBy, notes }
-   Backend: GET /api/vet/appointments?record=none|done      GET /api/appointments/:id/record
-            PUT /api/appointments/:id/record { visit, services, prescriptions, vaccinations } */
+   Backend records are loaded from /api/vet/patients/:petId and saved with
+   PUT /api/appointments/:id/record. */
 (() => {
   const V = window.PawVet, A = V.A, O = V.O, S = window.PawStaff, $ = (id) => document.getElementById(id), esc = O.esc;
   const PREVIEW = 5;
@@ -101,17 +101,19 @@
   function saveRx() {
     const medication = $("ve-med").value.trim();
     if (!medication) return err("Enter the medication name.");
-    const item = { medication, dose: $("ve-dose").value.trim(), quantity: $("ve-qty").value.trim(), instructions: $("ve-inst").value.trim() };
+    const quantity = $("ve-qty").value.trim();
+    if (!/^[1-9]\d*$/.test(quantity)) return err("Enter a positive whole-number quantity.");
+    const item = { medication, dose: $("ve-dose").value.trim(), quantity, instructions: $("ve-inst").value.trim() };
     if (rxEdit >= 0) rx[rxEdit] = item; else rx.push(item);
-    rxEdit = -1; clearRx(); err(""); drawRx();
+    rxEdit = -1; clearRx(); err(""); drawRx(); return true;
   }
 
-  function save() {
+  async function save() {
     const a = cur, diag = $("ve-diag").value.trim(), date = $("ve-date").value;
     if (!diag) return err("Enter the diagnosis.");
     if (!date) return err("Pick the record date.");
     if (date > V.today()) return err("The record date cannot be in the future.");
-    if ($("ve-med").value.trim()) saveRx();                       // a prescription typed but not added yet
+    if ($("ve-med").value.trim() && !saveRx()) return;
     for (const b of blocks) if (b.type === "Vaccination") {
       if (!b.vaccine.trim()) return err("Enter the vaccine name for each vaccination.");
       if (!b.given || b.given > V.today()) return err("Check the date administered of " + b.vaccine + ".");
@@ -125,13 +127,32 @@
     rec.prescriptions = (rec.prescriptions || []).filter((r) => r.apptId !== a.id);
     rx.forEach((r, i) => rec.prescriptions.push({ id: id + "-rx" + i, ...base, date, medication: r.medication, dose: r.dose, instructions: r.instructions, quantity: r.quantity }));
     const vk = "pawpaw_vaccinations:" + a.owner, vx = V.readJson(vk, []).filter((r) => r.apptId !== a.id);
-    blocks.filter((b) => b.type === "Vaccination").forEach((b, i) => vx.push({ id: "vx-" + Date.now().toString(36) + i, apptId: a.id, petId: a.petId || "", vaccine: b.vaccine.trim(), pet: V.petName(a), dateAdministered: b.given, nextDue: b.due, administeredBy: a.vet, notes: "" }));
+    const vaccinations = blocks.filter((b) => b.type === "Vaccination").map((b, i) => ({
+      id: "vx-" + Date.now().toString(36) + i, apptId: a.id, petId: a.petId || "", vaccine: b.vaccine.trim(),
+      pet: V.petName(a), dateAdministered: b.given, nextDue: b.due, administeredBy: a.vet, notes: ""
+    }));
+    vx.push(...vaccinations);
+    if (A.backend) {
+      try {
+        await window.PawApi.request("/api/appointments/" + encodeURIComponent(a.id) + "/record", {
+          method: "PUT",
+          body: {
+            date,
+            diagnosis: diag,
+            treatment: $("ve-treat").value.trim(),
+            notes: $("ve-notes").value.trim(),
+            prescriptions: rx
+          }
+        });
+      } catch (error) {
+        return err(error.message);
+      }
+    }
     try { localStorage.setItem(rk, JSON.stringify(rec)); localStorage.setItem(vk, JSON.stringify(vx)); } catch (_) { return err("Could not save. Storage is blocked."); }
     window.PawOwners.audit(old ? "update" : "create", "medical_record", (old ? "Updated" : "Added") + " the medical record of " + V.petName(a) + ".");
     if (rx.length) window.PawOwners.audit(old ? "update" : "create", "prescription", (old ? "Updated" : "Added") + " " + rx.length + " prescription" + (rx.length === 1 ? "" : "s") + " for " + V.petName(a) + ": " + rx.map((r) => r.medication).join(", ") + ".");
     A.notify(a.owner, "record", old ? "Medical record updated" : "Medical record added", V.petName(a) + "'s medical record is ready. See Medical Records for the details.");
-    const given = blocks.filter((b) => b.type === "Vaccination");
-    if (given.length) A.notify(a.owner, "record", "Vaccination recorded", given.map((b) => b.vaccine.trim()).join(", ") + " given to " + V.petName(a) + ". See Vaccination History for the next due date.");
+    if (vaccinations.length) A.notify(a.owner, "record", "Vaccination recorded", vaccinations.map((b) => b.vaccine).join(", ") + " given to " + V.petName(a) + ". See Vaccination History for the next due date.");
     closeEditor(); S.toast("Record saved for " + V.petName(a) + ".");
   }
 
@@ -153,7 +174,42 @@
   $("ve-save").addEventListener("click", save);
   $("ve-cancel").addEventListener("click", closeEditor);
 
-  renderList();
-  const want = new URLSearchParams(location.search).get("appt");
-  if (want) { const a = all.find((x) => key(x) === want && V.visible(x)); if (a) openEditor(a); }
+  async function hydrateRecords(appointments) {
+    if (!A.backend) return;
+    const pets = [...new Set(appointments.filter(V.visible).map((a) => String(a.petId || "")).filter(Boolean))];
+    const details = await Promise.all(pets.map((petId) => window.PawApi.request("/api/vet/patients/" + encodeURIComponent(petId))));
+    const recordsByOwner = new Map();
+    for (const detail of details) {
+      const ownerId = String(detail.pet.owner);
+      const rec = recordsByOwner.get(ownerId) || { visits: [], prescriptions: [] };
+      for (const visit of detail.visits || []) {
+        const appt = appointments.find((a) => String(a.id) === String(visit.appointment_id));
+        if (!appt) continue;
+        rec.visits.push({
+          id: visit.id, apptId: String(visit.appointment_id), petId: String(detail.pet.id), pet: detail.pet.name,
+          date: String(visit.date || "").slice(0, 10), diagnosis: visit.diagnosis, treatment: visit.treatment || "",
+          notes: visit.notes || "", vet: visit.vet,
+          services: (appt.services || []).map((service) => ({ type: service.name, name: service.name, notes: "" }))
+        });
+      }
+      for (const prescription of detail.prescriptions || []) {
+        const visit = rec.visits.find((r) => String(r.id) === String(prescription.record_id));
+        if (!visit) continue;
+        rec.prescriptions.push({
+          id: prescription.id, apptId: visit.apptId, petId: visit.petId, pet: visit.pet,
+          date: String(prescription.date || "").slice(0, 10), medication: prescription.medication,
+          dose: prescription.dose || "", instructions: prescription.instructions || "", quantity: prescription.quantity
+        });
+      }
+      recordsByOwner.set(ownerId, rec);
+    }
+    recordsByOwner.forEach((records, ownerId) => localStorage.setItem("pawpaw_records:" + ownerId, JSON.stringify(records)));
+  }
+  A.ready.then(async (appointments) => {
+    all = appointments;
+    await hydrateRecords(all);
+    renderList();
+    const want = new URLSearchParams(location.search).get("appt");
+    if (want) { const a = all.find((x) => key(x) === want && V.visible(x)); if (a) openEditor(a); }
+  }).catch((error) => S.toast(error.message));
 })();

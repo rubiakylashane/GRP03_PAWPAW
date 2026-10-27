@@ -1,7 +1,4 @@
-/* js/owner/pets-store.js
-   Shared helpers for the pet pages (my-pets, add-pet, edit-pet).
-   Demo storage = this browser's localStorage. When the backend is ready,
-   replace the bodies of load / save (or the add / update functions) with fetch() calls. */
+/* js/owner/pets-store.js - shared pet helpers backed by the clinic API when signed in. */
 window.PawPets = (() => {
   const BASE = "pawpaw_pets";
   let memory = []; // fallback when localStorage is blocked
@@ -33,6 +30,48 @@ window.PawPets = (() => {
     try { localStorage.setItem(userKey(BASE), JSON.stringify(list)); } catch (_) { /* ignore */ }
   }
 
+  function fromApi(pet) {
+    return {
+      ...pet,
+      id: String(pet.id),
+      dob: pet.date_of_birth || pet.dob || "",
+      sex: pet.gender || pet.sex || ""
+    };
+  }
+
+  async function refresh(ownerRows) {
+    if (!window.PawApi || !window.PawApi.isBackendSession()) return load();
+    const owners = ownerRows || await window.PawApi.loadOwners();
+    const owner = owners[0];
+    const localPets = load();
+    if (owner && localPets.length) {
+      const signature = (pet) => [pet.name, pet.species, pet.breed, pet.dob || pet.date_of_birth]
+        .map((value) => String(value || "").trim().toLowerCase()).join("|");
+      const existing = new Set((owner.pets || []).map(signature));
+      for (const pet of localPets) {
+        if (/^\d+$/.test(String(pet.id)) || existing.has(signature(pet))) continue;
+        const saved = await window.PawApi.request(`/api/owners/${encodeURIComponent(owner.id)}/pets`, {
+          method: "POST",
+          body: {
+            name: pet.name,
+            species: pet.species,
+            breed: pet.breed || null,
+            dateOfBirth: pet.dob || pet.date_of_birth || null,
+            gender: pet.sex || pet.gender || null,
+            allergies: pet.allergies || null,
+            notes: pet.notes || null,
+            photo: pet.photo || null
+          }
+        });
+        owner.pets.push(saved);
+        existing.add(signature(saved));
+      }
+    }
+    const pets = (owner?.pets || []).map(fromApi);
+    save(pets);
+    return pets;
+  }
+
   const get = (id) => load().find((p) => p.id === id) || null;
 
   function add(pet) {
@@ -49,6 +88,15 @@ window.PawPets = (() => {
     list[i] = { ...list[i], ...patch, id };
     save(list);
     return list[i];
+  }
+  function cacheApiPet(pet) {
+    const saved = fromApi(pet);
+    const pets = load();
+    const index = pets.findIndex((item) => item.id === saved.id);
+    if (index < 0) pets.push(saved);
+    else pets[index] = saved;
+    save(pets);
+    return saved;
   }
 
   /* dob is "YYYY-MM-DD" */
@@ -82,5 +130,5 @@ window.PawPets = (() => {
     } catch (_) { return null; }
   }
 
-  return { esc, load, get, add, update, ageText, fmtDate, setFlash, takeFlash };
+  return { esc, load, get, add, update, refresh, cacheApiPet, fromApi, ageText, fmtDate, setFlash, takeFlash };
 })();

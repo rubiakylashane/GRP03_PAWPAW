@@ -1,10 +1,11 @@
 /* js/owner/reschedule-appointment.js
    Reschedule one appointment (reschedule-appointment.html?id=...).
    The new date and time are saved and the request goes back to "pending" until staff confirm. */
-(() => {
+(async () => {
   const { esc } = window.PawPets;
   const Appts = window.PawAppts;
   const $ = (id) => document.getElementById(id);
+  const backend = window.PawApi && window.PawApi.isBackendSession();
 
   /* same clinic hours as book-appointment.js */
   const HOURS = { open: "09:00", close: "17:00", step: 30 };
@@ -24,7 +25,17 @@
   }
 
   const id = new URLSearchParams(location.search).get("id");
-  const appt = id ? Appts.get(id) : null;
+  let appt = null;
+  if (backend) {
+    try {
+      const appointments = await window.PawApi.request("/api/appointments");
+      appt = appointments.find((appointment) => String(appointment.id) === String(id));
+    } catch (error) {
+      $("rs-missing").hidden = false;
+      $("rs-missing").querySelector("p").textContent = error.message || "Appointments could not be loaded.";
+      return;
+    }
+  } else appt = id ? Appts.get(id) : null;
   if (!appt || ["pending", "confirmed"].indexOf(appt.status) < 0 || appt.date < new Date().toISOString().slice(0, 10)) { $("rs-missing").hidden = false; return; }
   $("rs-layout").hidden = false;
 
@@ -104,7 +115,7 @@
   f.time.addEventListener("change", () => setError("time", ""));
   buildTimes();
 
-  $("rs-form").addEventListener("submit", (e) => {
+  $("rs-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const iso = parseDate(f.date.value);
     let bad = false;
@@ -113,10 +124,31 @@
     else if (iso < todayIso) { setError("date", "Pick today or a later date."); bad = true; }
     else if (iso > maxIso) { setError("date", "Requests open up to " + MAX_DAYS_AHEAD / 30 + " months ahead."); bad = true; }
     if (!f.time.value) { setError("time", "Choose a time."); bad = true; }
-    else if (iso === appt.date && f.time.value === appt.time) { setError("time", "That is your current schedule. Choose a different date or time."); bad = true; }
+    else if (iso === appt.date && f.time.value === String(appt.time).slice(0, 5)) { setError("time", "That is your current schedule. Choose a different date or time."); bad = true; }
     if (bad) return;
 
-    Appts.update(appt.id, { date: iso, time: f.time.value, status: "pending", rescheduledFrom: { date: appt.date, time: appt.time } });
+    const submit = $("rs-form").querySelector('button[type="submit"]');
+    submit.disabled = true;
+    try {
+      if (backend) {
+        await window.PawApi.request("/api/appointments/" + encodeURIComponent(appt.id), {
+          method: "PATCH",
+          body: {
+            date: iso,
+            time: f.time.value,
+            status: "pending",
+            rescheduledFrom: { date: appt.date, time: appt.time },
+            rescheduleReason: "Owner requested a new appointment time."
+          }
+        });
+      } else {
+        Appts.update(appt.id, { date: iso, time: f.time.value, status: "pending", rescheduledFrom: { date: appt.date, time: appt.time } });
+      }
+    } catch (error) {
+      setError("time", error.message || "The reschedule request could not be saved.");
+      submit.disabled = false;
+      return;
+    }
     try { sessionStorage.setItem("pawpaw_flash", "Reschedule requested. The clinic will confirm it."); } catch (_) { /* ignore */ }
     location.href = "my-appointments.html";
   });

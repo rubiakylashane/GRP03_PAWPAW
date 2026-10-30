@@ -1,28 +1,12 @@
-/* js/staff/vaccine-reminders.js - staff Vaccination Reminder list
-   Reads the vaccination records saved per owner ("pawpaw_vaccinations:<owner>", each with a nextDue date).
-   Reminder records and delivery are managed by the clinic API. */
+/* js/staff/vaccine-reminders.js - staff Vaccination Reminder list */
 (() => {
   const O = window.PawOwners, S = window.PawStaff, $ = (id) => document.getElementById(id), esc = O.esc;
-  const USE_BACKEND = true;
   const API_NOTIFY = (id) => "/api/vaccination-reminders/" + encodeURIComponent(id) + "/notify";
   const SOON = 30;                                  // days: orange when due within this many days
-  const KEY = "pawpaw_vaccinations:";
   let loadError = "";
 
   async function load() {
-    if (USE_BACKEND && window.PawApi.isBackendSession()) {
-      return window.PawApi.request("/api/staff/vaccination-reminders");
-    }
-    const out = [];
-    try {
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (!k || k.indexOf(KEY) !== 0) continue;
-        const owner = k.slice(KEY.length);
-        (JSON.parse(localStorage.getItem(k) || "[]") || []).forEach((r, i) => { if (r && r.nextDue) out.push({ ...r, id: r.id || owner + "-" + i, owner }); });
-      }
-    } catch (_) { /* storage blocked */ }
-    return out;
+    return window.PawApi.request("/api/staff/vaccination-reminders");
   }
   let all = [];
 
@@ -82,20 +66,8 @@
     btn.disabled = true;
     let sentAt = new Date().toISOString();
     try {
-      if (USE_BACKEND && window.PawApi.isBackendSession()) {
-        sentAt = (await window.PawApi.request(API_NOTIFY(r.id), { method: "POST" })).sentAt || sentAt;
-      } else {
-        const key = KEY + r.owner, list = JSON.parse(localStorage.getItem(key) || "[]");
-        const i = list.findIndex((x, n) => (x.id || r.owner + "-" + n) === r.id);
-        if (i >= 0) { list[i].lastRemindedAt = sentAt; localStorage.setItem(key, JSON.stringify(list)); }
-      }
+      sentAt = (await window.PawApi.request(API_NOTIFY(r.id), { method: "POST" })).sentAt || sentAt;
       r.lastRemindedAt = sentAt; render();
-      if (!USE_BACKEND || !window.PawApi.isBackendSession()) try {
-        const nk = "pawpaw_notifications:" + r.owner, nl = JSON.parse(localStorage.getItem(nk) || "[]");
-        nl.push({ id: "n-" + Date.now().toString(36), type: "reminder", title: "Vaccine reminder: " + (r.pet || ""),
-          text: (r.vaccine || "Vaccine") + " is due on " + fmtDate(r.nextDue) + ". Book an appointment to keep your pet protected.", createdAt: sentAt, readAt: null });
-        localStorage.setItem(nk, JSON.stringify(nl.slice(-50)));
-      } catch (_) { /* ignore */ }
       S.toast("Reminder sent to " + (ownerOf(r).short || r.owner) + ".");
     } catch (err) {
       btn.disabled = false; S.toast(err.message || "Could not send the reminder. Try again.");

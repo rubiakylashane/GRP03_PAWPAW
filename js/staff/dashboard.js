@@ -1,94 +1,29 @@
-/* js/staff/dashboard.js
-   Staff dashboard (demo mode).
-   Reads the appointment requests that owners made (saved in this browser's localStorage by
-   js/owner/appts-store.js, one list per owner: "pawpaw_appointments:<owner name>").
-   Backend mode uses the shared authenticated API client. */
+/* js/staff/dashboard.js - live staff appointment dashboard. */
 (() => {
   const USE_BACKEND = Boolean(window.PawApi && window.PawApi.isBackendSession());
   const API = {
-    appointments: "/api/staff/appointments",   // GET   -> [{ id, owner, petName, vet, date, time, services:[{name}], status, walkIn }]
     update: "/api/appointments/"               // PATCH /:id  { status, vet }
   };
-  const VETS = (window.PawStaffAppts && window.PawStaffAppts.VETS) || [];
-  const SHOW_DEMO = false; // true = fill the page with sample rows to preview the layout
-
-  const KEY = "pawpaw_appointments:";
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const pad = (n) => String(n).padStart(2, "0");
   const todayIso = () => { const d = new Date(); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); };
 
-  /* ---------- Data ---------- */
-  const DEMO = () => [
-    { id: "d1", owner: "Ana", petName: "Bruno", vet: "Dr. Maria Santos", date: todayIso(), time: "09:00", services: [{ name: "Checkup" }], status: "confirmed" },
-    { id: "d2", owner: "Ana", petName: "Luna", vet: "To be assigned", date: todayIso(), time: "10:30", services: [{ name: "Vaccination" }], status: "checked_in" },
-    { id: "d3", owner: "Ben", petName: "Milo", vet: "Dr. Jose Reyes", date: todayIso(), time: "11:00", services: [{ name: "Grooming" }], status: "with_vet" },
-    { id: "d4", owner: "Cara", petName: "Coco", vet: "To be assigned", date: todayIso(), time: "13:30", services: [{ name: "Deworming" }], status: "pending" },
-    { id: "d5", owner: "Ben", petName: "Rex", vet: "To be assigned", date: todayIso(), time: "15:00", services: [{ name: "Dental" }], status: "pending" }
-  ];
-  let memory = [];
-
-  function readAll() {
-    if (SHOW_DEMO) return memory.length ? memory : (memory = DEMO());
-    const out = [];
-    try {
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (!k || k.indexOf(KEY) !== 0) continue;
-        const owner = k.slice(KEY.length);
-        (JSON.parse(localStorage.getItem(k) || "[]") || []).forEach((a) => out.push({ ...a, owner, _key: k }));
-      }
-    } catch (_) { /* storage blocked */ }
-    return out;
-  }
-
   async function load() {
-    if (!USE_BACKEND) return readAll();
-    const [appointments] = await Promise.all([
-      window.PawApi.request(API.appointments),
-      window.PawApi.loadOwners()
-    ]);
-    return appointments.map((a) => ({ ...a, id: String(a.id), owner: String(a.owner), _key: KEY + String(a.owner) }));
+    if (!USE_BACKEND) throw new Error("An authenticated clinic session is required.");
+    return A.ready;
   }
 
-  /* save a change (status / vet) back to the owner's list */
   async function change(appt, patch) {
-    if (USE_BACKEND) {
-      try {
-        await window.PawApi.request(API.update + encodeURIComponent(appt.id), { method: "PATCH", body: patch });
-      } catch (err) {
-        say(err.message);
-        return false;
-      }
-    } else if (SHOW_DEMO) {
-      Object.assign(memory.find((a) => a.id === appt.id) || {}, patch);
-    } else {
-      try {
-        const list = JSON.parse(localStorage.getItem(appt._key) || "[]");
-        const i = list.findIndex((a) => a.id === appt.id);
-        if (i >= 0) { list[i] = { ...list[i], ...patch, updatedAt: new Date().toISOString() }; localStorage.setItem(appt._key, JSON.stringify(list)); }
-      } catch (_) { /* ignore */ }
+    try {
+      await window.PawApi.request(API.update + encodeURIComponent(appt.id), { method: "PATCH", body: patch });
+    } catch (err) {
+      say(err.message);
+      return false;
     }
-    tellOwner(appt, patch);
-    if (!USE_BACKEND && window.PawStaffAppts) window.PawStaffAppts.vetChanged({ ...appt }, patch);
     Object.assign(appt, patch);
     return true;
-  }
-
-  /* message for the owner's notification bell (the server does this itself when there is a backend) */
-  function tellOwner(appt, patch) {
-    if (USE_BACKEND || SHOW_DEMO || !appt.owner) return;
-    let title = "", text = "";
-    const what = (appt.petName || "") + ", " + appt.date + " " + (appt.time || "");
-    if (patch.status === "confirmed" && appt.status === "pending") { title = "Appointment approved"; text = what + "."; }
-    else if (patch.status === "cancelled") { title = "Request declined"; text = what + "." + (patch.declineReason ? " Reason: " + patch.declineReason : ""); }
-    if (!title) return;
-    try {
-      const k = "pawpaw_notifications:" + appt.owner, list = JSON.parse(localStorage.getItem(k) || "[]");
-      list.push({ id: "n-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), type: "appointment", title, text, createdAt: new Date().toISOString(), readAt: null });
-      localStorage.setItem(k, JSON.stringify(list.slice(-50)));
-    } catch (_) { /* ignore */ }
   }
 
   /* ---------- Formatting ---------- */
@@ -100,7 +35,7 @@
     return new Date(iso + "T00:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
   }
   const serviceText = (a) => (a.services || []).map((s) => s.name).join(", ") || a.service || "-";
-  const STATUS = { confirmed: "Confirmed", checked_in: "Checked in", with_vet: "With vet" };
+  const STATUS = { confirmed: "Confirmed", checked_in: "Checked in", with_vet: "With Vet" };
 
   /* ---------- Render ---------- */
   let all = [];
@@ -188,8 +123,8 @@
     ];
     $("review-facts").innerHTML = rows.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join("");
     const sel = $("review-vet");
-    sel.innerHTML = VETS.map((v) => `<option>${esc(v)}</option>`).join("");
-    if (VETS.includes(a.vet)) sel.value = a.vet;
+    sel.innerHTML = A.VETS.map((v) => `<option>${esc(v)}</option>`).join("");
+    if (A.VETS.includes(a.vet)) sel.value = a.vet;
     $("review-reason").value = "";
     checkReview();
     reviewDlg.showModal();
@@ -204,8 +139,8 @@
     current = a;
     $("vet-sub").textContent = (a.petName || a.pet) + " - " + (a.ownerName || a.owner || "");
     const sel = $("vet-select");
-    sel.innerHTML = VETS.map((v) => `<option>${esc(v)}</option>`).join("");
-    if (VETS.includes(a.vet)) sel.value = a.vet;
+    sel.innerHTML = A.VETS.map((v) => `<option>${esc(v)}</option>`).join("");
+    if (A.VETS.includes(a.vet)) sel.value = a.vet;
     checkVet();
     vetDlg.showModal();
   }

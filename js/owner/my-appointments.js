@@ -3,7 +3,6 @@
    Needs pets-store.js (esc) and appts-store.js loaded first. */
 (() => {
   const { esc } = window.PawPets;
-  const Appts = window.PawAppts;
   const $ = (id) => document.getElementById(id);
   const backend = window.PawApi && window.PawApi.isBackendSession();
   let appointmentList = [], loading = backend, loadError = "";
@@ -19,7 +18,7 @@
     const h = h24 % 12 === 0 ? 12 : h24 % 12;
     return h + ":" + pad(m) + " " + (h24 < 12 ? "AM" : "PM");
   }
-  const LABELS = { checked_in: "Checked in", with_vet: "With vet", no_show: "No-show" };
+  const LABELS = { checked_in: "Checked in", with_vet: "With Vet", no_show: "No Show" };
   const label = (s) => LABELS[s] || s.charAt(0).toUpperCase() + s.slice(1);
   // order for "Sort: status" (statuses the clinic staff set are included)
   /* clinic note: decline reason only when cancelled; reschedule reason only while pending / confirmed
@@ -63,7 +62,7 @@
 
   function visible() {
     const q = search.value.trim().toLowerCase();
-    let list = backend ? appointmentList.slice() : Appts.load();
+    let list = appointmentList.slice();
     if (q) {
       list = list.filter((a) => [a.petName, a.vet, a.status, longDate(a.date), (a.services || []).map((l) => l.name).join(" ")]
         .join(" ").toLowerCase().includes(q));
@@ -79,7 +78,7 @@
   }
 
   function render() {
-    const all = backend ? appointmentList : Appts.load();
+    const all = appointmentList;
     const list = visible();
     rowsEl.innerHTML = list.length
       ? list.map(row).join("")
@@ -88,7 +87,12 @@
           : `No appointments yet. <a href="book-appointment.html">Book an appointment</a>`}</div>`;
   }
   async function refresh() {
-    if (!backend) { loading = false; render(); return; }
+    if (!backend) {
+      loading = false;
+      loadError = "An authenticated clinic session is required.";
+      render();
+      return;
+    }
     loading = true;
     loadError = "";
     render();
@@ -107,7 +111,7 @@
   rowsEl.addEventListener("click", (e) => {
     const btn = e.target.closest("[data-cancel]");
     if (!btn) return;
-    const a = backend ? appointmentList.find((item) => String(item.id) === btn.dataset.cancel) : Appts.get(btn.dataset.cancel);
+    const a = appointmentList.find((item) => String(item.id) === btn.dataset.cancel);
     if (!a) return;
     cancelId = a.id;
     $("cancel-text").textContent = a.petName + " · " + longDate(a.date) + ", " + time12(a.time);
@@ -120,15 +124,10 @@
     const id = cancelId;
     $("cancel-yes").disabled = true;
     try {
-      if (backend) {
-        await window.PawApi.request("/api/appointments/" + encodeURIComponent(id), {
-          method: "PATCH", body: { status: "cancelled" }
-        });
-        await refresh();
-      } else {
-        Appts.update(id, { status: "cancelled" });
-        render();
-      }
+      await window.PawApi.request("/api/appointments/" + encodeURIComponent(id), {
+        method: "PATCH", body: { status: "cancelled" }
+      });
+      await refresh();
       cancelId = null;
       dialog.close();
       showToast("Appointment cancelled.");

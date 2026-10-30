@@ -155,6 +155,32 @@ CREATE TABLE IF NOT EXISTS APPOINTMENT (
         ))
 );
 
+ALTER TABLE APPOINTMENT
+    DROP CONSTRAINT IF EXISTS chk_appointment_status;
+
+UPDATE APPOINTMENT
+   SET status = CASE
+       WHEN lower(trim(status)) IN ('in progress', 'with vet', 'with_vet') THEN 'With Vet'
+       WHEN lower(trim(status)) IN ('no-show', 'no show', 'no_show') THEN 'No Show'
+       ELSE status
+   END
+ WHERE lower(trim(status)) IN (
+     'in progress', 'with vet', 'with_vet', 'no-show', 'no show', 'no_show'
+ );
+
+ALTER TABLE APPOINTMENT
+    ADD CONSTRAINT chk_appointment_status
+    CHECK (status IN (
+        'Pending',
+        'Scheduled',
+        'Approved',
+        'Checked-in',
+        'With Vet',
+        'Completed',
+        'Cancelled',
+        'No Show'
+    ));
+
 
 CREATE TABLE IF NOT EXISTS APPOINTMENT_SERVICE (
     appointment_id INT NOT NULL,

@@ -6,7 +6,7 @@
 (() => {
   const P = window.PawStaffAppts, O = window.PawOwners, A = window.PawAdmin, S = window.PawStaff, $ = (id) => document.getElementById(id);
   const esc = A.esc, TBA = P.TBA, PAGE = 10;
-  const LABEL = { pending: "Pending", confirmed: "Approved", checked_in: "Checked-in", with_vet: "In Progress", completed: "Completed", cancelled: "Cancelled", no_show: "No-show" };
+  const LABEL = { pending: "Pending", confirmed: "Approved", checked_in: "Checked in", with_vet: "With Vet", completed: "Completed", cancelled: "Cancelled", no_show: "No Show" };
   const OPEN = ["pending", "confirmed", "checked_in", "with_vet"];        // can still be edited / cancelled
   const pad = (n) => String(n).padStart(2, "0");
   const todayIso = () => { const d = new Date(); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); };

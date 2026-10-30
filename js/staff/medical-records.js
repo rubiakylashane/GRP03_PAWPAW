@@ -1,20 +1,10 @@
-/* js/staff/medical-records.js - Records page, shared by staff (view only) and vet (view + add): visit records + prescriptions of every pet
-   Demo storage (same lists the owner's Medical Records page reads):
-     "pawpaw_records:<owner>" = { visits: [{ id, pet, date, diagnosis, treatment, notes }],
-                                  prescriptions: [{ id, pet, date, medication, dose, instructions, quantity }] }
-   Backend records are stored through the clinic API.
+/* js/staff/medical-records.js - clinic-wide records page, backed by the clinic API.
      GET  /api/staff/records            -> { visits: [{ ..., owner }], prescriptions: [{ ..., owner }] }
      POST /api/staff/records/visits           body: { owner, pet, date, diagnosis, treatment, notes }
      POST /api/staff/records/prescriptions    body: { owner, pet, date, medication, dose, instructions, quantity }
    Open with ?q=<pet name> to start with the search filled in (used by Appointments > View Record). */
 (() => {
-  const USE_BACKEND = true;
   const O = window.PawOwners, S = window.PawStaff, $ = (id) => document.getElementById(id), esc = O.esc;
-  const KEY = "pawpaw_records:";
-
-  const read = (key) => { try { const v = JSON.parse(localStorage.getItem(KEY + key) || "null"); return { visits: (v && v.visits) || [], prescriptions: (v && v.prescriptions) || [] }; } catch (_) { return { visits: [], prescriptions: [] }; } };
-  const write = (key, v) => { try { localStorage.setItem(KEY + key, JSON.stringify(v)); } catch (_) {} };
-  const uid = () => "r-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
   const pad = (n) => String(n).padStart(2, "0");
   const today = () => { const d = new Date(); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); };
   const fmt = (iso) => { const d = new Date(iso + "T00:00:00"); return !iso || isNaN(d) ? "-" : d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" }); };
@@ -23,21 +13,15 @@
   let visits = [], rxs = [], loadError = "";
   async function load() {
     visits = []; rxs = []; loadError = "";
-    if (USE_BACKEND && window.PawApi.isBackendSession()) {
-      const data = await window.PawApi.request("/api/staff/records");
-      visits = data.visits || [];
-      rxs = data.prescriptions || [];
-      return;
+    if (!window.PawApi || !window.PawApi.isBackendSession()) {
+      throw new Error("An authenticated clinic session is required.");
     }
-    try {
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (!k || k.indexOf(KEY) !== 0) continue;
-        const owner = k.slice(KEY.length), d = read(owner);
-        d.visits.forEach((v) => visits.push({ ...v, owner }));
-        d.prescriptions.forEach((r) => rxs.push({ ...r, owner }));
-      }
-    } catch (_) { /* storage blocked */ }
+    const [data] = await Promise.all([
+      window.PawApi.request("/api/staff/records"),
+      window.PawApi.loadOwners()
+    ]);
+    visits = data.visits || [];
+    rxs = data.prescriptions || [];
   }
 
   /* opened from "View Record": only this owner's pet (matched by pet id; older records without an id by name) */
@@ -114,14 +98,10 @@
     $(dialog).showModal();
   }
   async function save(owner, kind, rec) {
-    if (USE_BACKEND && window.PawApi.isBackendSession()) {
-      await window.PawApi.request("/api/staff/records/" + (kind === "v" ? "visits" : "prescriptions"), {
-        method: "POST",
-        body: { owner, ...rec }
-      });
-    } else {
-      const d = read(owner); d[kind === "v" ? "visits" : "prescriptions"].push(rec); write(owner, d);
-    }
+    await window.PawApi.request("/api/staff/records/" + (kind === "v" ? "visits" : "prescriptions"), {
+      method: "POST",
+      body: { owner, ...rec }
+    });
     await load(); render();
   }
   on("add-visit", "click", () => openAdd("visit-dialog", "v"));
@@ -134,7 +114,7 @@
     if (!petId) return err("v-err", "This owner has no pet yet.");
     if (!date) return err("v-err", "Pick the visit date.");
     if (!diagnosis) return err("v-err", "Enter the diagnosis.");
-    try { await save(owner, "v", { id: uid(), petId, pet, date, diagnosis, treatment: $("v-treat").value.trim(), notes: $("v-notes").value.trim() }); }
+    try { await save(owner, "v", { petId, pet, date, diagnosis, treatment: $("v-treat").value.trim(), notes: $("v-notes").value.trim() }); }
     catch (error) { return err("v-err", error.message || "Could not save. Try again."); }
     ["v-diag", "v-treat", "v-notes"].forEach((id) => { $(id).value = ""; });
     $("visit-dialog").close(); S.toast("Visit record saved.");
@@ -144,7 +124,7 @@
     if (!petId) return err("r-err", "This owner has no pet yet.");
     if (!date) return err("r-err", "Pick the date.");
     if (!medication) return err("r-err", "Enter the medication.");
-    try { await save(owner, "r", { id: uid(), petId, pet, date, medication, dose: $("r-dose").value.trim(), instructions: $("r-inst").value.trim(), quantity: $("r-qty").value.trim() }); }
+    try { await save(owner, "r", { petId, pet, date, medication, dose: $("r-dose").value.trim(), instructions: $("r-inst").value.trim(), quantity: $("r-qty").value.trim() }); }
     catch (error) { return err("r-err", error.message || "Could not save. Try again."); }
     ["r-med", "r-dose", "r-qty", "r-inst"].forEach((id) => { $(id).value = ""; });
     $("rx-dialog").close(); S.toast("Prescription saved.");

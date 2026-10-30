@@ -57,8 +57,14 @@ function validateStep(step) {
     } else if (input.name === "username" && value &&
                !/^[a-zA-Z0-9_]{4,20}$/.test(value)) {
       message = "Use 4 to 20 letters, numbers, or underscores.";
-    } else if (input.name === "password" && value && value.length < 8) {
-      message = "Use at least 8 characters.";
+    } else if (input.name === "password" && value) {
+      const missing = [];
+      if (value.length < 8) missing.push("at least 8 characters");
+      if (!/[A-Z]/.test(value)) missing.push("an uppercase letter");
+      if (!/[a-z]/.test(value)) missing.push("a lowercase letter");
+      if (!/[0-9]/.test(value)) missing.push("a number");
+      if (!/[^A-Za-z0-9\s]/.test(value)) missing.push("a special character");
+      if (missing.length) message = "Use " + missing.join(", ") + ".";
     } else if (input.name === "confirm_password" && value &&
                value !== form.elements.password.value) {
       message = "Passwords do not match.";

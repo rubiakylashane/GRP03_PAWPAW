@@ -1,12 +1,4 @@
-/* js/staff/vet-dashboard.js - Vet: My Patients + Complete Visit
-   The vet starts the visit and completes it. Completing saves, in one step:
-     - the visit record (diagnosis, treatment, notes)      "pawpaw_records:<owner>".visits
-     - an optional prescription                           "pawpaw_records:<owner>".prescriptions
-     - the next due date of each vaccine given             "pawpaw_vaccinations:<owner>"  (feeds Vaccine Reminders)
-     - the appointment status -> completed, and a notification for the owner.
-   Backend: replace load / change / the saves with
-     GET  /api/vet/appointments            PATCH /api/appointments/:id { status }
-     POST /api/vet/appointments/:id/complete   { diagnosis, treatment, notes, prescription, vaccines: [{ name, nextDue }] } */
+/* js/vet/vet-dashboard.js - veterinarian appointment workflow. */
 (() => {
   const A = window.PawStaffAppts, O = window.PawOwners, S = window.PawStaff, $ = (id) => document.getElementById(id), esc = O.esc;
   const TBA = A.TBA, ALL = "__all";
@@ -23,14 +15,8 @@
   const services = (a) => (a.services || []).map((s) => s.name).join(", ") || a.service || "-";
   const stamp = (a) => (a.date || "") + " " + (a.time || "");
 
-  let all = A.load(), tab = "clinic";
-
-  /* ----- which vet is signed in ----- */
-  let userName = "";
-  for (const st of ["sessionStorage", "localStorage"]) { try { const u = JSON.parse(window[st].getItem("pawpaw_user") || "null"); if (u && u.name) { userName = String(u.name).toLowerCase(); break; } } catch (_) {} }
-  const mine = A.VETS.find((v) => userName.split(/[\s_.-]+/).some((w) => w.length > 2 && v.toLowerCase().includes(w)));
-  $("vet-pick").innerHTML = `<option value="${ALL}">All veterinarians</option>` + A.VETS.map((v) => `<option${v === mine ? " selected" : ""}>${esc(v)}</option>`).join("");
-  if (!mine) $("vet-pick").value = A.VETS[0];
+  let all = [], tab = "clinic";
+  $("vet-pick").innerHTML = `<option value="${ALL}">My appointments</option>`;
 
   /* ----- list ----- */
   const SHOWN = ["confirmed", "checked_in", "with_vet", "completed"];
@@ -84,50 +70,40 @@
     err(""); dlg.showModal();
   }
 
-  const readJson = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k) || "null"); return v == null ? d : v; } catch (_) { return d; } };
   async function complete() {
     const a = cur, diag = $("cv-diag").value.trim(), g = given(a), dues = [...$("cv-vacc").querySelectorAll("input")];
     if (!diag) return err("Enter the diagnosis.");
     if (dues.some((i) => !i.value)) return err("Pick the next due date for each vaccine.");
-    if (window.PawApi.isBackendSession()) {
-      const medication = $("cv-med").value.trim();
-      try {
-        await window.PawApi.request("/api/vet/appointments/" + encodeURIComponent(a.id) + "/complete", {
-          method: "POST",
-          body: {
-            diagnosis: diag,
-            treatment: $("cv-treat").value.trim(),
-            notes: $("cv-notes").value.trim(),
-            prescription: medication ? {
-              medication,
-              dose: $("cv-dose").value.trim(),
-              instructions: $("cv-inst").value.trim(),
-              quantity: $("cv-qty").value
-            } : null,
-            vaccines: dues.map((input) => ({ name: input.dataset.vname, nextDue: input.value }))
-          }
-        });
-      } catch (error) {
-        return err(error.message || "Could not complete the visit.");
-      }
-      a.status = "completed";
-      dlg.close(); render(); S.toast(petName(a) + " completed. Records saved.");
-      return;
-    }
-    const rk = "pawpaw_records:" + a.owner, rec = readJson(rk, { visits: [], prescriptions: [] });
-    rec.visits = (rec.visits || []).filter((r) => r.apptId !== a.id); rec.prescriptions = rec.prescriptions || [];
-    const id = "r-" + Date.now().toString(36);
-    rec.visits.push({ id, apptId: a.id, petId: a.petId || "", pet: petName(a), date: g, diagnosis: diag, treatment: $("cv-treat").value.trim(), notes: $("cv-notes").value.trim(), vet: a.vet });
     const med = $("cv-med").value.trim();
-    if (med) rec.prescriptions.push({ id: id + "-rx", apptId: a.id, petId: a.petId || "", pet: petName(a), date: g, medication: med, dose: $("cv-dose").value.trim(), instructions: $("cv-inst").value.trim(), quantity: $("cv-qty").value.trim() });
-    try { localStorage.setItem(rk, JSON.stringify(rec)); } catch (_) {}
-    if (dues.length) {
-      const vk = "pawpaw_vaccinations:" + a.owner, vx = readJson(vk, []).filter((r) => r.apptId !== a.id);
-      dues.forEach((i) => vx.push({ id: "vx-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), apptId: a.id, petId: a.petId || "", vaccine: i.dataset.vname, pet: petName(a), dateAdministered: g, nextDue: i.value, administeredBy: a.vet, notes: "" }));
-      try { localStorage.setItem(vk, JSON.stringify(vx)); } catch (_) {}
+    if (med && !/^[1-9]\d*$/.test($("cv-qty").value.trim())) return err("Enter a positive whole-number prescription quantity.");
+    try {
+      await window.PawApi.request("/api/appointments/" + encodeURIComponent(a.id) + "/record", {
+        method: "PUT",
+        body: {
+          date: g,
+          diagnosis: diag,
+          treatment: $("cv-treat").value.trim(),
+          notes: $("cv-notes").value.trim(),
+          prescriptions: med ? [{
+            medication: med,
+            dose: $("cv-dose").value.trim(),
+            instructions: $("cv-inst").value.trim(),
+            quantity: $("cv-qty").value.trim()
+          }] : [],
+          services: (a.services || []).filter((service) => !/vaccin/i.test(service.name))
+            .map((service) => ({ type: "Service", name: service.name, notes: "" })),
+          vaccinations: dues.map((input) => ({
+            vaccine: input.dataset.vname,
+            dateAdministered: g,
+            nextDue: input.value
+          })),
+          complete: true
+        }
+      });
+    } catch (error) {
+      return err(error.message || "Could not complete the visit.");
     }
-    A.change(a, { status: "completed" });
-    A.notify(a.owner, "appointment", "Visit completed", petName(a) + " has finished the visit. See Medical Records for the details.");
+    a.status = "completed";
     dlg.close(); render(); S.toast(petName(a) + " completed. Records saved.");
   }
 
@@ -137,11 +113,17 @@
     if (e.target.closest("[data-close]")) { e.target.closest("dialog").close(); return; }
     const b = e.target.closest("[data-act]"); if (!b) return;
     const a = find(b.dataset.id); if (!a) return;
-    if (b.dataset.act === "start") { A.change(a, { status: "with_vet" }); tab = "clinic"; render(); S.toast("Visit started for " + petName(a) + "."); }
+    if (b.dataset.act === "start") {
+      A.change(a, { status: "with_vet" }).then(() => {
+        tab = "clinic"; render(); S.toast("Visit started for " + petName(a) + ".");
+      }).catch((error) => S.toast(error.message || "Could not start the visit."));
+    }
     else openComplete(a);
   });
   $("cv-ok").addEventListener("click", () => { complete(); });
   $("search").addEventListener("input", render);
   $("vet-pick").addEventListener("change", render);
   render();
+  A.ready.then((appointments) => { all = appointments; render(); })
+    .catch((error) => S.toast(error.message || "Could not load your appointments."));
 })();

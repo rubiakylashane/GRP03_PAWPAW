@@ -2,14 +2,15 @@ require('dotenv').config();
 
 const bcrypt = require('bcryptjs');
 const db = require('../config/db');
+const { passwordError } = require('../utils/http');
 
 async function createAdmin() {
   const username = process.env.ADMIN_USERNAME;
   const email = process.env.ADMIN_EMAIL;
   const name = process.env.ADMIN_NAME;
   const password = process.env.ADMIN_PASSWORD;
-  if (!username || !email || !name || !password || password.length < 12) {
-    throw new Error('Set ADMIN_USERNAME, ADMIN_EMAIL, ADMIN_NAME, and ADMIN_PASSWORD (at least 12 characters).');
+  if (!username || !email || !name || !password || password.length < 12 || passwordError(password)) {
+    throw new Error('Set ADMIN_USERNAME, ADMIN_EMAIL, ADMIN_NAME, and ADMIN_PASSWORD (at least 12 characters, including uppercase and lowercase letters, a number, and a special character).');
   }
   const result = await db.query(
     `INSERT INTO user_account

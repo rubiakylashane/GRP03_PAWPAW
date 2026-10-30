@@ -5,22 +5,8 @@
      ok       = everything else (including records with no next due date)
    The vet / staff add the records. */
 (() => {
-  const USE_BACKEND = true;
   const API = { vaccinations: "/api/vaccinations" }; // [{ id, vaccine, pet, dateAdministered, nextDue, administeredBy, notes }]
   const DUE_SOON_DAYS = 30;
-
-  /* Demo storage: this browser's localStorage, one list per signed-in user (empty until records are added). */
-  const BASE = "pawpaw_vaccinations";
-  function userKey() {
-    let name = "guest";
-    for (const store of ["sessionStorage", "localStorage"]) {
-      try {
-        const u = JSON.parse(window[store].getItem("pawpaw_user") || "null");
-        if (u && u.name) { name = String(u.name).trim().toLowerCase(); break; }
-      } catch (_) { /* ignore */ }
-    }
-    return BASE + ":" + name;
-  }
 
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
@@ -33,18 +19,7 @@
   };
 
   async function loadData() {
-    if (USE_BACKEND && window.PawApi.isBackendSession()) {
-      try {
-        return await window.PawApi.request(API.vaccinations);
-      } catch (err) {
-        console.error("[vaccinations] backend failed:", err);
-        throw err;
-      }
-    }
-    try {
-      const v = JSON.parse(localStorage.getItem(userKey()) || "null");
-      return Array.isArray(v) ? v : [];
-    } catch (_) { return []; }
+    return window.PawApi.request(API.vaccinations);
   }
 
   let records = [];

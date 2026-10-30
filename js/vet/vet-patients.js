@@ -20,7 +20,6 @@
   addAppointmentPatients();
   const petOf = (p) => (p.petId && O.getPet(p.owner, p.petId)) || O.petsOf(p.owner).find((x) => x.name === p.name) || null;
   const ownerOf = (key) => { try { return O.owner(key); } catch (_) { return { short: key, name: key, phone: "", email: "" }; } };
-  const same = (p, r) => (p.petId && r.petId ? r.petId === p.petId : r.pet === p.name);
   const photo = (pet) => pet && pet.photo ? ` style="background-image:url('${esc(pet.photo)}')"` : "";
   const sub = (pet) => { const age = pet && pet.dob ? O.ageText(pet.dob) : ""; return ((pet && pet.species) || "-") + (age ? " - " + age : ""); };
 
@@ -57,9 +56,8 @@
       phone: remoteOwner.ownerPhone,
       email: remoteOwner.ownerEmail
     } : cachedOwner;
-    const rec = V.readJson("pawpaw_records:" + sel.owner, { visits: [], prescriptions: [] });
-    const visits = detailData ? detailData.visits : (rec.visits || []).filter((r) => same(sel, r));
-    const rx = detailData ? detailData.prescriptions : (rec.prescriptions || []).filter((r) => same(sel, r));
+    const visits = detailData ? detailData.visits : [];
+    const rx = detailData ? detailData.prescriptions : [];
     visits.sort((a, b) => String(b.date || b.record_date || "").localeCompare(String(a.date || a.record_date || "")));
     rx.sort((a, b) => String(b.date || b.date_prescribed || "").localeCompare(String(a.date || a.date_prescribed || "")));
     const others = O.petsOf(sel.owner).filter((x) => !(pet && x.id === pet.id) && x.name !== sel.name);
@@ -98,7 +96,7 @@
     sel = patient;
     detailData = null;
     show();
-    if (V.A.backend && patient.petId) {
+    if (patient.petId) {
       try {
         detailData = await window.PawApi.request("/api/vet/patients/" + encodeURIComponent(patient.petId));
         show();

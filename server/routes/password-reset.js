@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const db = require('../config/db');
-const { asyncRoute, requiredString } = require('../utils/http');
+const { asyncRoute, requiredString, passwordError } = require('../utils/http');
 const { sendPasswordResetCode, ensureEmailConfigured } = require('../utils/mailer');
 
 const router = express.Router();
@@ -134,9 +134,8 @@ router.post('/reset', asyncRoute(async (req, res) => {
   const code = requiredString(req.body.otp, 'Verification code', 6);
   const password = requiredString(req.body.password, 'Password', 200);
   if (!email || !/^\d{6}$/.test(code)) return res.status(400).json({ error: 'Verify the 6-digit code before resetting your password.' });
-  if (password.length < 8 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) {
-    return res.status(400).json({ error: 'Password must be at least 8 characters and contain a letter and a number.' });
-  }
+  const passwordIssue = passwordError(password);
+  if (passwordIssue) return res.status(400).json({ error: passwordIssue });
 
   const client = await db.connect();
   try {

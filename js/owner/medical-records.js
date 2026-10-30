@@ -2,25 +2,10 @@
    Medical Records (read only for the owner): visit records and prescriptions of the signed-in user's pets.
    The vet / staff add the records. */
 (() => {
-  const USE_BACKEND = true;
   const API = {
     visits: "/api/medical-records",      // [{ id, pet, date, diagnosis, treatment, notes }]
     prescriptions: "/api/prescriptions"  // [{ id, pet, date, medication, dose, instructions, quantity }]
   };
-
-  /* Demo storage: this browser's localStorage, one list per signed-in user.
-     Shape: { visits: [...], prescriptions: [...] }  (empty until records are added) */
-  const BASE = "pawpaw_records";
-  function userKey() {
-    let name = "guest";
-    for (const store of ["sessionStorage", "localStorage"]) {
-      try {
-        const u = JSON.parse(window[store].getItem("pawpaw_user") || "null");
-        if (u && u.name) { name = String(u.name).trim().toLowerCase(); break; }
-      } catch (_) { /* ignore */ }
-    }
-    return BASE + ":" + name;
-  }
 
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
@@ -34,19 +19,16 @@
     return window.PawApi.request(url);
   }
   async function loadData() {
-    if (USE_BACKEND && window.PawApi.isBackendSession()) {
-      try {
-        const [visits, prescriptions] = await Promise.all([get(API.visits), get(API.prescriptions)]);
-        return { visits, prescriptions };
-      } catch (err) {
-        console.error("[medical records] backend failed:", err);
-        throw err;
-      }
+    if (!window.PawApi || !window.PawApi.isBackendSession()) {
+      throw new Error("An authenticated clinic session is required.");
     }
     try {
-      const v = JSON.parse(localStorage.getItem(userKey()) || "null");
-      return { visits: (v && v.visits) || [], prescriptions: (v && v.prescriptions) || [] };
-    } catch (_) { return { visits: [], prescriptions: [] }; }
+      const [visits, prescriptions] = await Promise.all([get(API.visits), get(API.prescriptions)]);
+      return { visits, prescriptions };
+    } catch (err) {
+      console.error("[medical records] backend failed:", err);
+      throw err;
+    }
   }
 
   let data = { visits: [], prescriptions: [] };

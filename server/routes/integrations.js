@@ -484,7 +484,7 @@ router.post('/vet/appointments/:id/complete', authenticate, authorize('Veterinar
       await client.query('ROLLBACK');
       return res.status(403).json({ error: 'You can only complete appointments assigned to you.' });
     }
-    if (!['Checked-in', 'In Progress'].includes(appt.status)) {
+    if (!['Checked-in', 'With Vet', 'In Progress'].includes(appt.status)) {
       await client.query('ROLLBACK');
       return res.status(409).json({ error: 'Start the appointment before completing the visit.' });
     }
@@ -533,6 +533,14 @@ router.post('/vet/appointments/:id/complete', authenticate, authorize('Veterinar
     );
     await createNotification(client, appt.owner_user_id, 'appointment', 'Visit completed',
       `${appt.pet_name} has finished the visit. See Medical Records for the details.`);
+    await client.query(
+      `INSERT INTO notification (user_id, notification_type, title, message)
+       SELECT user_id, 'appointment', 'Visit completed', $1
+         FROM user_account
+        WHERE role IN ('Staff', 'Admin')
+          AND account_status = 'Active'`,
+      [`${appt.pet_name} has finished the visit.`]
+    );
     await writeAudit(client, req.user.userId, 'UPDATE', 'appointment', appointmentId, `Completed the visit for ${appt.pet_name}.`);
     await writeAudit(client, req.user.userId, 'INSERT', 'medical_record', record.rows[0].record_id, `Saved a visit record for ${appt.pet_name}.`);
     await client.query('COMMIT');

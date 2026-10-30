@@ -42,7 +42,7 @@
   const clash = (a) => A.ACTIVE.indexOf(a.status) >= 0 ? A.conflict(all, a.vet, a.date, a.time, a.id) : null;
 
   /* ---------- tabs ---------- */
-  const TABS = [["all", "All"], ["pending", "Pending"], ["today", "Today"], ["confirmed", "Confirmed"], ["checked_in", "Checked in"], ["completed", "Completed"], ["no_show", "No-show"], ["cancelled", "Cancelled"]];
+  const TABS = [["all", "All"], ["pending", "Pending"], ["today", "Today"], ["confirmed", "Confirmed"], ["checked_in", "Checked in"], ["completed", "Completed"], ["no_show", "No Show"], ["cancelled", "Cancelled"]];
   const inTab = (a, t) => t === "all" || (t === "today" ? a.date === today() : a.status === t);
   /* the dashboard cards open this page with ?tab=...: a real tab, or "scheduled" (today's confirmed / checked-in / with-vet visits, shown under the Today tab) */
   let sub = "";
@@ -63,7 +63,7 @@
     const btn = (act, cls, text) => `<button type="button" class="obtn ${cls} obtn-sm" data-act="${act}" ${u}>${text}</button>`;
     switch (a.status) {
       case "pending": return btn("approve", "obtn-green", "Approve &amp; Assign") + btn("decline", "obtn-cancel", "Decline");
-      case "confirmed": return btn("checkin", "obtn-green", "Check In") + btn("resched", "obtn-outline", "Reschedule") + btn("noshow", "obtn-outline", "No-show");
+      case "confirmed": return btn("checkin", "obtn-green", "Check In") + btn("resched", "obtn-outline", "Reschedule") + btn("noshow", "obtn-outline", "No Show");
       case "checked_in": return btn("assign", "obtn-outline", "Assign Vet");
       case "with_vet": return "";                                   // the vet completes the visit
       case "completed": return `<a class="obtn obtn-outline obtn-sm" href="medical-records.html?owner=${encodeURIComponent(a.owner)}&petid=${encodeURIComponent(a.petId || "")}&q=${encodeURIComponent(petName(a))}">View Record</a>`;
@@ -156,17 +156,6 @@
   }
   const checkAdd = () => hint($("add-hint"), A.conflict(all, $("add-vet").value, $("add-date").value, $("add-time").value));
 
-  /* tell the owner (notification bell) what the clinic just did */
-  function tell(a, before, patch) {
-    const what = petName(a) + ", " + (a.date ? fmtShort(a.date) : "") + " " + fmtTime(a.time);
-    const n = (title, text) => A.notify(a.owner, "appointment", title, text);
-    if (patch.date || patch.time) n("Appointment rescheduled", what + (patch.rescheduleReason ? ". Reason: " + patch.rescheduleReason : "") + ".");
-    else if (patch.status === "confirmed" && before === "pending") n("Appointment approved", what + (a.vet && a.vet !== TBA ? " with " + a.vet : "") + ".");
-    else if (patch.status === "cancelled") n("Request declined", petName(a) + ", " + (a.date ? fmtShort(a.date) : "") + "." + (patch.declineReason ? " Reason: " + patch.declineReason : ""));
-    else if (patch.status === "completed") n("Visit completed", petName(a) + " has finished the visit.");
-    else if (patch.status === "checked_in") n("Checked in", petName(a) + " has checked in for the " + fmtShort(a.date) + " " + fmtTime(a.time) + " appointment.");
-    else if (patch.status === "no_show") n("Marked as no-show", petName(a) + " did not arrive for the " + fmtShort(a.date) + " appointment.");
-  }
   /* ask the staff first: "has the pet really checked in?" / "is it really a no-show?" */
   const CONFIRM = {
     checkin: { title: (a) => "Has " + petName(a) + " really checked in?", note: "Confirm only if the owner and the pet are already at the clinic.",
@@ -193,10 +182,8 @@
   $("cfm-yes").addEventListener("click", () => { cfm.close(); set(cfmA, cfmK.patch, cfmK.msg(cfmA)); });
 
   async function set(a, patch, msg) {
-    const before = a.status;
     try { await A.change(a, patch); }
     catch (error) { S.toast(error.message); return; }
-    tell(a, before, patch);
     render();
     S.toast(msg);
   }
@@ -271,7 +258,6 @@
     try {
       a = await A.add(key, { petId, petName: pet ? pet.name : "", vet: $("add-vet").value, date, time, services: [{ name: svc, price: 0 }] });
     } catch (error) { S.toast(error.message); return; }
-    A.notify(a.owner, "appointment", "Appointment booked", petName(a) + ", " + fmtShort(a.date) + " " + fmtTime(a.time) + ", " + services(a) + ".");
     all.push(a); D.add.close(); render(); S.toast("Appointment added for " + petName(a) + ".");
   });
 

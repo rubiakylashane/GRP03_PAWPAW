@@ -1,5 +1,5 @@
 /* js/vet/vet-appointments.js - Vet: My Appointments
-   The vet starts the visit ("Mark In Progress") and finishes it ("Mark Completed").
+   The vet starts the visit and finishes it ("Mark Completed").
    The diagnosis, services and prescriptions are written afterwards in Medical Records
    (medical-record-form.html), which also saves the vaccines given.
    Backend: GET   /api/vet/appointments
@@ -28,7 +28,7 @@
   function action(a) {
     const u = `data-id="${esc(a.owner + "|" + a.id)}"`;
     if (a.status === "confirmed") return `<a class="obtn obtn-outline obtn-sm" href="patients.html?${V.patientQuery(a)}">View Patient</a>`;
-    if (a.status === "checked_in") return `<button type="button" class="obtn obtn-outline obtn-sm" data-act="start" ${u}>Mark In Progress</button><button type="button" class="obtn obtn-green obtn-sm" data-act="done" ${u}>Mark Completed</button>`;
+    if (a.status === "checked_in") return `<button type="button" class="obtn obtn-outline obtn-sm" data-act="start" ${u}>Start Visit</button><button type="button" class="obtn obtn-green obtn-sm" data-act="done" ${u}>Mark Completed</button>`;
     if (a.status === "with_vet") return `<button type="button" class="obtn obtn-green obtn-sm" data-act="done" ${u}>Mark Completed</button>`;
     if (a.status === "completed") return `<a class="obtn obtn-outline obtn-sm" href="${V.recordHref(a)}">${V.hasRecord(a) ? "View Record" : "Add Record"}</a>`;
     return "";
@@ -50,13 +50,10 @@
 
   const dlg = $("done-dialog");
   const find = (u) => all.find((a) => a.owner + "|" + a.id === u);
-  async function finish(goRecord) {
-    const a = cur; dlg.close();
-    try { await A.change(a, { status: "completed" }); }
-    catch (error) { S.toast(error.message); return; }
-    A.notify(a.owner, "appointment", "Visit completed", petName(a) + " has finished the visit. The medical record will be added by the vet.");
-    if (goRecord) { location.href = V.recordHref(a); return; }
-    render(); S.toast(petName(a) + " marked as completed.");
+  function finish() {
+    if (!cur) return;
+    dlg.close();
+    location.href = V.recordHref(cur);
   }
 
   document.addEventListener("click", async (e) => {
@@ -69,8 +66,7 @@
     }
     else { cur = a; $("done-sub").textContent = petName(a) + " - " + ownerName(a) + ", " + fmtDate(a.date) + " " + fmtTime(a.time); dlg.showModal(); }
   });
-  $("done-ok").addEventListener("click", () => finish(false));
-  $("done-record").addEventListener("click", () => finish(true));
+  $("done-record").addEventListener("click", finish);
   $("search").addEventListener("input", render);
   $("sort").addEventListener("change", render);
   render();

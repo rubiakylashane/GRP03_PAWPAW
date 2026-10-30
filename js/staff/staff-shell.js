@@ -3,6 +3,17 @@
 window.PawStaff = (() => {
   const $ = (id) => document.getElementById(id);
 
+  function loadNotifications() {
+    if (!window.PawApi || !window.PawApi.isBackendSession()
+        || document.querySelector('script[src$="/js/notifications.js"]')) return;
+    const notifications = document.createElement("script");
+    notifications.src = "../../js/notifications.js";
+    document.body.appendChild(notifications);
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", loadNotifications, { once: true });
+  } else loadNotifications();
+
   for (const store of ["sessionStorage", "localStorage"]) {
     try {
       const u = JSON.parse(window[store].getItem("pawpaw_user") || "null");

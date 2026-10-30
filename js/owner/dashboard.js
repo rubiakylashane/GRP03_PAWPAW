@@ -74,7 +74,7 @@
     const d = new Date(2000, 0, 1, h, m);
     return d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
   }
-  const label = (s) => ({ checked_in: "Checked in", with_vet: "With vet", no_show: "No-show" }[s] || s.charAt(0).toUpperCase() + s.slice(1));
+  const label = (s) => ({ checked_in: "Checked in", with_vet: "With Vet", no_show: "No Show" }[s] || s.charAt(0).toUpperCase() + s.slice(1));
 
   /* ---------- Renderers ---------- */
   function appointmentRow(a) {

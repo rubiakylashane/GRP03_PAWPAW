@@ -2,7 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const db = require('../config/db');
 const { authenticate, issueToken } = require('../middleware/auth');
-const { asyncRoute, requiredString, notFound } = require('../utils/http');
+const { asyncRoute, requiredString, passwordError, notFound } = require('../utils/http');
 
 const router = express.Router();
 const ROLE_TO_UI = {
@@ -100,7 +100,8 @@ router.post('/register', asyncRoute(async (req, res) => {
   if (photo && !/^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/.test(photo)) {
     return res.status(400).json({ error: 'Profile photo must be a valid JPEG image.' });
   }
-  if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters.' });
+  const passwordIssue = passwordError(password);
+  if (passwordIssue) return res.status(400).json({ error: passwordIssue });
 
   const client = await db.connect();
   try {
@@ -203,7 +204,8 @@ router.put('/me', authenticate, asyncRoute(async (req, res) => {
 router.post('/me/password', authenticate, asyncRoute(async (req, res) => {
   const current = requiredString(req.body.current, 'Current password', 200);
   const next = requiredString(req.body.new, 'New password', 200);
-  if (next.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters.' });
+  const passwordIssue = passwordError(next);
+  if (passwordIssue) return res.status(400).json({ error: passwordIssue });
   const result = await db.query(
     `SELECT password_hash FROM user_account
       WHERE user_id = $1 AND account_status = 'Active'`,

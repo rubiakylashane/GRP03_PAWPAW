@@ -1,42 +1,14 @@
-/* js/owner/notifications.js - notification bell for the owner pages
-   Add ONE line before </body> on every owner page (after the other scripts):
-       <script src="../../js/owner/notifications.js"></script>
-   The bell is added by this script (top right), no HTML or CSS changes needed.
-
-   Demo data: localStorage "pawpaw_notifications:<owner>" = [{ id, type, title, text, createdAt, readAt }]
-   (the staff pages write to it). Backend API:
-     GET   /api/notifications            -> [{ id, type, title, text, createdAt, readAt }]
-     PATCH /api/notifications/:id/read
-     POST  /api/notifications/read-all */
+/* Shared notification bell backed by the clinic API. */
 (() => {
-  const USE_BACKEND = true;
   const API = { list: "/api/notifications", read: (id) => "/api/notifications/" + encodeURIComponent(id) + "/read", readAll: "/api/notifications/read-all" };
-  const backendToken = () => {
-    for (const store of [sessionStorage, localStorage]) {
-      for (const key of ["token", "pawpaw_token"]) {
-        const value = store.getItem(key);
-        if (value) return value;
-      }
-    }
-    return "";
-  };
-  const backendSession = () => window.PawApi
-    ? window.PawApi.isBackendSession()
-    : Boolean(backendToken() && backendToken() !== "demo-token");
   async function backendRequest(url, options = {}) {
-    if (window.PawApi) return window.PawApi.request(url, options);
-    const headers = new Headers(options.headers || {});
-    const token = backendToken();
-    if (token) headers.set("Authorization", `Bearer ${token}`);
-    const response = await fetch(url, { ...options, headers });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || data.message || `Request failed (${response.status}).`);
-    return data;
+    if (!window.PawApi || !window.PawApi.isBackendSession()) {
+      throw new Error("An authenticated clinic session is required.");
+    }
+    return window.PawApi.request(url, options);
   }
 
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-  /* Notifications are scoped to locally known vet identities only in demo mode. */
-  const VETS = (() => { try { const v = JSON.parse(localStorage.getItem("pawpaw_vets") || "null"); if (Array.isArray(v)) return v.map((x) => x.name); } catch (_) { /* use no cached names */ } return []; })();
   const user = (() => {
     for (const st of ["sessionStorage", "localStorage"]) {
       try { const u = JSON.parse(window[st].getItem("pawpaw_user") || "null"); if (u && u.name) return u; } catch (_) {}
@@ -44,31 +16,13 @@
     return null;
   })();
   const role = user ? String(user.role || "owner") : "";
-  const vetOf = () => { const w = String(user.name).toLowerCase().split(/[\s_.-]+/); return VETS.find((v) => w.some((x) => x.length > 2 && x !== "dr" && v.toLowerCase().includes(x))) || null; };
-  function ownerKey() {                                     // identity used for this browser's "already shown" list
-    if (!user) return "";
-    if (role === "staff" || role === "admin") return "staff";
-    if (role === "vet") return "vet:" + (vetOf() || "all").toLowerCase();
-    return String(user.name).trim().toLowerCase();
-  }
-  const KEYS = !user ? [] : (role === "staff" || role === "admin") ? ["pawpaw_notifications:staff"]
-    : role === "vet" ? (vetOf() ? [vetOf()] : VETS).map((v) => "pawpaw_notifications:vet:" + v.toLowerCase())
-    : ["pawpaw_notifications:" + String(user.name).trim().toLowerCase()];
   if (!user) return;                                         // not signed in
 
   let items = [];
-  async function load() {
-    if (USE_BACKEND && backendSession()) {
-      return backendRequest(API.list);
-    }
-    const out = [];
-    KEYS.forEach((k) => { try { const v = JSON.parse(localStorage.getItem(k) || "[]"); if (Array.isArray(v)) v.forEach((n) => out.push({ ...n, _k: k })); } catch (_) {} });
-    return out;
-  }
-  const save = () => KEYS.forEach((k) => { try { localStorage.setItem(k, JSON.stringify(items.filter((n) => n._k === k).map(({ _k, ...n }) => n))); } catch (_) {} });
+  const load = () => backendRequest(API.list);
 
-  const IS_STAFF = role === "staff" || role === "admin";   // staff bell reads "pawpaw_notifications:staff" (owner book / cancel / reschedule)
-  const IS_VET = role === "vet";                            // vet bell: new patient, check-in, reschedule, cancel
+  const IS_STAFF = role === "staff" || role === "admin";
+  const IS_VET = role === "vet";
   const ACCENT = "#f2d64f";
   /* Where a notification leads: the page of what it is about. A notification can carry its own page in
      "link" (e.g. "medical-records.html"); older ones are matched by their title / type. */
@@ -174,14 +128,14 @@
   }
 
   /* ---------- toast: a short pop-up for something new ---------- */
-  const TKEY = "pawpaw_notif_toasted:" + ownerKey();
+  const toasted = new Set();
+  let initialLoad = true;
   const toastBox = document.createElement("div");
   toastBox.className = "nb-toasts"; toastBox.setAttribute("aria-live", "polite"); document.body.appendChild(toastBox);
   function popToasts() {
-    let done = []; try { done = JSON.parse(localStorage.getItem(TKEY) || "[]"); } catch (_) {}
-    const fresh = items.filter((n) => !n.readAt && done.indexOf(n.id) < 0).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+    const fresh = items.filter((n) => !n.readAt && !toasted.has(String(n.id))).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
     if (!fresh.length) return;
-    try { localStorage.setItem(TKEY, JSON.stringify(done.concat(fresh.map((n) => n.id)).slice(-100))); } catch (_) {}
+    fresh.forEach((n) => toasted.add(String(n.id)));
     fresh.slice(0, 2).forEach((n) => {
       const t = document.createElement("a");
       t.className = "nb-toast"; t.href = pageOf(n);
@@ -198,23 +152,15 @@
 
   async function markRead(id) {
     const n = items.find((x) => x.id === id); if (!n || n.readAt) return;
-    if (USE_BACKEND && backendSession()) {
-      const saved = await backendRequest(API.read(id), { method: "PATCH" });
-      n.readAt = saved.readAt;
-      render();
-      return;
-    }
-    n.readAt = new Date().toISOString(); save();
+    const saved = await backendRequest(API.read(id), { method: "PATCH" });
+    n.readAt = saved.readAt;
+    render();
   }
   async function markAll() {
-    if (USE_BACKEND && backendSession()) {
-      await backendRequest(API.readAll, { method: "POST" });
-      const now = new Date().toISOString();
-      items.forEach((n) => { if (!n.readAt) n.readAt = now; });
-      render();
-      return;
-    }
-    const now = new Date().toISOString(); items.forEach((n) => { if (!n.readAt) n.readAt = now; }); save(); render();
+    await backendRequest(API.readAll, { method: "POST" });
+    const now = new Date().toISOString();
+    items.forEach((n) => { if (!n.readAt) n.readAt = now; });
+    render();
   }
   const setOpen = (open) => { if (open) tab = "all"; panel.hidden = !open; bell.setAttribute("aria-expanded", String(open)); if (open) render(); };
 
@@ -225,12 +171,16 @@
   document.addEventListener("click", (e) => { if (!panel.hidden && !panel.contains(e.target) && !bell.contains(e.target)) setOpen(false); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !panel.hidden) { setOpen(false); bell.focus(); } });
 
-  /* refresh when the staff page (another tab) adds something, or when this tab is shown again */
-  const refresh = () => load().then((v) => { items = v; render(); popToasts(); }).catch((error) => {
+  /* Refresh across screens and tabs while this page is open. */
+  const refresh = () => load().then((v) => {
+    items = v;
+    render();
+    if (!initialLoad) popToasts();
+    initialLoad = false;
+  }).catch((error) => {
     console.error("[notifications] backend failed:", error);
     list.textContent = error.message || "Could not load notifications.";
   });
-  window.addEventListener("storage", (e) => { if (KEYS.indexOf(e.key) >= 0) refresh(); });
   document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
   setInterval(refresh, 15000);
   refresh();

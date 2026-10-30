@@ -2,7 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const db = require('../config/db');
 const { authenticate, authorize } = require('../middleware/auth');
-const { asyncRoute, notFound, requiredString } = require('../utils/http');
+const { asyncRoute, notFound, passwordError, requiredString } = require('../utils/http');
 
 const router = express.Router();
 const UI_ROLES = {
@@ -15,22 +15,33 @@ const DB_ROLES = Object.fromEntries(Object.entries(UI_ROLES).map(([dbRole, uiRol
 const APPOINTMENT_STATUS = {
   pending: 'Pending',
   confirmed: 'Approved',
+  approved: 'Approved',
   scheduled: 'Scheduled',
   checked_in: 'Checked-in',
-  with_vet: 'In Progress',
+  with_vet: 'With Vet',
+  in_progress: 'With Vet',
   completed: 'Completed',
   cancelled: 'Cancelled',
-  no_show: 'No-show'
+  no_show: 'No Show'
 };
 // The schema has no service status column; keep the original description after this private prefix.
 const INACTIVE_SERVICE_MARKER = '[PAWPAW-SERVICE-INACTIVE]\n';
 const UI_APPOINTMENT_STATUS = {
   ...Object.fromEntries(Object.entries(APPOINTMENT_STATUS).map(([ui, dbStatus]) => [dbStatus, ui])),
   Scheduled: 'confirmed',
-  Approved: 'confirmed'
+  Approved: 'confirmed',
+  'With Vet': 'with_vet',
+  'No Show': 'no_show',
+  'In Progress': 'with_vet',
+  'No-show': 'no_show'
 };
 
 router.use(authenticate);
+
+function appointmentStatus(value) {
+  const key = String(value).trim().toLowerCase().replace(/[\s-]+/g, '_');
+  return APPOINTMENT_STATUS[key];
+}
 
 function mapAppointment(row) {
   return {
@@ -52,6 +63,7 @@ function mapAppointment(row) {
     veterinarianId: row.veterinarian_id,
     services: row.services || [],
     total: Number(row.total || 0),
+    hasRecord: row.has_record,
     createdAt: row.created_date,
     updatedAt: row.updated_date
   };
@@ -64,6 +76,7 @@ const APPOINTMENT_SELECT = `
          a.reason, a.status, a.created_date, a.updated_date,
          a.cancellation_reason, a.reschedule_reason,
          a.rescheduled_from_date::text, to_char(a.rescheduled_from_time, 'HH24:MI') AS rescheduled_from_time,
+         EXISTS (SELECT 1 FROM medical_record mr WHERE mr.appointment_id = a.appointment_id) AS has_record,
          COALESCE(s.services, '[]'::json) AS services,
          COALESCE(s.total, 0) AS total
     FROM appointment a
@@ -101,6 +114,18 @@ async function notify(client, userId, type, title, message) {
   );
 }
 
+async function notifyStaff(client, type, title, message, excludeUserId) {
+  await client.query(
+    `INSERT INTO notification (user_id, notification_type, title, message)
+     SELECT user_id, $1, $2, $3
+       FROM user_account
+      WHERE role IN ('Staff', 'Admin')
+        AND account_status = 'Active'
+        AND ($4::int IS NULL OR user_id <> $4)`,
+    [type, title, message, excludeUserId || null]
+  );
+}
+
 function validAppointmentDate(value) {
   const date = String(value || '');
   const parsed = new Date(`${date}T00:00:00Z`);
@@ -132,6 +157,47 @@ async function getAppointments({ userId, role, ownerId, status } = {}) {
     values
   );
   return result.rows.map(mapAppointment);
+}
+
+const VACCINATION_SELECT = `
+  SELECT vx.vaccination_id AS id, p.owner_id AS owner,
+         o.user_id AS owner_user_id, o.name AS "ownerName",
+         COALESCE(o.phone, u.phone) AS phone,
+         p.pet_id AS "petId", p.name AS pet, vx.vaccine_type AS vaccine,
+         vx.date_administered::text AS "dateAdministered",
+         vx.next_due_date::text AS "nextDue", vx.notes,
+         COALESCE(vx.administered_by, vet.name) AS "administeredBy",
+         vx.last_reminded_at AS "lastRemindedAt",
+         vx.appointment_id AS "appointmentId",
+         vet.user_id AS "veterinarianUserId"
+    FROM vaccination vx
+    JOIN pet p ON p.pet_id = vx.pet_id
+    JOIN owner o ON o.owner_id = p.owner_id
+    LEFT JOIN user_account u ON u.user_id = o.user_id
+    LEFT JOIN veterinarian vet ON vet.veterinarian_id = vx.veterinarian_id
+    LEFT JOIN appointment a ON a.appointment_id = vx.appointment_id`;
+
+async function getVaccinations({ ownerUserId, vetUserId, remindersOnly = false } = {}) {
+  const clauses = [];
+  const values = [];
+  if (ownerUserId) {
+    values.push(ownerUserId);
+    clauses.push(`o.user_id = $${values.length}`);
+  }
+  if (vetUserId) {
+    values.push(vetUserId);
+    clauses.push(`(vet.user_id = $${values.length} OR a.veterinarian_id = (
+      SELECT veterinarian_id FROM veterinarian WHERE user_id = $${values.length}
+    ))`);
+  }
+  if (remindersOnly) clauses.push('vx.next_due_date IS NOT NULL');
+  const result = await db.query(
+    `${VACCINATION_SELECT}
+      ${clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''}
+      ORDER BY vx.next_due_date NULLS LAST, vx.date_administered DESC, vx.vaccination_id DESC`,
+    values
+  );
+  return result.rows;
 }
 
 router.get('/me', asyncRoute(async (req, res) => {
@@ -173,7 +239,8 @@ router.post('/admin/users', authorize('Admin'), asyncRoute(async (req, res) => {
   const role = DB_ROLES[String(req.body.role || '').toLowerCase()];
   const password = requiredString(req.body.password || req.body.temporaryPassword, 'Temporary password', 200);
   if (!role || role === 'Veterinarian') return res.status(400).json({ error: 'Choose Owner, Staff, or Admin. Add veterinarians from the Veterinarians page.' });
-  if (password.length < 8) return res.status(400).json({ error: 'Temporary password must be at least 8 characters.' });
+  const passwordIssue = passwordError(password, 'Temporary password');
+  if (passwordIssue) return res.status(400).json({ error: passwordIssue });
   const username = (req.body.username || name.toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/^\.+|\.+$/g, '')).slice(0, 50);
   const client = await db.connect();
   try {
@@ -305,7 +372,8 @@ router.patch('/admin/users/:id', authorize('Admin'), asyncRoute(async (req, res)
 
 router.post('/admin/users/:id/reset-password', authorize('Admin'), asyncRoute(async (req, res) => {
   const password = requiredString(req.body.temporaryPassword || req.body.password, 'Temporary password', 200);
-  if (password.length < 8) return res.status(400).json({ error: 'Temporary password must be at least 8 characters.' });
+  const passwordIssue = passwordError(password, 'Temporary password');
+  if (passwordIssue) return res.status(400).json({ error: passwordIssue });
   const result = await db.query(
     `UPDATE user_account
         SET password_hash = $2
@@ -352,7 +420,8 @@ router.post('/admin/veterinarians', authorize('Admin'), asyncRoute(async (req, r
   const email = requiredString(req.body.email, 'Email', 100).toLowerCase();
   const license = requiredString(req.body.license || req.body.license_number, 'License number', 50);
   const password = requiredString(req.body.password || req.body.temporaryPassword, 'Temporary password', 200);
-  if (password.length < 8) return res.status(400).json({ error: 'Temporary password must be at least 8 characters.' });
+  const passwordIssue = passwordError(password, 'Temporary password');
+  if (passwordIssue) return res.status(400).json({ error: passwordIssue });
   const username = (req.body.username || name.toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/^\.+|\.+$/g, '')).slice(0, 50);
   const client = await db.connect();
   try {
@@ -532,8 +601,9 @@ router.patch('/owners/:id', authorize('Admin', 'Staff', 'Pet Owner'), asyncRoute
   if ((currentPassword === null) !== (newPassword === null)) {
     return res.status(400).json({ error: 'Current and new passwords are both required.' });
   }
-  if (newPassword !== null && newPassword.length < 8) {
-    return res.status(400).json({ error: 'Password must be at least 8 characters.' });
+  const passwordIssue = newPassword === null ? null : passwordError(newPassword);
+  if (passwordIssue) {
+    return res.status(400).json({ error: passwordIssue });
   }
 
   const client = await db.connect();
@@ -845,8 +915,8 @@ router.patch(['/services/:id', '/admin/services/:id'], authorize('Admin'), async
 }));
 
 router.get('/admin/appointments', authorize('Admin', 'Staff'), asyncRoute(async (req, res) => {
-  const status = req.query.status ? APPOINTMENT_STATUS[String(req.query.status).toLowerCase()] || String(req.query.status) : null;
-  if (status && !Object.values(APPOINTMENT_STATUS).includes(status)) return res.status(400).json({ error: 'Invalid appointment status filter.' });
+  const status = req.query.status ? appointmentStatus(req.query.status) : null;
+  if (req.query.status && !status) return res.status(400).json({ error: 'Invalid appointment status filter.' });
   return res.json(await getAppointments({ status }));
 }));
 
@@ -890,6 +960,163 @@ router.get('/owner/vaccinations/overdue', authorize('Pet Owner'), asyncRoute(asy
     vaccine: row.vaccine_type,
     nextDue: row.next_due_date
   })));
+}));
+
+router.get('/staff/vaccinations', authorize('Admin', 'Staff'), asyncRoute(async (_req, res) => {
+  return res.json(await getVaccinations());
+}));
+
+router.get('/vet/vaccinations', authorize('Veterinarian'), asyncRoute(async (req, res) => {
+  return res.json(await getVaccinations({ vetUserId: req.user.userId }));
+}));
+
+router.get('/vaccinations', authorize('Admin', 'Staff', 'Veterinarian', 'Pet Owner'), asyncRoute(async (req, res) => {
+  if (req.user.role === 'Pet Owner') return res.json(await getVaccinations({ ownerUserId: req.user.userId }));
+  if (req.user.role === 'Veterinarian') return res.json(await getVaccinations({ vetUserId: req.user.userId }));
+  return res.json(await getVaccinations());
+}));
+
+router.get('/staff/vaccination-reminders', authorize('Admin', 'Staff'), asyncRoute(async (_req, res) => {
+  return res.json(await getVaccinations({ remindersOnly: true }));
+}));
+
+router.post('/vaccinations', authorize('Admin', 'Staff', 'Veterinarian'), asyncRoute(async (req, res) => {
+  const petId = validId(req.body.petId);
+  if (!petId) return res.status(400).json({ error: 'Choose a valid pet.' });
+  const vaccine = requiredString(req.body.vaccine, 'Vaccine name', 100);
+  const date = requiredString(req.body.dateAdministered, 'Date administered', 10);
+  if (!validAppointmentDate(date)) return res.status(400).json({ error: 'Date administered must be a valid YYYY-MM-DD date.' });
+  const nextDue = req.body.nextDue == null || req.body.nextDue === ''
+    ? null
+    : requiredString(req.body.nextDue, 'Next due date', 10);
+  if (nextDue && (!validAppointmentDate(nextDue) || nextDue < date)) {
+    return res.status(400).json({ error: 'Next due date must be a valid date on or after the date administered.' });
+  }
+  const appointmentId = req.body.appointmentId == null || req.body.appointmentId === ''
+    ? null
+    : validId(req.body.appointmentId);
+  if (req.body.appointmentId != null && req.body.appointmentId !== '' && !appointmentId) {
+    return res.status(400).json({ error: 'Invalid appointment ID.' });
+  }
+
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+    const pet = await client.query(
+      `SELECT p.owner_id, p.name AS pet, o.user_id AS owner_user_id
+         FROM pet p JOIN owner o ON o.owner_id = p.owner_id
+        WHERE p.pet_id = $1 AND p.pet_status = 'Active'`,
+      [petId]
+    );
+    if (!pet.rows[0]) {
+      await client.query('ROLLBACK');
+      return notFound(res, 'Active pet not found.');
+    }
+
+    let veterinarianId = null;
+    let administeredBy = null;
+    if (req.user.role === 'Veterinarian') {
+      const vet = await client.query(
+        `SELECT veterinarian_id, name FROM veterinarian WHERE user_id = $1`,
+        [req.user.userId]
+      );
+      if (!vet.rows[0]) {
+        await client.query('ROLLBACK');
+        return notFound(res, 'Veterinarian profile not found.');
+      }
+      veterinarianId = vet.rows[0].veterinarian_id;
+      administeredBy = vet.rows[0].name;
+      const assigned = await client.query(
+        `SELECT 1 FROM appointment
+          WHERE pet_id = $1 AND veterinarian_id = $2
+            AND ($3::int IS NULL OR appointment_id = $3)
+          LIMIT 1`,
+        [petId, veterinarianId, appointmentId]
+      );
+      if (!assigned.rowCount) {
+        await client.query('ROLLBACK');
+        return res.status(403).json({ error: 'You may only record a vaccination for a pet assigned to you.' });
+      }
+    } else {
+      const user = await client.query(
+        `SELECT COALESCE(display_name, username) AS name FROM user_account WHERE user_id = $1`,
+        [req.user.userId]
+      );
+      administeredBy = user.rows[0]?.name || null;
+    }
+
+    if (appointmentId) {
+      const appointment = await client.query(
+        `SELECT appointment_id FROM appointment
+          WHERE appointment_id = $1 AND pet_id = $2
+            AND ($3::int IS NULL OR veterinarian_id = $3)`,
+        [appointmentId, petId, veterinarianId]
+      );
+      if (!appointment.rowCount) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: 'Appointment does not belong to this pet or veterinarian.' });
+      }
+    }
+    const saved = await client.query(
+      `INSERT INTO vaccination
+         (pet_id, veterinarian_id, vaccine_type, date_administered, next_due_date,
+          notes, administered_by, appointment_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING vaccination_id AS id, pet_id AS "petId",
+                 vaccine_type AS vaccine, date_administered::text AS "dateAdministered",
+                 next_due_date::text AS "nextDue", notes, administered_by AS "administeredBy",
+                 appointment_id AS "appointmentId"`,
+      [petId, veterinarianId, vaccine, date, nextDue, req.body.notes || null, administeredBy, appointmentId]
+    );
+    await audit(client, req.user.userId, 'INSERT', 'vaccination', saved.rows[0].id, `Recorded ${vaccine} for ${pet.rows[0].pet}.`);
+    await notify(client, pet.rows[0].owner_user_id, 'record', 'Vaccination recorded',
+      `${vaccine} was given to ${pet.rows[0].pet}. See Vaccination History for the next due date.`);
+    await notifyStaff(client, 'record', 'Vaccination recorded',
+      `${vaccine} was given to ${pet.rows[0].pet}.`, req.user.userId);
+    await client.query('COMMIT');
+    return res.status(201).json(saved.rows[0]);
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}));
+
+router.post('/vaccination-reminders/:id/notify', authorize('Admin', 'Staff'), asyncRoute(async (req, res) => {
+  const id = validId(req.params.id);
+  if (!id) return res.status(400).json({ error: 'Invalid vaccination ID.' });
+  const result = await db.query(
+    `${VACCINATION_SELECT}
+      WHERE vx.vaccination_id = $1 AND vx.next_due_date IS NOT NULL`,
+    [id]
+  );
+  const vaccination = result.rows[0];
+  if (!vaccination) return notFound(res, 'Vaccination reminder not found.');
+  const phone = normalizePhone(vaccination.phone);
+  if (!phone) return res.status(400).json({ error: 'The pet owner does not have a valid mobile number for reminders.' });
+  const message = `${vaccination.vaccine} is due on ${vaccination.nextDue}. Please book an appointment to keep ${vaccination.pet} protected.`;
+  await sendSms(phone, message);
+
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+    const updated = await client.query(
+      `UPDATE vaccination SET last_reminded_at = CURRENT_TIMESTAMP
+        WHERE vaccination_id = $1
+        RETURNING last_reminded_at AS "lastRemindedAt"`,
+      [id]
+    );
+    await notify(client, vaccination.owner_user_id, 'reminder', `Vaccine reminder: ${vaccination.pet}`, message);
+    await audit(client, req.user.userId, 'UPDATE', 'vaccination', id, `Sent a ${vaccination.vaccine} reminder.`);
+    await client.query('COMMIT');
+    return res.json({ sentAt: updated.rows[0].lastRemindedAt });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 }));
 
 router.post('/appointments', authorize('Admin', 'Staff', 'Pet Owner'), asyncRoute(async (req, res) => {
@@ -951,7 +1178,7 @@ router.post('/appointments', authorize('Admin', 'Staff', 'Pet Owner'), asyncRout
         `SELECT 1 FROM appointment
           WHERE veterinarian_id = $1 AND appointment_date = $2::date
             AND appointment_time = $3::time
-            AND status NOT IN ('Completed', 'Cancelled', 'No-show')
+            AND status NOT IN ('Completed', 'Cancelled', 'No Show', 'No-show')
           FOR UPDATE`,
         [vetId, date, time]
       );
@@ -976,6 +1203,8 @@ router.post('/appointments', authorize('Admin', 'Staff', 'Pet Owner'), asyncRout
       await notify(client, vetAccount.rows[0]?.user_id, 'appointment', 'New appointment',
         `${pet.rows[0].pet_name} has an appointment on ${date} at ${time}.`);
     }
+    await notifyStaff(client, 'appointment', 'New appointment request',
+      `${pet.rows[0].pet_name} has an appointment request for ${date} at ${time}.`, req.user.userId);
     const requestedServices = Array.isArray(req.body.services) ? req.body.services : [];
     for (const service of requestedServices) {
       let serviceId = Number(typeof service === 'object' ? service.id || service.serviceId : service);
@@ -1025,8 +1254,8 @@ router.patch('/appointments/:id', authorize('Admin', 'Staff', 'Veterinarian', 'P
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: 'Invalid appointment ID.' });
   const requestedStatus = req.body.status;
-  const status = requestedStatus === undefined ? undefined : APPOINTMENT_STATUS[requestedStatus] || requestedStatus;
-  if (status !== undefined && !Object.values(APPOINTMENT_STATUS).includes(status)) {
+  const status = requestedStatus === undefined ? undefined : appointmentStatus(requestedStatus);
+  if (requestedStatus !== undefined && !status) {
     return res.status(400).json({ error: 'Invalid appointment status.' });
   }
   if (req.body.date !== undefined) {
@@ -1132,7 +1361,7 @@ router.patch('/appointments/:id', authorize('Admin', 'Staff', 'Veterinarian', 'P
         `SELECT 1 FROM appointment
           WHERE veterinarian_id = $1 AND appointment_date = $2::date
             AND appointment_time = $3::time AND appointment_id <> $4
-            AND status NOT IN ('Completed', 'Cancelled', 'No-show')
+            AND status NOT IN ('Completed', 'Cancelled', 'No Show', 'No-show')
           FOR UPDATE`,
         [nextVetId, nextDate, nextTime, id]
       );
@@ -1142,9 +1371,9 @@ router.patch('/appointments/:id', authorize('Admin', 'Staff', 'Veterinarian', 'P
       }
     }
     const dbStatus = status === undefined ? before.status : status;
-    if (ownVet && status !== undefined && !['In Progress', 'Completed'].includes(dbStatus)) {
+    if (ownVet && status !== undefined && dbStatus !== 'With Vet') {
       await client.query('ROLLBACK');
-      return res.status(403).json({ error: 'Veterinarians may only start or complete their assigned appointments.' });
+      return res.status(403).json({ error: 'Use the medical record form to complete a visit.' });
     }
     const update = await client.query(
       `UPDATE appointment
@@ -1167,7 +1396,7 @@ router.patch('/appointments/:id', authorize('Admin', 'Staff', 'Veterinarian', 'P
     );
     await audit(client, req.user.userId, 'UPDATE', 'appointment', id, `Updated appointment ${id}.`);
     if (status !== undefined || req.body.date !== undefined || req.body.time !== undefined || nextVetId !== before.veterinarian_id) {
-      const message = `Appointment for ${before.pet_name} was updated to ${UI_APPOINTMENT_STATUS[dbStatus] || dbStatus} on ${nextDate} at ${nextTime}.`;
+      const message = `Appointment for ${before.pet_name} was updated to ${dbStatus} on ${nextDate} at ${nextTime}.`;
       await notify(client, before.owner_user_id, 'appointment', 'Appointment updated', message);
       if (before.veterinarian_id && before.veterinarian_id !== nextVetId) {
         const oldVet = await client.query('SELECT user_id FROM veterinarian WHERE veterinarian_id = $1', [before.veterinarian_id]);
@@ -1177,6 +1406,7 @@ router.patch('/appointments/:id', authorize('Admin', 'Staff', 'Veterinarian', 'P
         const nextVet = await client.query('SELECT user_id FROM veterinarian WHERE veterinarian_id = $1', [nextVetId]);
         await notify(client, nextVet.rows[0]?.user_id, 'appointment', 'Appointment updated', message);
       }
+      await notifyStaff(client, 'appointment', 'Appointment updated', message, req.user.userId);
     }
     await client.query('COMMIT');
     const result = await db.query(`${APPOINTMENT_SELECT} WHERE a.appointment_id = $1`, [update.rows[0].appointment_id]);
@@ -1303,33 +1533,81 @@ router.get('/vet/medical-records', authorize('Veterinarian'), asyncRoute(async (
   return res.json(result.rows);
 }));
 
+router.get('/vet/appointments/:id/record', authorize('Veterinarian'), asyncRoute(async (req, res) => {
+  const appointmentId = validId(req.params.id);
+  if (!appointmentId) return res.status(400).json({ error: 'Invalid appointment ID.' });
+  const assigned = await db.query(
+    `SELECT a.appointment_id
+       FROM appointment a
+       JOIN veterinarian v ON v.veterinarian_id = a.veterinarian_id
+      WHERE a.appointment_id = $1 AND v.user_id = $2`,
+    [appointmentId, req.user.userId]
+  );
+  if (!assigned.rowCount) return notFound(res, 'Appointment not found or not assigned to you.');
+  const record = await db.query(
+    `SELECT record_id AS id, appointment_id AS "appointmentId", diagnosis, treatment,
+            notes, record_date::text AS date, services
+       FROM medical_record WHERE appointment_id = $1`,
+    [appointmentId]
+  );
+  if (!record.rows[0]) return res.json({ record: null, prescriptions: [], vaccinations: [] });
+  const prescriptions = await db.query(
+    `SELECT prescription_id AS id, medication_name AS medication, dosage AS dose,
+            instructions, quantity, date_prescribed::text AS date
+       FROM prescription WHERE record_id = $1
+      ORDER BY prescription_id`,
+    [record.rows[0].id]
+  );
+  const vaccinations = await db.query(
+    `${VACCINATION_SELECT}
+      WHERE vx.appointment_id = $1
+      ORDER BY vx.vaccination_id`,
+    [appointmentId]
+  );
+  return res.json({ record: record.rows[0], prescriptions: prescriptions.rows, vaccinations: vaccinations.rows });
+}));
+
 router.put('/appointments/:id/record', authorize('Veterinarian'), asyncRoute(async (req, res) => {
   const appointmentId = Number(req.params.id);
   if (!Number.isInteger(appointmentId) || appointmentId < 1) return res.status(400).json({ error: 'Invalid appointment ID.' });
   const diagnosis = requiredString(req.body.diagnosis, 'Diagnosis', 10000);
   const date = requiredString(req.body.date, 'Record date', 10);
   const assigned = await db.query(
-    `SELECT a.appointment_id, v.user_id
+    `SELECT a.appointment_id, a.pet_id, a.veterinarian_id, a.status,
+            p.name AS pet_name, o.user_id AS owner_user_id, v.user_id, v.name AS veterinarian_name
        FROM appointment a
        JOIN veterinarian v ON v.veterinarian_id = a.veterinarian_id
+       JOIN pet p ON p.pet_id = a.pet_id
+       JOIN owner o ON o.owner_id = p.owner_id
       WHERE a.appointment_id = $1`,
     [appointmentId]
   );
   if (!assigned.rows[0]) return notFound(res, 'Appointment not found.');
   if (Number(assigned.rows[0].user_id) !== Number(req.user.userId)) return res.status(403).json({ error: 'You can only update records for your assigned appointments.' });
   if (!Array.isArray(req.body.prescriptions)) return res.status(400).json({ error: 'Prescriptions must be an array.' });
+  if (req.body.vaccinations !== undefined && !Array.isArray(req.body.vaccinations)) {
+    return res.status(400).json({ error: 'Vaccinations must be an array.' });
+  }
+  if (req.body.services !== undefined && !Array.isArray(req.body.services)) {
+    return res.status(400).json({ error: 'Services must be an array.' });
+  }
+  if (req.body.complete !== undefined && typeof req.body.complete !== 'boolean') {
+    return res.status(400).json({ error: 'Complete must be a boolean.' });
+  }
 
   const client = await db.connect();
   try {
     await client.query('BEGIN');
     const record = await client.query(
-      `INSERT INTO medical_record (appointment_id, diagnosis, treatment, notes, record_date)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO medical_record (appointment_id, diagnosis, treatment, notes, record_date, services)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb)
        ON CONFLICT (appointment_id)
        DO UPDATE SET diagnosis = EXCLUDED.diagnosis, treatment = EXCLUDED.treatment,
-                     notes = EXCLUDED.notes, record_date = EXCLUDED.record_date
-       RETURNING record_id, appointment_id, diagnosis, treatment, notes, record_date`,
-      [appointmentId, diagnosis, req.body.treatment || null, req.body.notes || null, date]
+                     notes = EXCLUDED.notes, record_date = EXCLUDED.record_date,
+                     services = CASE WHEN $7::boolean THEN EXCLUDED.services ELSE medical_record.services END
+       RETURNING record_id, appointment_id, diagnosis, treatment, notes, record_date, services`,
+      [appointmentId, diagnosis, req.body.treatment || null, req.body.notes || null, date,
+        JSON.stringify(req.body.services || []), req.body.services !== undefined]
     );
     const recordId = record.rows[0].record_id;
     await client.query('DELETE FROM prescription WHERE record_id = $1', [recordId]);
@@ -1349,9 +1627,67 @@ router.put('/appointments/:id/record', authorize('Veterinarian'), asyncRoute(asy
       );
       prescriptions.push(saved.rows[0]);
     }
+    const vaccinations = [];
+    if (req.body.vaccinations !== undefined) {
+      await client.query('DELETE FROM vaccination WHERE appointment_id = $1', [appointmentId]);
+      for (const vaccination of req.body.vaccinations) {
+        const vaccine = requiredString(vaccination.vaccine, 'Vaccine name', 100);
+        const dateAdministered = requiredString(vaccination.dateAdministered, 'Date administered', 10);
+        const nextDue = vaccination.nextDue == null || vaccination.nextDue === ''
+          ? null
+          : requiredString(vaccination.nextDue, 'Next due date', 10);
+        if (!validAppointmentDate(dateAdministered)) {
+          throw Object.assign(new Error('Date administered must be a valid YYYY-MM-DD date.'), { status: 400 });
+        }
+        if (nextDue && (!validAppointmentDate(nextDue) || nextDue < dateAdministered)) {
+          throw Object.assign(new Error('Next due date must be a valid date on or after the date administered.'), { status: 400 });
+        }
+        const saved = await client.query(
+          `INSERT INTO vaccination
+             (pet_id, veterinarian_id, vaccine_type, date_administered, next_due_date,
+              notes, administered_by, appointment_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+           RETURNING vaccination_id AS id, pet_id AS "petId",
+                     vaccine_type AS vaccine, date_administered::text AS "dateAdministered",
+                     next_due_date::text AS "nextDue", notes, administered_by AS "administeredBy",
+                     appointment_id AS "appointmentId"`,
+          [assigned.rows[0].pet_id, assigned.rows[0].veterinarian_id, vaccine,
+            dateAdministered, nextDue, null, assigned.rows[0].veterinarian_name, appointmentId]
+        );
+        vaccinations.push(saved.rows[0]);
+      }
+      if (vaccinations.length) {
+        const names = vaccinations.map((item) => item.vaccine).join(', ');
+        const message = `${names} ${vaccinations.length === 1 ? 'was' : 'were'} recorded for ${assigned.rows[0].pet_name}.`;
+        await notify(client, assigned.rows[0].owner_user_id, 'record', 'Vaccination recorded', message);
+        await notifyStaff(client, 'record', 'Vaccination recorded', message, req.user.userId);
+      }
+    }
+    if (req.body.complete === true) {
+      if (!['Checked-in', 'With Vet', 'In Progress'].includes(assigned.rows[0].status)) {
+        throw Object.assign(new Error('Only checked-in or in-progress appointments can be completed.'), { status: 409 });
+      }
+      await client.query(
+        `UPDATE appointment
+            SET status = 'Completed', updated_date = CURRENT_TIMESTAMP
+          WHERE appointment_id = $1`,
+        [appointmentId]
+      );
+      await notify(client, assigned.rows[0].owner_user_id, 'appointment', 'Visit completed',
+        `${assigned.rows[0].pet_name} has finished the visit. See Medical Records for the details.`);
+      await notifyStaff(client, 'appointment', 'Visit completed',
+        `${assigned.rows[0].pet_name} has finished the visit.`, req.user.userId);
+    } else {
+      const message = `The medical record for ${assigned.rows[0].pet_name} was saved.`;
+      await notify(client, assigned.rows[0].owner_user_id, 'record', 'Medical record updated', message);
+      await notifyStaff(client, 'record', 'Medical record updated', message, req.user.userId);
+    }
     await audit(client, req.user.userId, 'UPDATE', 'medical_record', recordId, 'Saved a medical record and its prescriptions.');
     await client.query('COMMIT');
-    return res.json({ record: record.rows[0], prescriptions });
+    return res.json({
+      record: record.rows[0], prescriptions, vaccinations,
+      appointmentStatus: req.body.complete === true ? 'Completed' : assigned.rows[0].status
+    });
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;

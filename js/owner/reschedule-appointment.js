@@ -3,7 +3,6 @@
    The new date and time are saved and the request goes back to "pending" until staff confirm. */
 (async () => {
   const { esc } = window.PawPets;
-  const Appts = window.PawAppts;
   const $ = (id) => document.getElementById(id);
   const backend = window.PawApi && window.PawApi.isBackendSession();
 
@@ -35,7 +34,11 @@
       $("rs-missing").querySelector("p").textContent = error.message || "Appointments could not be loaded.";
       return;
     }
-  } else appt = id ? Appts.get(id) : null;
+  } else {
+    $("rs-missing").hidden = false;
+    $("rs-missing").querySelector("p").textContent = "An authenticated clinic session is required.";
+    return;
+  }
   if (!appt || ["pending", "confirmed"].indexOf(appt.status) < 0 || appt.date < new Date().toISOString().slice(0, 10)) { $("rs-missing").hidden = false; return; }
   $("rs-layout").hidden = false;
 
@@ -130,20 +133,16 @@
     const submit = $("rs-form").querySelector('button[type="submit"]');
     submit.disabled = true;
     try {
-      if (backend) {
-        await window.PawApi.request("/api/appointments/" + encodeURIComponent(appt.id), {
-          method: "PATCH",
-          body: {
-            date: iso,
-            time: f.time.value,
-            status: "pending",
-            rescheduledFrom: { date: appt.date, time: appt.time },
-            rescheduleReason: "Owner requested a new appointment time."
-          }
-        });
-      } else {
-        Appts.update(appt.id, { date: iso, time: f.time.value, status: "pending", rescheduledFrom: { date: appt.date, time: appt.time } });
-      }
+      await window.PawApi.request("/api/appointments/" + encodeURIComponent(appt.id), {
+        method: "PATCH",
+        body: {
+          date: iso,
+          time: f.time.value,
+          status: "pending",
+          rescheduledFrom: { date: appt.date, time: appt.time },
+          rescheduleReason: "Owner requested a new appointment time."
+        }
+      });
     } catch (error) {
       setError("time", error.message || "The reschedule request could not be saved.");
       submit.disabled = false;

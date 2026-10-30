@@ -3,8 +3,7 @@
    Clicking a card opens Book Appointment with that service already ticked. */
 (async () => {
   const list = document.getElementById("svc-list");
-  const backend = window.PawApi && window.PawApi.isBackendSession();
-  let services = backend ? [] : window.PawServices || [];
+  let services = [];
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const peso = (n) => "₱" + Number(n).toLocaleString("en-US");
@@ -27,13 +26,14 @@
     }
     list.innerHTML = html || `<p class="svc-empty">${services.length ? "No services listed yet." : "No active services are available."}</p>`;
   }
-  if (backend) {
-    list.innerHTML = `<p class="svc-empty">Loading services…</p>`;
-    try {
-      services = await window.PawApi.request("/api/services");
-      render();
-    } catch (error) {
-      list.textContent = "Could not load services: " + (error.message || "Request failed.");
+  list.innerHTML = `<p class="svc-empty">Loading services…</p>`;
+  try {
+    if (!window.PawApi || !window.PawApi.isBackendSession()) {
+      throw new Error("Sign in to load current clinic services.");
     }
-  } else render();
+    services = await window.PawApi.request("/api/services");
+    render();
+  } catch (error) {
+    list.textContent = "Could not load services: " + (error.message || "Request failed.");
+  }
 })();

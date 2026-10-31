@@ -1,6 +1,7 @@
 /* js/vet/vet-records.js - Vet: Medical Record
-   List: completed appointments with no record yet / with a record. "Add Record" or "Edit Details" opens the editor
-   (also opened from other vet pages as medical-records.html?appt=<owner>|<id>).
+   List: completed appointments with no record yet / with a record. "Add Record" or "Edit Details" opens the editor;
+   "View" opens the same page read-only (with an Edit button to switch to editing).
+   (also opened from other vet pages as medical-records.html?appt=<owner>|<id>; a visit that already has a record opens read-only).
    Save writes, for that appointment (replacing what it saved before):
      "pawpaw_records:<owner>".visits          { id, apptId, petId, pet, date, diagnosis, treatment, notes, vet, services:[{type,name,notes}] }
      "pawpaw_records:<owner>".prescriptions   { id, apptId, petId, pet, date, medication, dose, instructions, quantity }
@@ -10,7 +11,7 @@
 (() => {
   const V = window.PawVet, A = V.A, O = V.O, S = window.PawStaff, $ = (id) => document.getElementById(id), esc = O.esc;
   const PREVIEW = 5;
-  let all = A.load(), showAllNo = false, showAllDone = false, cur = null, blocks = [], rx = [], rxEdit = -1;
+  let all = A.load(), showAllNo = false, showAllDone = false, cur = null, blocks = [], rx = [], rxEdit = -1, viewing = false;
 
   const key = (a) => a.owner + "|" + a.id;
   const done = () => all.filter((a) => V.visible(a) && a.status === "completed").sort((a, b) => V.stamp(b).localeCompare(V.stamp(a)));
@@ -34,7 +35,7 @@
       $(allBtn).hidden = rows.length <= PREVIEW; $(allBtn).textContent = showAll ? "Show less" : "View All";
     };
     fill(none, "nr-rows", "nr-all", showAllNo, (a) => row(a, `<button type="button" class="vr-btn vr-add" data-open="${esc(key(a))}">Add Record</button>`), "Every completed appointment has a record.");
-    fill(has, "cp-rows", "cp-all", showAllDone, (a) => row(a, `<button type="button" class="vr-btn vr-edit" data-open="${esc(key(a))}">Edit Details</button>`), "No completed appointments with a record yet.");
+    fill(has, "cp-rows", "cp-all", showAllDone, (a) => row(a, `<span style="display:grid;gap:6px"><button type="button" class="vr-btn vr-view" data-view="${esc(key(a))}">View</button><button type="button" class="vr-btn vr-edit" data-open="${esc(key(a))}">Edit Details</button></span>`), "No completed appointments with a record yet.");
   }
 
   /* ----- editor ----- */
@@ -59,15 +60,30 @@
     }
     rxEdit = -1; clearRx(); err("");
   }
-  function openEditor(a) {
-    cur = a; loadState(a);
-    $("ve-bar").innerHTML = `<span>Pet: <strong>${esc(V.petName(a))}${petInfo(a)}</strong></span><span>Owner: <strong>${esc(V.ownerName(a))}</strong></span><span>Visit: <strong>${esc(V.fmtShort(a.date))} &middot; ${esc(V.services(a))}</strong></span><span>Status: <strong>${esc(V.label(a))}</strong></span>`;
+  function openEditor(a, readOnly) {
+    cur = a; viewing = !!readOnly; loadState(a);
+    $("ve-bar").innerHTML = `<span>Pet: <strong>${esc(V.petName(a))}${petInfo(a)}</strong></span><span>Owner: <strong>${esc(V.ownerName(a))}</strong></span><span>Visit: <strong>${esc(V.fmtShort(a.date))} &middot; ${esc(V.services(a))}</strong></span><span>Status: <strong>${esc(V.label(a))}</strong></span>${viewing ? "<span><strong>View only</strong></span>" : ""}`;
     $("ve-svc").innerHTML = ["Vaccination"].concat(A.SERVICES.filter((s) => !isVacc(s))).map((s) => `<option>${esc(s)}</option>`).join("");
-    drawBlocks(); drawRx();
+    drawBlocks(); drawRx(); applyMode();
     $("rec-list").hidden = true; $("rec-edit").hidden = false; window.scrollTo(0, 0);
   }
+  /* View only: every field is locked and the add / remove / edit controls are hidden; Save becomes Edit and Cancel becomes Back. */
+  function applyMode() {
+    const v = viewing, root = $("rec-edit");
+    root.querySelectorAll("input, select, textarea").forEach((el) => { el.disabled = v; });
+    const hide = (el) => { if (el) el.style.display = v ? "none" : ""; };
+    [$("ve-svc").closest(".ve-add"), root.querySelector('label[for="ve-svc"]'), $("ve-rx-h"),
+     root.querySelector('label[for="ve-med"]'), $("ve-med"), $("ve-dose").closest(".ve-two"),
+     root.querySelector('label[for="ve-inst"]'), $("ve-inst"), $("ve-rx-add")].forEach(hide);
+    root.querySelectorAll(".ve-remove, .ve-edit").forEach(hide);
+    if (v && !blocks.length) $("ve-blocks").innerHTML = `<p class="o-empty">No services recorded.</p>`;
+    if (v && !rx.length) $("ve-rx-list").innerHTML = `<p class="o-empty">No prescriptions.</p>`;
+    $("ve-save").textContent = v ? "Edit" : "Save";
+    $("ve-cancel").textContent = v ? "Back" : "Cancel";
+    err("");
+  }
   const petInfo = (a) => { const p = (a.petId && O.getPet(a.owner, a.petId)) || null; return p ? " (" + [p.species, p.breed].filter(Boolean).join(", ") + ")" : ""; };
-  function closeEditor() { cur = null; $("rec-edit").hidden = true; $("rec-list").hidden = false; renderList(); window.scrollTo(0, 0); }
+  function closeEditor() { cur = null; viewing = false; $("rec-edit").hidden = true; $("rec-list").hidden = false; renderList(); window.scrollTo(0, 0); }
 
   function drawBlocks() {
     $("ve-blocks").innerHTML = blocks.map((b, i) => b.type === "Vaccination" ? `
@@ -158,6 +174,7 @@
 
   /* ----- events ----- */
   document.addEventListener("click", (e) => {
+    const vw = e.target.closest("[data-view]"); if (vw) { const a = all.find((x) => key(x) === vw.dataset.view); if (a) openEditor(a, true); return; }
     const o = e.target.closest("[data-open]"); if (o) { const a = all.find((x) => key(x) === o.dataset.open); if (a) openEditor(a); return; }
     const rm = e.target.closest("[data-rm]"); if (rm) { blocks.splice(+rm.dataset.rm, 1); drawBlocks(); return; }
     const re = e.target.closest("[data-rxe]"); if (re) { rxEdit = +re.dataset.rxe; const r = rx[rxEdit]; $("ve-med").value = r.medication; $("ve-dose").value = r.dose; $("ve-qty").value = r.quantity; $("ve-inst").value = r.instructions; drawRx(); $("ve-med").focus(); return; }
@@ -171,7 +188,7 @@
     blocks.push(t === "Vaccination" ? { type: t, vaccine: "", given: d, due: plusYear(d) } : { type: t, name: "", notes: "" }); drawBlocks();
   });
   $("ve-rx-add").addEventListener("click", saveRx);
-  $("ve-save").addEventListener("click", save);
+  $("ve-save").addEventListener("click", () => { if (viewing) openEditor(cur, false); else save(); });
   $("ve-cancel").addEventListener("click", closeEditor);
 
   async function hydrateRecords(appointments) {
@@ -210,6 +227,6 @@
     await hydrateRecords(all);
     renderList();
     const want = new URLSearchParams(location.search).get("appt");
-    if (want) { const a = all.find((x) => key(x) === want && V.visible(x)); if (a) openEditor(a); }
+    if (want) { const a = all.find((x) => key(x) === want && V.visible(x)); if (a) openEditor(a, V.hasRecord(a)); }
   }).catch((error) => S.toast(error.message));
 })();

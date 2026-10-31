@@ -192,3 +192,31 @@ body.sdash.adm { --admin-dark: #0d2a25; --sidebar-bg: #0d2a25; }
   .adm .nav { padding-top: 24px; }
 }
  
+/* ===== Admin: pare-parehong laki ng Cancel button (kapareho ng Save / Confirm) ===== */
+.adm .obtn-cancel,
+.adm .u-btn-cancel,
+.adm .sv-btn-cancel,
+.adm .dlg-actions .btn,
+.adm .dlg-actions .u-btn,
+.adm .dlg-actions .sv-btn {
+  box-sizing: border-box !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: auto !important;
+  height: 44px !important;
+  min-height: 44px !important;
+  min-width: 150px !important;
+  padding: 0 24px !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+}
+@media (max-width: 560px) {
+  .adm .obtn-cancel, .adm .u-btn-cancel, .adm .sv-btn-cancel { width: 100% !important; }
+}
+
+/* Appointments > Edit appointment: 3 buttons, kailangan ng mas malapad na dialog para hindi maputol */
+.adm #edit-dialog { width: min(560px, calc(100vw - 32px)) !important; max-width: none !important; }
+.adm #edit-dialog .dlg-actions { display: flex !important; justify-content: center !important; align-items: center; gap: 16px !important; }
+.adm #edit-dialog .dlg-actions .btn { margin: 0 !important; }

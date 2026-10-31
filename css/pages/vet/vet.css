@@ -178,3 +178,51 @@
 .sdash #done-dialog .dlg-actions { justify-content: center; flex-wrap: wrap; gap: 12px; }
 .sdash #done-dialog .dlg-actions .btn { flex: 0 0 auto !important; width: auto !important; min-width: 0 !important; padding: 0 20px !important; white-space: nowrap; }
  
+/* ===== IDAGDAG ITO SA DULO NG css/pages/vet/vet.css (copy-paste lang) =====
+   Vet dashboard: bagong design ng "Recently Completed".
+   Bawat item ay sariling kahon, at ang View Record ay nasa ilalim na kasinlapad ng kahon.
+   Ang buong Recently Completed box ay laging kasing-taas ng dalawang box sa kaliwa. */
+.sdash #recent-list .req { padding: 0; margin-top: 10px; border-bottom: 0; }
+.sdash #recent-list .vrec {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 6px;
+  min-height: 0;
+  padding: 8px 12px 10px;
+  background: #eef5f2;
+  border: 1px solid #cfe1da;
+  border-radius: 14px;
+}
+.sdash #recent-list .vrec > div { flex: 0 0 auto; margin: 0; }
+.sdash #recent-list .req-title { margin: 0; font-size: 12.5px; line-height: 1.3; }
+.sdash #recent-list .req-title strong { font-size: 13.5px; text-transform: uppercase; }
+.sdash #recent-list .req-sub { margin: 3px 0 0; font-size: 11.5px; line-height: 1.35; color: #3d4d48; }
+.sdash #recent-list .vrec .btn {
+  width: 100%;
+  min-height: 30px;
+  margin: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+}
+
+/* Parehong taas ng Recently Completed at ng dalawang box sa kaliwa (laptop at mas malaki).
+   Ang laman ay hindi na nagpapataas ng box; kung sobra, may scroll sa loob. */
+@media (min-width: 1101px) {
+  .sdash .vgrid { align-items: stretch; }
+  .sdash .vgrid > .card { contain: size; overflow-y: auto; }
+}
+
+/* Kapantay ng "Upcoming" na stat box sa itaas: parehong 4 na kolum at parehong agwat ang stats at ang dalawang kolum sa ibaba.
+   Ang kaliwang kolum ay tatlong kolum ang lapad, at ang Recently Completed ay nasa pang-apat. (Malalapad na screen lang.) */
+@media (min-width: 1500px) {
+  .sdash .main:has(.vgrid) .stats { column-gap: 28px; }
+  .sdash .vgrid { grid-template-columns: repeat(4, minmax(0, 1fr)); column-gap: 28px; }
+  .sdash .vgrid > .vcol { grid-column: 1 / span 3; }
+  .sdash .vgrid > .card { grid-column: 4; }
+}

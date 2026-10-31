@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Pawpaw Veterinary Clinic
 
 ## Run the PostgreSQL-backed application
@@ -17,3 +18,6 @@
 4. Open `http://localhost:5000`. The server serves the login page and the frontend assets.
 
 The migration is additive and expects the existing clinic schemas and tables to be present. The administrator bootstrap reads its credentials from environment variables; do not commit real credentials. Set `window.PAWPAW_DEMO_MODE = true` before loading the login script only when intentionally using the local demo data.
+=======
+# DBA_PAWPAW
+>>>>>>> 95c601c8ca5ed05af18cea1ca8158a77c7495209

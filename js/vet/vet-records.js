@@ -230,3 +230,4 @@
     if (want) { const a = all.find((x) => key(x) === want && V.visible(x)); if (a) openEditor(a, V.hasRecord(a)); }
   }).catch((error) => S.toast(error.message));
 })();
+

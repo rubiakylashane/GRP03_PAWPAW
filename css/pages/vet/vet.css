@@ -226,3 +226,18 @@
   .sdash .vgrid > .vcol { grid-column: 1 / span 3; }
   .sdash .vgrid > .card { grid-column: 4; }
 }
+
+/* ===== IDAGDAG ITO SA DULO NG css/pages/vet/vet.css (copy-paste lang) =====
+   Vet Medical Record (View / Edit): pantay ang ilalim ng kaliwang kolum (Visit record + Services)
+   at ng kanang box (Prescriptions), kahit mas maikli o mas mahaba ang isa. */
+@media (min-width: 1101px) {
+  .sdash .ve-grid { align-items: stretch; }
+  .sdash .ve-grid > .ve-card { align-self: stretch; }
+  .sdash .ve-col > .ve-card:last-child { flex: 1 1 auto; }
+}
+
+/* Listahan ng Medical Records: pantay ang taas ng "Appointments with No Records" at "Completed Appointments"
+   (magkatabi sila sa malalapad na screen). */
+@media (min-width: 1281px) {
+  .sdash #rec-list { align-items: stretch; }
+}

@@ -30,11 +30,28 @@ window.PawPets = (() => {
     try { localStorage.setItem(userKey(BASE), JSON.stringify(list)); } catch (_) { /* ignore */ }
   }
 
+  /* A date can come as "2024-09-29" or as a timestamp like "2024-09-28T16:00:00.000Z" (= Sep 29 in Manila).
+     dayOf() reads the calendar day in local time; dayIso() gives it back as "YYYY-MM-DD". */
+  function dayOf(raw) {
+    const s = String(raw == null ? "" : raw).trim();
+    if (!s) return null;
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+    if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+    const d = new Date(s);
+    return isNaN(d) ? null : new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  }
+  function dayIso(raw) {
+    const d = dayOf(raw);
+    if (!d) return "";
+    const p = (n) => String(n).padStart(2, "0");
+    return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+  }
+
   function fromApi(pet) {
     return {
       ...pet,
       id: String(pet.id),
-      dob: pet.date_of_birth || pet.dob || "",
+      dob: dayIso(pet.dateOfBirth || pet.date_of_birth || pet.dob),
       sex: pet.gender || pet.sex || ""
     };
   }
@@ -45,7 +62,7 @@ window.PawPets = (() => {
     const owner = owners[0];
     const localPets = load();
     if (owner && localPets.length) {
-      const signature = (pet) => [pet.name, pet.species, pet.breed, pet.dob || pet.date_of_birth]
+      const signature = (pet) => [pet.name, pet.species, pet.breed, dayIso(pet.dob || pet.dateOfBirth || pet.date_of_birth)]
         .map((value) => String(value || "").trim().toLowerCase()).join("|");
       const existing = new Set((owner.pets || []).map(signature));
       for (const pet of localPets) {
@@ -99,11 +116,10 @@ window.PawPets = (() => {
     return saved;
   }
 
-  /* dob is "YYYY-MM-DD" */
+  /* dob is "YYYY-MM-DD" (a timestamp from the server also works) */
   function ageText(dob) {
-    if (!dob) return "";
-    const b = new Date(dob + "T00:00:00");
-    if (isNaN(b)) return "";
+    const b = dayOf(dob);
+    if (!b) return "";
     const now = new Date();
     let months = (now.getFullYear() - b.getFullYear()) * 12 + (now.getMonth() - b.getMonth());
     if (now.getDate() < b.getDate()) months -= 1;
@@ -115,9 +131,8 @@ window.PawPets = (() => {
     return months >= 1 ? months + " mo" : "Under 1 mo";
   }
   function fmtDate(dob) {
-    if (!dob) return "";
-    const d = new Date(dob + "T00:00:00");
-    return isNaN(d) ? "" : d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    const d = dayOf(dob);
+    return !d ? "" : d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   }
 
   /* one-time message shown on the next page (e.g. "Pet added.") */
@@ -130,5 +145,5 @@ window.PawPets = (() => {
     } catch (_) { return null; }
   }
 
-  return { esc, load, get, add, update, refresh, cacheApiPet, fromApi, ageText, fmtDate, setFlash, takeFlash };
+  return { esc, load, get, add, update, refresh, cacheApiPet, fromApi, ageText, fmtDate, dayIso, setFlash, takeFlash };
 })();

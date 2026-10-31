@@ -117,20 +117,27 @@ window.PawOwners = (() => {
   /* ----- helpers ----- */
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  /* A date from the backend can be "2024-09-29" or a timestamp like "2024-09-28T16:00:00.000Z" (= Sep 29 in Manila).
+     Read the calendar day in local time, so the birthday / registered date is never shifted by a day. */
+  function dayOf(raw) {
+    const s = String(raw == null ? "" : raw).trim();
+    if (!s) return null;
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+    if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+    const d = new Date(s);
+    return isNaN(d) ? null : new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  }
   function fmtLong(iso) {
-    if (!iso) return "-";
-    const d = new Date(String(iso).slice(0, 10) + "T00:00:00");
-    return isNaN(d) ? "-" : d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+    const d = dayOf(iso);
+    return d ? d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : "-";
   }
   function fmtShort(iso) {
-    if (!iso) return "-";
-    const d = new Date(String(iso).slice(0, 10) + "T00:00:00");
-    return isNaN(d) ? "-" : d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    const d = dayOf(iso);
+    return d ? d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "-";
   }
   function ageText(dob) {
-    if (!dob) return "";
-    const b = new Date(dob + "T00:00:00"), n = new Date();
-    if (isNaN(b) || b > n) return "";
+    const b = dayOf(dob), n = new Date();
+    if (!b || b > n) return "";
     let m = (n.getFullYear() - b.getFullYear()) * 12 + n.getMonth() - b.getMonth();
     if (n.getDate() < b.getDate()) m--;
     if (m < 1) return "Under 1 month";

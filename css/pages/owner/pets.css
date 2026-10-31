@@ -444,3 +444,11 @@
 #pet-form .pf-field input[type="text"], #pet-form .pf-field select, #pet-form .pf-date input { height: 38px; }
 #pet-form .pf-field textarea { height: 80px; }
 #pet-form .pf-field > .pf-photo-box { width: 160px; }
+
+/* ===== IDAGDAG ITO SA DULO NG css/pages/pets.css (copy-paste lang) =====
+   My Pets: hanggang 4 na card lang sa bawat row. Kapag maliit ang screen, bumababa sa 3, 2, o 1. */
+@media (min-width: 561px) {
+  .pets-grid {
+    grid-template-columns: repeat(auto-fill, minmax(max(240px, calc((100% - 3 * 28px) / 4)), 1fr));
+  }
+}

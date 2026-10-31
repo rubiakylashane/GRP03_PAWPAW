@@ -37,11 +37,18 @@
   });
   removeBtn.addEventListener("click", () => { $("photo").value = ""; setPhoto(""); });
 
-  /* show / hide password */
-  document.querySelectorAll("[data-eye]").forEach((b) => b.addEventListener("click", () => {
-    const input = $(b.dataset.eye);
-    input.type = input.type === "password" ? "text" : "password";
-  }));
+  /* show / hide password: the icon is an eye while the password is hidden, and an eye with a slash while it is showing */
+  document.querySelectorAll("[data-eye]").forEach((b) => {
+    const input = $(b.dataset.eye), svg = b.querySelector("svg");
+    const eye = svg ? svg.innerHTML : "", what = (b.getAttribute("aria-label") || "password").replace(/^(show|hide)\s+/i, "");
+    b.addEventListener("click", () => {
+      const show = input.type === "password";
+      input.type = show ? "text" : "password";
+      if (svg) svg.innerHTML = show ? eye + '<path d="M4 4l16 16" stroke-width="2.4"/>' : eye;
+      b.setAttribute("aria-pressed", String(show));
+      b.setAttribute("aria-label", (show ? "Hide " : "Show ") + what);
+    });
+  });
 
   const KEYS = ["name", "email", "username", "phone", "cur", "new", "conf"];
   KEYS.forEach((k) => $(k).addEventListener("input", () => S.setError(k, "")));

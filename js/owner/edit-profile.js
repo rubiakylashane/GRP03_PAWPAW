@@ -75,12 +75,14 @@
   });
   $("photo-remove").addEventListener("click", () => { f.photo.value = ""; setPhoto(""); });
 
-  /* ----- show / hide password ----- */
+  /* ----- show / hide password: the icon is an eye while the password is hidden, and an eye with a slash while it is showing ----- */
   document.querySelectorAll(".pr-eye").forEach((btn) => {
+    const svg = btn.querySelector("svg"), eye = svg ? svg.innerHTML : "";
     btn.addEventListener("click", () => {
       const input = $(btn.dataset.for);
       const show = input.type === "password";
       input.type = show ? "text" : "password";
+      if (svg) svg.innerHTML = show ? eye + '<path d="M4 4l16 16" stroke-width="2.4"/>' : eye;
       btn.setAttribute("aria-pressed", String(show));
       btn.setAttribute("aria-label", show ? "Hide password" : "Show password");
     });

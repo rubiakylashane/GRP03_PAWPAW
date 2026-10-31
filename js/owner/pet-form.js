@@ -384,15 +384,19 @@
 
     // An old "N/A" value is not a date, so the field stays empty and a real date must be typed.
     if (f.dob && pet.dob && !/^(?:n\/?a|unknown|not known)$/i.test(String(pet.dob).trim())) {
-      // Stored date is YYYY-MM-DD.
+      // The date is either a plain YYYY-MM-DD, or a full timestamp from the backend
+      // such as 2024-09-28T16:00:00.000Z (that is midnight of Sept 29 in the Philippines).
       // Display it as MM/DD/YYYY in the input.
-      const parts = pet.dob.split("-");
+      const raw = String(pet.dob).trim();
+      const plain = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
 
-      if (parts.length === 3) {
-        const [year, month, day] = parts;
-        f.dob.value = `${month}/${day}/${year}`;
+      if (plain) {
+        f.dob.value = `${plain[2]}/${plain[3]}/${plain[1]}`;
       } else {
-        f.dob.value = pet.dob;
+        const d = new Date(raw);   // local date parts, so the Philippine date is shown
+        f.dob.value = isNaN(d.getTime())
+          ? ""
+          : `${pad(d.getMonth() + 1)}/${pad(d.getDate())}/${d.getFullYear()}`;
       }
     }
 

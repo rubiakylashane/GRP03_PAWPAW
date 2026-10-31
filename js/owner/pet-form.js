@@ -143,18 +143,12 @@
   */
   if (f.dob) {
     f.dob.type = "text";
-    f.dob.placeholder = "MM/DD/YYYY or N/A";
+    f.dob.placeholder = "MM/DD/YYYY";
     f.dob.maxLength = 10;
-    f.dob.inputMode = "text";
+    f.dob.inputMode = "numeric";
     f.dob.autocomplete = "bday";
 
     f.dob.addEventListener("input", () => {
-      const typed = f.dob.value.trim().toLowerCase();
-      const unknownLabels = ["n/a", "na", "unknown", "not known"];
-      if (typed && unknownLabels.some((label) => label.startsWith(typed))) {
-        setError("dob", "");
-        return;
-      }
       const digits = f.dob.value
         .replace(/\D/g, "")
         .slice(0, 8);
@@ -388,7 +382,8 @@
 
     if (f.sex) f.sex.value = pet.sex || "";
 
-    if (f.dob && pet.dob) {
+    // An old "N/A" value is not a date, so the field stays empty and a real date must be typed.
+    if (f.dob && pet.dob && !/^(?:n\/?a|unknown|not known)$/i.test(String(pet.dob).trim())) {
       // Stored date is YYYY-MM-DD.
       // Display it as MM/DD/YYYY in the input.
       const parts = pet.dob.split("-");
@@ -418,8 +413,7 @@
 
     const name = f.name ? f.name.value.trim() : "";
     const rawDob = f.dob ? f.dob.value.trim() : "";
-    const dobUnknown = /^(?:n\/?a|unknown|not known)$/i.test(rawDob);
-    const parsedDob = dobUnknown ? null : parseDob(rawDob);
+    const parsedDob = parseDob(rawDob);
 
     const values = {
       name,
@@ -452,16 +446,14 @@
       errors.sex = "Choose a sex.";
     }
 
-    if (!dobUnknown) {
-      if (!rawDob) {
-        errors.dob = "Enter the date of birth or type N/A if unknown.";
-      } else if (!values.dob) {
-        errors.dob = "Enter a valid date in MM/DD/YYYY format, or type N/A if unknown.";
-      } else if (values.dob > todayIso) {
-        errors.dob = "Date of birth can't be in the future.";
-      } else if (values.dob < "1990-01-01") {
-        errors.dob = "Please check the year.";
-      }
+    if (!rawDob) {
+      errors.dob = "Enter the date of birth.";
+    } else if (!values.dob) {
+      errors.dob = "Enter a valid date in MM/DD/YYYY format.";
+    } else if (values.dob > todayIso) {
+      errors.dob = "Date of birth can't be in the future.";
+    } else if (values.dob < "1990-01-01") {
+      errors.dob = "Please check the year.";
     }
 
     ["name", "species", "breed", "sex", "dob"].forEach((key) => {
@@ -497,8 +489,12 @@
     submitError.textContent = "";
     try {
       if (backend) {
-        const owners = await window.PawApi.loadOwners();
-        const owner = owners[0];
+        // Staff page: the owner comes from the URL (set by owner-pet-shim.js).
+        // Owner page: the signed-in owner's own profile.
+        const staffOwnerId = document.body.dataset.ownerId;
+        const owner = staffOwnerId
+          ? { id: staffOwnerId }
+          : (await window.PawApi.loadOwners())[0];
         if (!owner) throw new Error("Your owner profile could not be found. Sign out and sign in again.");
         const body = {
           name: values.name,

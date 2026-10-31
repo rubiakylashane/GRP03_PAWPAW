@@ -103,3 +103,24 @@
 /* Admin Edit owner / Add-Edit pet: Go Back and Save Changes / Confirm are amber again (they were green on green) */
 body.sdash.adm .abtn, body.sdash.adm .abtn-light, body.sdash.adm .obtn-amber { color: #1b1300; background: #e29d1a; border: 1px solid #c98712; }
 body.sdash.adm .abtn:hover, body.sdash.adm .abtn-light:hover, body.sdash.adm .obtn-amber:hover { background: #e29d1a; filter: brightness(1.07); }
+
+/* ===== Admin Owners and Pets: ayos ng spacing (Name | Species | Breed | Gender | Date of birth | Actions) =====
+   Hanggang 1719px: magkapatong ang Owners at Pets cards (buong lapad, maluwag).
+   1720px pataas: magkatabi pa rin, pero mas malapad ang Pets card. */
+.adm .o-prow { column-gap: 16px; grid-template-columns: minmax(0, 1.1fr) 90px minmax(0, 1.3fr) 80px 120px 172px; padding-left: 8px; padding-right: 8px; }
+.adm .o-prow.o-head span { white-space: nowrap; }
+.adm .o-prow .o-acts { flex-wrap: nowrap; justify-content: flex-start; }
+
+@media (min-width: 1281px) and (max-width: 1719px) {
+  .adm .o-split { grid-template-columns: minmax(0, 1fr); }
+  .adm .o-split .o-card { padding-left: 20px; padding-right: 20px; }
+  .adm .o-split .o-row:not(.o-prow) { column-gap: 14px; padding-left: 8px; padding-right: 8px; grid-template-columns: minmax(0, 2.6fr) 70px minmax(0, 1fr) 172px; }
+  .adm .o-split .o-prow { column-gap: 16px; grid-template-columns: minmax(0, 1.1fr) 90px minmax(0, 1.3fr) 80px 120px 172px; }
+  .adm .o-split .o-acts { gap: 8px; }
+}
+@media (min-width: 1720px) {
+  .adm .o-split { grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); }
+  .adm .o-split .o-prow { column-gap: 12px; padding-left: 8px; padding-right: 8px; grid-template-columns: minmax(0, 1fr) 70px minmax(0, 1.1fr) 70px 104px 160px; }
+  .adm .o-split .o-prow .o-acts { gap: 6px; }
+}
+.adm .o-prow > span:nth-child(5) { white-space: nowrap; }  /* hindi na mag-wrap ang petsa (Sep 28, 2024) */

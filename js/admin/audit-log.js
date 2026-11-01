@@ -9,7 +9,7 @@
   const S = window.PawStaff, PAGE = 10;
   const ROLE = { admin: "Admin", staff: "Staff", vet: "Veterinarian", owner: "Owner" };
   const RECORDS = ["owner", "pet", "appointment", "medical_record", "prescription", "vaccination", "veterinarian", "user", "service"];
-  const ACTIONS = { create: "CREATE", update: "UPDATE", delete: "DELETE", login: "LOGIN", logout: "LOGOUT" };
+  const ACTIONS = { create: "CREATE", update: "UPDATE", deactivate: "DEACTIVATE", login: "LOGIN", logout: "LOGOUT" };
   const backend = window.PawApi.isBackendSession();
 
   const plain = (h) => String(h || "").replace(/<[^>]*>/g, "").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&").trim();
@@ -25,7 +25,9 @@
       details = details || (d.charAt(0).toUpperCase() + d.slice(1) + (/[.!?]$/.test(d) ? "" : "."));
     }
     const low = details.toLowerCase();
-    const action = ACTIONS[e.action] ? e.action : /^(regist|add|creat|book|request)/.test(low) ? "create" : /^(delet|remov)/.test(low) ? "delete" : "update";
+    /* there is no delete in the clinic: turning an account / record off is a "deactivate" (old "delete" entries and "Deactivated ..." sentences land here too) */
+    let action = e.action === "delete" ? "deactivate" : ACTIONS[e.action] ? e.action : /^(regist|add|creat|book|request)/.test(low) ? "create" : /^(delet|remov|deactivat)/.test(low) ? "deactivate" : "update";
+    if (action === "update" && /\bdeactivat/.test(low)) action = "deactivate";
     const record = e.record || (/veterinarian/.test(low) ? "veterinarian" : /appointment/.test(low) ? "appointment" : /\bpet\b/.test(low) ? "pet" : /owner/.test(low) ? "owner" : /service/.test(low) ? "service" : "user");
     const role = String(e.role || (String(user).toLowerCase() === "admin" ? "admin" : "")).toLowerCase();
     return { at: e.at, t: Date.parse(e.at) || 0, user, userId: e.user_id == null ? null : String(e.user_id), role, action, record, details };
@@ -90,7 +92,7 @@
       <div class="au-row" role="row">
         <span class="au-when"><b>${esc(fmtDate(e.t))}</b><i>${esc(fmtTime(e.t))}</i></span>
         <span class="au-who"><b>${esc(e.user)}</b>${e.role && String(e.user).toLowerCase() !== String(ROLE[e.role] || e.role).toLowerCase() ? `<i>${esc(ROLE[e.role] || e.role)}</i>` : ""}</span>
-        <span><span class="au-pill au-${e.action}">${ACTIONS[e.action]}</span></span>
+        <span><span class="au-pill au-${e.action === "deactivate" ? "delete" : e.action}" style="min-width:96px">${ACTIONS[e.action]}</span></span>
         <span><span class="au-rec">${esc(recNice(e.record))}</span></span>
         <span class="au-det">${esc(e.details)}</span>
       </div>`).join("")

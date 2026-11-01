@@ -60,9 +60,21 @@
   $("ap-prev").addEventListener("click", () => { page--; render(); });
   $("ap-next").addEventListener("click", () => { page++; render(); });
 
+  const backend = Boolean(P.backend);
+  /* the list is re-read from the server after every save, so the page always shows what is really stored */
+  async function reload() {
+    if (!backend) { all = P.load(); return; }
+    const data = await window.PawApi.request("/api/admin/appointments");
+    all = data.map((a) => ({ ...a, id: String(a.id), owner: String(a.owner), _key: "pawpaw_appointments:" + String(a.owner), pet: a.petName }));
+  }
   const find = (k) => { const [key, id] = k.split("|"); return all.find((a) => a._key === key && String(a.id) === id); };
-  const done = (msg) => { load(); render(); S.toast(msg); };
-  const tell = (a, type, title, text) => P.notify(a.owner, type, title, text);   // owner's bell (the server does this when there is a backend)
+  const done = async (msg) => {
+    try { await reload(); } catch (error) { S.toast(error.message); return; }
+    render(); S.toast(msg);
+  };
+  /* owner bell + audit line are written by the server when there is a backend; only the demo needs them here */
+  const tell = (a, type, title, text) => { if (!backend) P.notify(a.owner, type, title, text); };
+  const log = (text) => { if (!backend) A.log(text, "update", "appointment"); };
 
   /* ----- edit (vet, date, time) ----- */
   const eDlg = $("edit-dialog");
@@ -84,18 +96,23 @@
   }
   ["e-vet", "e-date", "e-time"].forEach((id) => $(id).addEventListener("change", hint));
   $("e-cancel").addEventListener("click", () => eDlg.close());
-  $("e-save").addEventListener("click", () => {
+  $("e-save").addEventListener("click", async () => {
     const patch = { vet: $("e-vet").value, date: $("e-date").value, time: $("e-time").value };
-    if (!patch.date) { $("e-hint").textContent = "Choose a date."; $("e-hint").className = "dlg-hint bad"; return; }
-    if (patch.date < todayIso()) { $("e-hint").textContent = "Choose today or a later date."; $("e-hint").className = "dlg-hint bad"; return; }
+    const bad = (m) => { $("e-hint").textContent = m; $("e-hint").className = "dlg-hint bad"; };
+    if (!patch.date) return bad("Choose a date.");
+    if (patch.date < todayIso()) return bad("Choose today or a later date.");
     const was = { ...cur }, moved = patch.date !== was.date || patch.time !== was.time, vetChanged = patch.vet !== (was.vet || TBA);
     if (!moved && !vetChanged) { eDlg.close(); return; }
-    eDlg.close(); P.change(cur, patch, true);
+    const btn = $("e-save"); btn.disabled = true;
+    try {
+      await P.change(cur, patch, true);
+    } catch (error) { bad(error.message || "Could not save the changes."); btn.disabled = false; return; }
+    btn.disabled = false; eDlg.close();
     const bits = [];
     if (vetChanged) bits.push("reassigned to " + (patch.vet === TBA ? "no vet" : patch.vet));
     if (moved) { bits.push("moved to " + fmtDate(patch.date) + " " + fmtTime(patch.time)); tell(cur, "appointment", "Appointment rescheduled", (cur.petName || "") + ", " + patch.date + " " + patch.time + "."); }
-    A.log("edited the appointment of " + esc(cur.petName) + " (" + esc(ownerName(cur)) + "): " + esc(bits.join(", ")), "update", "appointment");
-    done("Appointment updated.");
+    log("edited the appointment of " + esc(cur.petName) + " (" + esc(ownerName(cur)) + "): " + esc(bits.join(", ")));
+    await done("Appointment updated.");
   });
   $("e-override").addEventListener("click", () => { eDlg.close(); openOverride(cur); });
 
@@ -107,31 +124,39 @@
     $("ov-reason").value = ""; $("ov-err").hidden = true; oDlg.showModal();
   }
   $("ov-cancel").addEventListener("click", () => oDlg.close());
-  $("ov-ok").addEventListener("click", () => {
+  $("ov-ok").addEventListener("click", async () => {
     const status = $("ov-status").value, reason = $("ov-reason").value.trim();
     const err = (m) => { $("ov-err").textContent = m; $("ov-err").hidden = false; };
+    if (!cur) return err("Choose an appointment first.");
     if (status === cur.status) return err("Choose a different status.");
     if (reason.length < 5) return err("Enter a reason (at least 5 characters).");
-    oDlg.close();
+    $("ov-err").hidden = true;
     const patch = { status, overrideReason: reason };
     if (status === "cancelled") patch.declineReason = reason;
-    P.change(cur, patch, true);
+    const btn = $("ov-ok"); btn.disabled = true;
+    try {
+      await P.change(cur, patch, true);        // wait for the server; a refused change stays open with the reason shown
+    } catch (error) { err(error.message || "Could not change the status."); btn.disabled = false; return; }
+    btn.disabled = false; oDlg.close();
     if (status === "cancelled") tell(cur, "appointment", "Appointment cancelled", (cur.petName || "") + ", " + cur.date + " " + cur.time + ". Reason: " + reason);
     else if (status === "confirmed") tell(cur, "appointment", "Appointment approved", (cur.petName || "") + ", " + cur.date + " " + cur.time + ".");
-    A.log("overrode the status of " + esc(cur.petName) + " (" + esc(ownerName(cur)) + ") to " + esc(LABEL[status]) + ". Reason: " + esc(reason), "update", "appointment");
-    done("Status changed to " + LABEL[status] + ".");
+    log("overrode the status of " + esc(cur.petName) + " (" + esc(ownerName(cur)) + ") to " + esc(LABEL[status]) + ". Reason: " + esc(reason));
+    await done("Status changed to " + LABEL[status] + ".");
   });
 
   /* ----- cancel ----- */
   const cDlg = $("cx-dialog");
   function openCancel(a) { cur = a; $("cx-sub").textContent = label(a); $("cx-reason").value = ""; cDlg.showModal(); }
   $("cx-keep").addEventListener("click", () => cDlg.close());
-  $("cx-ok").addEventListener("click", () => {
-    const reason = $("cx-reason").value.trim(); cDlg.close();
-    P.change(cur, { status: "cancelled", declineReason: reason }, true);
+  $("cx-ok").addEventListener("click", async () => {
+    const reason = $("cx-reason").value.trim(), btn = $("cx-ok"); btn.disabled = true;
+    try {
+      await P.change(cur, { status: "cancelled", declineReason: reason }, true);
+    } catch (error) { cDlg.close(); S.toast(error.message || "Could not cancel the appointment."); btn.disabled = false; return; }
+    btn.disabled = false; cDlg.close();
     tell(cur, "appointment", "Appointment cancelled", (cur.petName || "") + ", " + cur.date + " " + cur.time + "." + (reason ? " Reason: " + reason : ""));
-    A.log("cancelled the appointment of " + esc(cur.petName) + " (" + esc(ownerName(cur)) + ")" + (reason ? ". Reason: " + esc(reason) : ""), "update", "appointment");
-    done("Appointment cancelled.");
+    log("cancelled the appointment of " + esc(cur.petName) + " (" + esc(ownerName(cur)) + ")" + (reason ? ". Reason: " + esc(reason) : ""));
+    await done("Appointment cancelled.");
   });
 
   document.addEventListener("click", (e) => {

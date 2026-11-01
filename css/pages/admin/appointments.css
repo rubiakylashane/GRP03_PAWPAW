@@ -27,7 +27,8 @@
 .adm .ap-checked_in { color: #5a2ea8; background: #e7ddf8; }
 .adm .ap-with_vet { color: #0b5b7a; background: #d3edf6; }
 .adm .ap-completed { color: #0b5649; background: #cfeadf; }
-.adm .ap-cancelled, .adm .ap-no_show { color: #555; background: #e4e4e4; }
+.adm .ap-cancelled { color: #555; background: #e4e4e4; }
+.adm .ap-no_show { color: #6b2a86; background: #ecd3f6; }
 .adm .ap-foot { display: flex; align-items: center; gap: 10px; margin-top: 12px; font-size: 12px; color: #444; }
 .adm .ap-foot #ap-count { margin-right: 4px; }
 .adm .ap-page { min-height: 26px; padding: 0 14px; font: inherit; font-size: 11px; font-weight: 600; color: #fff; background: var(--green); border: 0; border-radius: 6px; cursor: pointer; }
@@ -44,7 +45,11 @@
   .adm .ap-headrow span:last-child { display: none; }
 }
 @media (max-width: 900px) {
-  .adm .ap-tabs { margin-left: 0; }
+  .adm .ap-tabs { margin-left: 0; gap: 8px; }
+  .adm .ap-tab { padding: 0 14px; }
+  .adm .ap-head .sub { font-size: 13px; }
+  .adm .ap-foot { flex-wrap: wrap; }
+  .adm .ap-foot #ap-count { flex-basis: 100%; margin-bottom: 4px; }
   .adm .ap-card { margin-left: 0; margin-right: 0; }
   .adm .ap-filters { grid-template-columns: 1fr; gap: 10px; }
   .adm .ap-row.ap-headrow { display: none; }
@@ -58,3 +63,12 @@
 body.sdash.adm .ap-tab.on { color: #1b1300; font-weight: 700; background: #e29d1a; border: 1px solid #c98712; }
 body.sdash.adm .ap-page, body.sdash.adm .ap-page-next { color: #1b1300; background: #e29d1a; border: 1px solid #c98712; }
 body.sdash.adm .ap-page:not(:disabled):hover { filter: brightness(1.07); }
+
+/* Dialogs on small screens: stack the buttons so nothing is cut off (admin.css forces min-width 150px on them) */
+.adm .dlg { max-height: calc(100vh - 32px); overflow-y: auto; }
+@media (max-width: 560px) {
+  .adm .ap-card { padding: 12px 12px 18px; }
+  .adm #edit-dialog .dlg-actions, .adm #ov-dialog .dlg-actions, .adm #cx-dialog .dlg-actions { flex-direction: column-reverse !important; align-items: stretch !important; gap: 10px !important; }
+  .adm #edit-dialog .dlg-actions .btn, .adm #ov-dialog .dlg-actions .btn, .adm #cx-dialog .dlg-actions .btn { width: 100% !important; min-width: 0 !important; }
+  .adm #e-override { margin-right: 0; }
+}

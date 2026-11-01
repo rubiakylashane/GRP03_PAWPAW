@@ -10,13 +10,24 @@
   const backend = window.PawApi.isBackendSession();
   let all = backend ? [] : load(), filter = "all", current = null, loadFailed = "", loading = backend;
 
+  /* the signed-in account, taken from the saved login (userId / username), not the display name */
+  const mine = (() => {
+    for (const st of [sessionStorage, localStorage]) {
+      try { const u = JSON.parse(st.getItem("pawpaw_user") || "null"); if (u) return { id: String(u.userId || u.id || ""), username: String(u.username || "").toLowerCase() }; } catch (_) { /* ignore */ }
+    }
+    return { id: "", username: "" };
+  })();
+  const isMe = (u) => Boolean(u) && ((mine.id && String(u.id) === mine.id) || (mine.username && String(u.username || "").toLowerCase() === mine.username));
+
   const btn = (act, cls, label, id) => `<button type="button" class="u-act ${cls}" data-act="${act}" data-id="${A.esc(id)}">${label}</button>`;
   /* Every account can be managed consistently, including reversible role changes. */
   function actions(u) {
     const edit = btn("edit", "", "Edit details", u.id);
     const role = btn("role", "", "Edit role", u.id);
     const reset = btn("reset", "", "Reset password", u.id);
-    const toggle = u.status === "active" ? btn("deactivate", "u-act-red", "Deactivate", u.id) : btn("activate", "u-act-green", "Activate", u.id);
+    const toggle = u.status === "active"
+      ? (isMe(u) ? `<button type="button" class="u-act u-act-red" disabled title="You cannot deactivate your own account." style="opacity:.45;cursor:not-allowed">Deactivate</button>` : btn("deactivate", "u-act-red", "Deactivate", u.id))
+      : btn("activate", "u-act-green", "Activate", u.id);
     return edit + role + reset + toggle;
   }
   const row = (u) => `
@@ -67,8 +78,9 @@
     }
     else if (b.dataset.act === "role") { $("role-sub").textContent = current.username + " (" + A.ROLES[current.role] + ")"; $("role-select").value = current.role; $("role-err").hidden = true; roleDlg.showModal(); }
     else if (b.dataset.act === "reset") { $("pw-sub").textContent = current.username + " · " + (current.email || ""); $("pw-new").value = ""; $("pw-err").hidden = true; pwDlg.showModal(); $("pw-new").focus(); }
-    else if (b.dataset.act === "deactivate" && current.role === "admin" && (current.username.toLowerCase() === A.me().toLowerCase() || all.filter((u) => u.role === "admin" && u.status === "active").length < 2)) {
-      toast(current.username.toLowerCase() === A.me().toLowerCase() ? "You cannot deactivate your own account." : "This is the only active admin, so it cannot be deactivated.");
+    else if (b.dataset.act === "deactivate" && isMe(current)) { toast("You cannot deactivate your own account."); }
+    else if (b.dataset.act === "deactivate" && current.role === "admin" && all.filter((u) => u.role === "admin" && u.status === "active").length < 2) {
+      toast("This is the only active admin, so it cannot be deactivated.");
     }
     else { const on = b.dataset.act === "deactivate"; $("st-title").textContent = on ? "Deactivate account" : "Activate account"; $("st-sub").textContent = on ? current.username + " will not be able to sign in until you activate the account again." : current.username + " will be able to sign in again."; $("st-ok").textContent = on ? "Deactivate" : "Activate"; $("st-ok").className = "btn " + (on ? "btn-danger" : "btn-primary"); $("st-ok").dataset.to = on ? "inactive" : "active"; stDlg.showModal(); }
   });

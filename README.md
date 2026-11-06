@@ -100,7 +100,7 @@ The database schema is provided in `server/schema.sql` and uses primary keys, fo
 
 For detailed information about application roles, 
 permissions, responsibilities, and intended PostgreSQL 
-role mapping, see [User Roles Documentation](PAWPAW_App_User_Roles.md).
+role mapping, see [User Roles Documentation](docs/PAWPAW_App_User_Roles.md).
 
 ## 6. Prerequisites
 

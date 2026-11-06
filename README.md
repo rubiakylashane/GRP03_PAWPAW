@@ -68,7 +68,7 @@ DBA-main/
 
 **Database Management System:** PostgreSQL
 
-**Database Name:** `group3_Pawpaw`
+**Database Name:** `group3_pawpaw`
 
 The database stores and manages the following main records:
 
@@ -124,7 +124,7 @@ cd GRP03_PAWPAW-main
 Create a PostgreSQL database named:
 
 ```sql
-CREATE DATABASE group3_Pawpaw;
+CREATE DATABASE group3_pawpaw;
 ```
 
 ### Step 3: Configure Environment Variables
@@ -141,7 +141,7 @@ Configure the database connection and required application settings:
 
 ```env
 PORT=5000
-DATABASE_URL=postgresql://USERNAME:PASSWORD@localhost:5432/group3_Pawpaw
+DATABASE_URL=postgresql://USERNAME:PASSWORD@localhost:5432/group3_pawpaw
 AUTH_SECRET=your-random-secret-at-least-32-characters-long
 
 ADMIN_USERNAME=admin
